@@ -1,0 +1,47 @@
+// =============================================================================
+// BUNDLER FOR 93-SCREEN UI/UX STUDIO & LIVE MODULE ACTION RUNNER
+// =============================================================================
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const srcDir = path.join(__dirname, 'src');
+const thumbsDir = path.join(__dirname, 'assets', 'thumbs_hq');
+
+const shellHtml = fs.readFileSync(path.join(srcDir, 'app_shell.html'), 'utf8');
+
+// 1. Load all 34 ChatGPT HQ JPEGs as base64 data URIs
+const imagesMap = {};
+for (const file of fs.readdirSync(thumbsDir).sort()) {
+  const m = file.match(/^uid_(\d+)\.jpg$/);
+  if (m) {
+    const b64 = fs.readFileSync(path.join(thumbsDir, file)).toString('base64');
+    imagesMap[m[1]] = `data:image/jpeg;base64,${b64}`;
+  }
+}
+
+// 2. Concatenate all JS modules
+const jsFiles = [
+  'ui_kit.js',
+  'screens_m1_m2.js',
+  'screens_m3_m4_m5_m8.js',
+  'screens_web_m6_m7.js',
+  'screens_m9_m10_expansion.js'
+];
+
+const scriptsBlock = jsFiles
+  .map(f => `<script>\n${fs.readFileSync(path.join(srcDir, f), 'utf8')}\n</script>`)
+  .join('\n');
+
+const bundled = shellHtml
+  .replace('/*__IMAGES_DATA_PLACEHOLDER__*/ {}', JSON.stringify(imagesMap))
+  .replace('<!--/*__SCREENS_JS_PLACEHOLDER__*/-->', scriptsBlock);
+
+const outIndex = path.join(__dirname, 'index.html');
+const outArtifact = '/Users/longx/.gemini/antigravity/brain/176623c3-3f6e-4106-880e-97fb8bc20f0a/taste_of_vietnam_ui_studio.html';
+
+fs.writeFileSync(outIndex, bundled, 'utf8');
+fs.writeFileSync(outArtifact, bundled, 'utf8');
+console.log(`✔ Bundled 93-Screen UI/UX Studio (${(bundled.length / 1024 / 1024).toFixed(2)} MB) to index.html and artifact.`);

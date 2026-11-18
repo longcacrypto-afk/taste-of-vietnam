@@ -1,0 +1,17 @@
+name: hom_nay_an_gi_mobile
+description: Hôm nay ăn gì · Taste of Vietnam — Consumer Mobile App (Flutter MVP M1–M5, M8)
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  google_fonts: ^6.2.1
+  url_launcher: ^6.2.5
+
+flutter:
+  uses-material-design: true

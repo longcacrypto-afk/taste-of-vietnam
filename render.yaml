@@ -1,0 +1,25 @@
+# Render.com Deploy Config — Hôm nay ăn gì · Taste of Vietnam v0.1
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ── Backend API + UI Studio ───────────────────────────────────────────────
+  - type: web
+    name: taste-of-vietnam-api
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        generateValue: false
+        # Render injects PORT automatically — do not set here
+      - key: GEMINI_API_KEY
+        sync: false   # Set manually in Render dashboard
+
+    healthCheckPath: /api/v1/suggestions/today
+
+    # Auto-deploy when main branch changes
+    autoDeploy: true

@@ -1,0 +1,14 @@
+{
+  "name": "hom-nay-an-gi-taste-of-vietnam",
+  "version": "0.1.0",
+  "description": "Hôm nay ăn gì · Taste of Vietnam — AI-Powered Vietnamese Food Discovery Platform (Full-Stack MVP + 94-Screen UI Studio)",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test tests/api.test.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
