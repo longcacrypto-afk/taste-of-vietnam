@@ -50,12 +50,19 @@ export function createAppServer() {
       return res.end(JSON.stringify(result.data, null, 2));
     }
 
-    // 3. Serve PWA Web Manifest
+    // 3. Serve PWA Web Manifest & Service Worker
     if (pathname === '/manifest.json') {
       const manifestFile = path.join(__dirname, 'ui-design', 'manifest.json');
       if (fs.existsSync(manifestFile)) {
         res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8' });
         return fs.createReadStream(manifestFile).pipe(res);
+      }
+    }
+    if (pathname === '/sw.js') {
+      const swFile = path.join(__dirname, 'ui-design', 'sw.js');
+      if (fs.existsSync(swFile)) {
+        res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+        return fs.createReadStream(swFile).pipe(res);
       }
     }
 
