@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { createInitialStore } from './src/data/seed.js';
 import { handleApiRequest } from './src/api/router.js';
 import { setupWebSocket, getWsTestPayload } from './src/services/websocketService.js';
+import { initDatabase } from './src/db/connection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const store = createInitialStore();
@@ -79,6 +80,9 @@ export function createAppServer() {
 
   // Wire up WebSocket on the same HTTP server
   setupWebSocket(server, store);
+
+  // Initialize Database (Postgres with In-Memory fallback)
+  initDatabase();
 
   return server;
 }

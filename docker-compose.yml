@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # ─── 1. TASTE OF VIETNAM API & WEB STUDIO ──────────────────────────────────
+  web:
+    build: .
+    container_name: taste_of_vietnam_web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - DATABASE_URL=postgresql://tov_user:tov_secret_password@db:5432/taste_of_vietnam
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ─── 2. POSTGRESQL + POSTGIS + PGVECTOR ────────────────────────────────────
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: taste_of_vietnam_db
+    restart: always
+    environment:
+      POSTGRES_USER: tov_user
+      POSTGRES_PASSWORD: tov_secret_password
+      POSTGRES_DB: taste_of_vietnam
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tov_user -d taste_of_vietnam"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
