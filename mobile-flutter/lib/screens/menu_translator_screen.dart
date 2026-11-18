@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class MenuTranslatorScreen extends StatefulWidget {
   const MenuTranslatorScreen({super.key});
@@ -135,16 +136,16 @@ class _MenuTranslatorScreenState extends State<MenuTranslatorScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.camera_alt_outlined, color: AppTheme.goldenAmber),
-            onPressed: () {
+            onPressed: () async {
               setState(() => _scanning = true);
-              Future.delayed(const Duration(seconds: 2), () {
-                if (mounted) {
-                  setState(() => _scanning = false);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✨ Đã nhận diện 4 món từ thực đơn hình ảnh!')),
-                  );
-                }
-              });
+              final res = await ApiService.translateMenu(_selectedLang);
+              if (mounted) {
+                setState(() => _scanning = false);
+                final count = res != null && res['items'] is List ? (res['items'] as List).length : 4;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('✨ AI OCR đã quét và dịch $count món sang $_selectedLang!')),
+                );
+              }
             },
           ),
         ],

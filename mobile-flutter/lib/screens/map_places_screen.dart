@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class MapPlacesScreen extends StatefulWidget {
   const MapPlacesScreen({super.key});
@@ -14,7 +15,42 @@ class MapPlacesScreen extends StatefulWidget {
 
 class _MapPlacesScreenState extends State<MapPlacesScreen> {
   bool _openOnly = true;
+  bool _isLoading = false;
   String? _activeOrderBanner;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLivePlaces();
+  }
+
+  Future<void> _loadLivePlaces() async {
+    setState(() => _isLoading = true);
+    final places = await ApiService.fetchNearbyPlaces();
+    if (mounted && places != null && places.isNotEmpty) {
+      setState(() {
+        _places.clear();
+        for (final p in places) {
+          _places.add({
+            'id': p['id'] ?? 'PLACE-401',
+            'name': p['name'] ?? 'Quán Ngon',
+            'dish': (p['dishes'] is List && (p['dishes'] as List).isNotEmpty)
+                ? (p['dishes'] as List).first['name'] ?? 'Món đặc sản'
+                : 'Món đặc sản',
+            'distance': '${p['distance_meters'] ?? 500}m',
+            'price': '45.000đ',
+            'rating': p['rating'] ?? 4.8,
+            'isOpen': p['is_open'] ?? true,
+            'sponsored': p['is_sponsored'] ?? false,
+            'reports': p['reports_count'] ?? 0,
+          });
+        }
+        _isLoading = false;
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   final List<Map<String, dynamic>> _places = [
     {

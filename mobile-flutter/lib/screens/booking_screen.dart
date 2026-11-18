@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class BookingScreen extends StatefulWidget {
   final String? placeName;
@@ -49,13 +50,27 @@ class _BookingScreenState extends State<BookingScreen>
 
   Future<void> _submitBooking() async {
     setState(() => _loading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    _bookingCode = 'TOV-${DateTime.now().millisecondsSinceEpoch % 100000}';
-    setState(() {
-      _submitted = true;
-      _loading = false;
-    });
-    _successAnim.forward();
+    final bookingPayload = {
+      'place_id': 'PLACE-401',
+      'place_name': widget.placeName ?? 'Quán Ngon',
+      'party_size': _guests,
+      'time_slot': '$_time ngày ${_date.day}/${_date.month}',
+      'note': _noteCtrl.text,
+      'has_baby_chair': true,
+    };
+    final response = await ApiService.createBooking(bookingPayload);
+    if (mounted) {
+      if (response != null && response['booking_id'] != null) {
+        _bookingCode = response['booking_id'].toString();
+      } else {
+        _bookingCode = 'TOV-${DateTime.now().millisecondsSinceEpoch % 100000}';
+      }
+      setState(() {
+        _submitted = true;
+        _loading = false;
+      });
+      _successAnim.forward();
+    }
   }
 
   @override

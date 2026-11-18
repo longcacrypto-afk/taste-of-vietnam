@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class MealPlanScreen extends StatefulWidget {
   const MealPlanScreen({super.key});
@@ -13,8 +14,9 @@ class MealPlanScreen extends StatefulWidget {
 class _MealPlanScreenState extends State<MealPlanScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
+  bool _isLoading = false;
 
-  final List<_DayMeal> _week = [
+  List<_DayMeal> _week = [
     _DayMeal('Thứ 2', 'Phở Bò Tái Nạm Hà Nội', 480, 55000, '🍜', null, false),
     _DayMeal('Thứ 3', 'Cơm Tấm Sườn Bì Chả', 620, 50000, '🍚', null, false),
     _DayMeal('Thứ 4 🌿', 'Gỏi Cuốn Chay Đậu Hũ', 310, 40000, '🥗', 'vegan', false),
@@ -29,7 +31,7 @@ class _MealPlanScreenState extends State<MealPlanScreen>
     _GroceryItem('Nước mắm', '1 chai', true),
   ];
 
-  final List<_GroceryItem> _toBuy = [
+  List<_GroceryItem> _toBuy = [
     _GroceryItem('Xương bò', '500g', false),
     _GroceryItem('Bánh phở tươi', '300g', false),
     _GroceryItem('Thịt sườn heo', '400g', false),
@@ -54,6 +56,44 @@ class _MealPlanScreenState extends State<MealPlanScreen>
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
+    _loadLiveMealPlan();
+  }
+
+  Future<void> _loadLiveMealPlan() async {
+    setState(() => _isLoading = true);
+    final data = await ApiService.fetchWeeklyMealPlan();
+    if (mounted && data != null) {
+      setState(() {
+        if (data['days'] is List) {
+          final list = data['days'] as List;
+          if (list.isNotEmpty) {
+            _week = list.map((item) {
+              final dayStr = item['day'] ?? 'Ngày';
+              final isVegan = dayStr.toString().contains('Mùng 1');
+              return _DayMeal(
+                dayStr,
+                item['dish_name'] ?? 'Món ngon',
+                item['calories'] ?? 450,
+                item['est_market_cost_vnd'] ?? 50000,
+                isVegan ? '🥗' : '🍲',
+                isVegan ? 'vegan' : null,
+                false,
+              );
+            }).toList();
+          }
+        }
+        if (data['consolidated_groceries'] is List) {
+          final gList = data['consolidated_groceries'] as List;
+          _toBuy = gList
+              .where((g) => g['in_fridge'] != true)
+              .map((g) => _GroceryItem(g['name'] ?? '', '${g['amount']} ${g['unit']}', false))
+              .toList();
+        }
+        _isLoading = false;
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -79,9 +119,12 @@ class _MealPlanScreenState extends State<MealPlanScreen>
         actions: [
           IconButton(
             icon: Icon(Icons.refresh_rounded, color: AppTheme.goldenAmber),
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('🤖 Lá đang tạo thực đơn mới...')),
-            ),
+            onPressed: () {
+              _loadLiveMealPlan();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('🤖 Đang đồng bộ thực đơn từ AI Cloud...')),
+              );
+            },
           ),
         ],
         bottom: TabBar(

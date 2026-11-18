@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class B2gInsightsScreen extends StatefulWidget {
   const B2gInsightsScreen({super.key});
@@ -13,6 +14,33 @@ class B2gInsightsScreen extends StatefulWidget {
 
 class _B2gInsightsScreenState extends State<B2gInsightsScreen> {
   String _selectedPeriod = '7 ngày';
+  String _queriesCount = '384,200';
+  String _ordersCount = '58,410';
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLiveInsights();
+  }
+
+  Future<void> _loadLiveInsights() async {
+    setState(() => _loading = true);
+    final data = await ApiService.fetchB2gInsights();
+    if (mounted && data != null) {
+      setState(() {
+        if (data['local_specialty_queries_30d'] != null) {
+          _queriesCount = '${data['local_specialty_queries_30d']}';
+        }
+        if (data['international_visitors_m16'] != null) {
+          _ordersCount = '${data['international_visitors_m16']}';
+        }
+        _loading = false;
+      });
+    } else {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   final List<Map<String, dynamic>> _fmcgCampaigns = [
     {
@@ -156,9 +184,9 @@ class _B2gInsightsScreenState extends State<B2gInsightsScreen> {
 
   Widget _buildOverviewMetrics() => Row(
         children: [
-          _metricCard('👥 Lượt Tìm Kiếm', '384,200', '+24.5%', AppTheme.goldenAmber),
+          _metricCard('👥 Lượt Tìm Kiếm', _queriesCount, '+24.5%', AppTheme.goldenAmber),
           const SizedBox(width: 10),
-          _metricCard('🍜 Món Đã Đặt', '58,410', '+18.2%', AppTheme.emeraldBadge),
+          _metricCard('🍜 Khách Quốc Tế', _ordersCount, '+18.2%', AppTheme.emeraldBadge),
           const SizedBox(width: 10),
           _metricCard('💰 Doanh Thu Quán', '2.84 Tỷ', '+15.0%', Colors.blueAccent),
         ],
