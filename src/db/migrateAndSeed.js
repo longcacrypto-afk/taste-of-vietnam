@@ -134,6 +134,60 @@ export async function runMigrationAndSeed(customConnectionString = null) {
       );
     }
 
+    // 7. Seed Phase 2: Cultural Stories (M14)
+    console.log(`📖 Seeding cultural stories into 'cultural_stories' table...`);
+    await pool.query(
+      `INSERT INTO cultural_stories (id, dish_id, title, history_summary, regional_variants)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id) DO NOTHING;`,
+      [
+        'STORY-PHO',
+        'DISH-101',
+        'Nguồn Gốc & Sự Biến Chuyển Của Phở Bò',
+        'Phở ra đời vào đầu thế kỷ 20 tại miền Bắc Việt Nam, giao thoa giữa nét ẩm thực cung đình Huế, Pháp và làng quê Bắc Bộ.',
+        JSON.stringify([
+          { region: 'Bắc', style: 'Nước dùng trong, thanh ngọt xương bò, bánh phở dẹp bản to, không giá quế' },
+          { region: 'Nam', style: 'Nước dùng béo đậm, ăn kèm tương đen, bò viên, giá trụng và húng quế' }
+        ])
+      ]
+    );
+
+    // 8. Seed Phase 2: Food Trails (M15)
+    console.log(`🗺️ Seeding Food Trail into 'food_trails' table...`);
+    await pool.query(
+      `INSERT INTO food_trails (id, title, city, stops, passport_badge)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id) DO NOTHING;`,
+      [
+        'TRAIL-HN-OLDQUARTER',
+        'Food Trail 1 Ngày Khám Phá Ẩm Thực Cổ',
+        'Hà Nội',
+        JSON.stringify([
+          { order: 1, dish_name: 'Phở Bò Tái Nạm', place_name: 'Phở Gia Truyền Bát Đàn' },
+          { order: 2, dish_name: 'Cà Phê Trứng', place_name: 'Giảng Cafe Hàng Gai' },
+          { order: 3, dish_name: 'Bún Chả Nem Cua Bể', place_name: 'Bún Chả Hương Liên' },
+          { order: 4, dish_name: 'Chả Cá Lã Vọng', place_name: 'Chả Cá Thăng Long' }
+        ]),
+        'Đại Sứ Ẩm Thực Phố Cổ'
+      ]
+    );
+
+    // 9. Seed Phase 2: B2G Tourism Reports (M17)
+    console.log(`📊 Seeding B2G insights report into 'b2g_tourism_reports' table...`);
+    await pool.query(
+      `INSERT INTO b2g_tourism_reports (id, report_period, k_anonymity_min_group, specialty_search_count, international_tourist_count, trending_dishes)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO NOTHING;`,
+      [
+        'REP-2026-Q4',
+        '30d',
+        50,
+        142500,
+        18400,
+        JSON.stringify(['Phở Bò Tái Nạm', 'Cơm Tấm Sườn Bì Chả', 'Bún Bò Huế O Xuân'])
+      ]
+    );
+
     console.log('🎉 Database migration & seeding completed successfully!');
     return { success: true, seeded: { dishes: store.dishes.length, places: store.places.length } };
   } catch (err) {

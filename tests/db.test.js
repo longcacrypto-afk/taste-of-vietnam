@@ -11,6 +11,10 @@ import {
   searchDishesWithFilters,
   recordAdClickWithAntiFraud,
   verifyGpsAndSubmitReview,
+  saveWeeklyMealPlan,
+  fetchDishCulturalStory,
+  fetchFoodTrail,
+  fetchB2gTourismReport,
 } from '../src/db/repository.js';
 
 test('DB-01: Graceful fallback when DATABASE_URL is not set', () => {
@@ -36,6 +40,18 @@ test('DB-02: Repository methods safely fallback when PostgreSQL is offline', asy
 
   const reviewResult = await verifyGpsAndSubmitReview('PLACE-401', 106.82, 10.95, 5, 'Ngon');
   assert.equal(reviewResult, null, 'verifyGpsAndSubmitReview should return null in fallback mode');
+
+  const mealPlanResult = await saveWeeklyMealPlan({});
+  assert.equal(mealPlanResult, null, 'saveWeeklyMealPlan should return null in fallback mode');
+
+  const storyResult = await fetchDishCulturalStory('DISH-101');
+  assert.equal(storyResult, null, 'fetchDishCulturalStory should return null in fallback mode');
+
+  const trailResult = await fetchFoodTrail();
+  assert.equal(trailResult, null, 'fetchFoodTrail should return null in fallback mode');
+
+  const b2gResult = await fetchB2gTourismReport();
+  assert.equal(b2gResult, null, 'fetchB2gTourismReport should return null in fallback mode');
 });
 
 test('DB-03: Close database handles null pool gracefully', async () => {

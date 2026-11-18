@@ -141,3 +141,58 @@ export async function verifyGpsAndSubmitReview(placeId, userLng, userLat, rating
 
   return { verified: isValid, distance_meters: distMeters, place: distRes.rows[0] };
 }
+
+/**
+ * M11: Lưu và truy vấn Kế hoạch Thực đơn 7 Ngày
+ */
+export async function saveWeeklyMealPlan(planData) {
+  if (!isPostgresConnected()) return null;
+  const sql = `
+    INSERT INTO weekly_meal_plans (id, user_id, week_start_date, plan_slots, consolidated_groceries, total_budget_vnd)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    ON CONFLICT (id) DO UPDATE SET
+      plan_slots = EXCLUDED.plan_slots,
+      consolidated_groceries = EXCLUDED.consolidated_groceries,
+      total_budget_vnd = EXCLUDED.total_budget_vnd
+    RETURNING *;
+  `;
+  const res = await query(sql, [
+    planData.id || `PLAN-${Date.now()}`,
+    planData.user_id || null,
+    planData.week_start_date || new Date().toISOString().slice(0, 10),
+    JSON.stringify(planData.days || []),
+    JSON.stringify(planData.consolidated_groceries || []),
+    planData.weekly_budget_vnd || 450000,
+  ]);
+  return res ? res.rows[0] : null;
+}
+
+/**
+ * M14: Truy vấn câu chuyện di sản & biến thể 3 miền
+ */
+export async function fetchDishCulturalStory(dishId) {
+  if (!isPostgresConnected()) return null;
+  const res = await query(`SELECT * FROM cultural_stories WHERE dish_id = $1 LIMIT 1;`, [dishId]);
+  return res && res.rows.length > 0 ? res.rows[0] : null;
+}
+
+/**
+ * M15: Truy vấn lộ trình Food Trail & trạm dừng
+ */
+export async function fetchFoodTrail(trailId = 'TRAIL-HN-OLDQUARTER') {
+  if (!isPostgresConnected()) return null;
+  const res = await query(`SELECT * FROM food_trails WHERE id = $1 LIMIT 1;`, [trailId]);
+  return res && res.rows.length > 0 ? res.rows[0] : null;
+}
+
+/**
+ * M17: Báo cáo du lịch B2G tuân thủ K-Anonymity (k >= 50)
+ */
+export async function fetchB2gTourismReport(period = '30d') {
+  if (!isPostgresConnected()) return null;
+  const res = await query(
+    `SELECT * FROM b2g_tourism_reports WHERE report_period = $1 ORDER BY generated_at DESC LIMIT 1;`,
+    [period]
+  );
+  return res && res.rows.length > 0 ? res.rows[0] : null;
+}

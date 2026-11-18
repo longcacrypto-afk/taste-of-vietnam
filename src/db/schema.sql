@@ -160,3 +160,61 @@ CREATE TABLE IF NOT EXISTS rbac_audit_logs (
     ip_address VARCHAR(45) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- =============================================================================
+-- PHASE 2 SCALE & EXPANSION TABLES (M11–M17)
+-- =============================================================================
+
+-- 13. BẢNG KẾ HOẠCH THỰC ĐƠN TUẦN & GIỎ ĐI CHỢ (M11 WEEKLY MEAL PLANS)
+CREATE TABLE IF NOT EXISTS weekly_meal_plans (
+    id VARCHAR(32) PRIMARY KEY,
+    user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
+    week_start_date DATE NOT NULL,
+    plan_slots JSONB NOT NULL DEFAULT '[]', -- [{day, dish_id, calories, cost_vnd}]
+    consolidated_groceries JSONB NOT NULL DEFAULT '[]', -- [{name, amount, unit, in_fridge}]
+    total_budget_vnd INT NOT NULL DEFAULT 450000,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 14. BẢNG BÌNH CHỌN ĂN NHÓM & VOTE (M12 GROUP POLLS)
+CREATE TABLE IF NOT EXISTS group_polls (
+    id VARCHAR(32) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    creator_id UUID REFERENCES user_profiles(id) ON DELETE SET NULL,
+    member_allergies_union TEXT[] NOT NULL DEFAULT '{}',
+    options JSONB NOT NULL DEFAULT '[]', -- [{dish_id, name, votes}]
+    is_closed BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 15. BẢNG CÂU CHUYỆN DI SẢN ẨM THỰC & BẢN ĐỒ BIẾN THỂ (M14 CULTURAL STORIES)
+CREATE TABLE IF NOT EXISTS cultural_stories (
+    id VARCHAR(32) PRIMARY KEY,
+    dish_id VARCHAR(32) REFERENCES dishes(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    history_summary TEXT NOT NULL,
+    regional_variants JSONB NOT NULL DEFAULT '[]', -- [{region, broth, noodles, herbs}]
+    audio_guide_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 16. BẢNG FOOD TRAIL & HỘ CHIẾU ẨM THỰC QR (M15 FOOD TRAILS)
+CREATE TABLE IF NOT EXISTS food_trails (
+    id VARCHAR(32) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    city VARCHAR(64) NOT NULL DEFAULT 'Hà Nội',
+    stops JSONB NOT NULL DEFAULT '[]', -- [{order, place_id, dish_name, story}]
+    passport_badge VARCHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 17. BẢNG BÁO CÁO DU LỊCH B2G & K-ANONYMITY (M17 TOURISM INSIGHTS)
+CREATE TABLE IF NOT EXISTS b2g_tourism_reports (
+    id VARCHAR(32) PRIMARY KEY,
+    report_period VARCHAR(32) NOT NULL, -- '7d', '30d', 'quarter'
+    k_anonymity_min_group INT NOT NULL DEFAULT 50, -- k >= 50
+    specialty_search_count INT NOT NULL,
+    international_tourist_count INT NOT NULL,
+    trending_dishes JSONB NOT NULL DEFAULT '[]',
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
