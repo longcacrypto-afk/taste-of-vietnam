@@ -13,6 +13,9 @@ import 'screens/map_places_screen.dart';
 import 'screens/meal_plan_screen.dart';
 import 'screens/group_poll_screen.dart';
 import 'screens/booking_screen.dart';
+import 'screens/cultural_story_screen.dart';
+import 'screens/food_trail_screen.dart';
+import 'screens/menu_translator_screen.dart';
 import 'screens/profile_expansion_screen.dart';
 
 void main() {
@@ -169,16 +172,31 @@ class _MainShellScreenState extends State<MainShellScreen> {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.language, color: AppTheme.slateMuted),
-            title: const Text('🌐 Menu Translator AI (M16)', style: TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: const Text('EN / KO / JA — Giữ tên tiếng Việt', style: TextStyle(fontSize: 11)),
-            onTap: () => Navigator.pop(context),
+            leading: const Icon(Icons.menu_book_rounded, color: AppTheme.goldenAmber),
+            title: const Text('📖 Chuyện Ẩm Thực & 3 Miền (M14)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('Podcast di sản & Bản đồ biến thể', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const CulturalStoryScreen()));
+            },
           ),
           ListTile(
-            leading: const Icon(Icons.explore_rounded, color: AppTheme.slateMuted),
+            leading: const Icon(Icons.explore_rounded, color: AppTheme.emeraldBadge),
             title: const Text('🗺️ Food Trail & Hộ Chiếu QR (M15)', style: TextStyle(fontWeight: FontWeight.w700)),
             subtitle: const Text('Hành trình ẩm thực 4 trạm', style: TextStyle(fontSize: 11)),
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const FoodTrailScreen()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.language, color: Colors.blueAccent),
+            title: const Text('🌐 Menu Translator AI (M16)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('EN / KO / JA — Giữ tên tiếng Việt', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuTranslatorScreen()));
+            },
           ),
           const Spacer(),
           const Padding(
