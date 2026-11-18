@@ -221,4 +221,19 @@ test('M13, M14, M15, M16 & M17: Expansion modules (Bookings, Cultural Stories, F
   const b2g = await handleApiRequest(store, 'GET', '/api/v1/enterprise/tourism-insights', new URLSearchParams());
   assert.equal(b2g.status, 200);
   assert.equal(b2g.data.k_anonymity_enforced, true);
+
+  // Flutter Route Aliases (/reviews/gps, /meal-planner/weekly)
+  const gpsRev = await handleApiRequest(store, 'POST', '/api/v1/reviews/gps', new URLSearchParams(), {
+    place_id: 'PLACE-401',
+    lat: 10.9583,
+    lng: 106.8432,
+    rating: 5,
+    comment: 'Tuyệt vời!'
+  });
+  assert.equal(gpsRev.status, 200);
+  assert.equal(gpsRev.data.verified, true);
+
+  const mealPlannerRes = await handleApiRequest(store, 'GET', '/api/v1/meal-planner/weekly', new URLSearchParams());
+  assert.equal(mealPlannerRes.status, 200);
+  assert.equal(mealPlannerRes.data.days.length, 7);
 });

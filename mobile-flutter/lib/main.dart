@@ -240,10 +240,32 @@ class _MainShellScreenState extends State<MainShellScreen> {
             },
           ),
           const Spacer(),
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('API: http://127.0.0.1:3000/api/v1\nWS: ws://127.0.0.1:3000/ws/merchant',
-                style: TextStyle(fontSize: 10, color: AppTheme.slateMuted), textAlign: TextAlign.center),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.emeraldBadge.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.emeraldBadge.withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_done_rounded, color: AppTheme.emeraldBadge, size: 14),
+                      SizedBox(width: 6),
+                      Text('Cloud: Render Singapore (LIVE)',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.emeraldBadge)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text('API: https://taste-of-vietnam.onrender.com/api/v1\nWS: wss://taste-of-vietnam.onrender.com/ws/merchant',
+                    style: TextStyle(fontSize: 9, color: AppTheme.slateMuted), textAlign: TextAlign.center),
+              ],
+            ),
           ),
         ],
       ),

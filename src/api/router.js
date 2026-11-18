@@ -534,7 +534,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ===========================================================================
   // MODULE M11: WEEKLY MEAL PLANNER & CONSOLIDATED GROCERY LIST (M11-S01 .. M11-S03)
   // ===========================================================================
-  if ((pathname === '/api/v1/meal-plans/weekly' || pathname === '/api/v1/groceries/consolidated') && method === 'GET') {
+  if ((pathname === '/api/v1/meal-plans/weekly' || pathname === '/api/v1/meal-planner/weekly' || pathname === '/api/v1/groceries/consolidated') && method === 'GET') {
     const fridge = (searchParams.get('fridge') || 'Hành tím,Nước mắm').split(',').map(s => s.trim());
     return { status: 200, data: generateWeeklyMealPlanAndGroceries(store, fridge) };
   }
@@ -542,13 +542,18 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ===========================================================================
   // MODULE M12: GROUP POLLS & GPS-VERIFIED COMMUNITY REVIEWS (M12-S01 .. M12-S03)
   // ===========================================================================
-  if (pathname === '/api/v1/polls' && (method === 'GET' || method === 'POST')) {
+  if ((pathname === '/api/v1/polls' || pathname.startsWith('/api/v1/polls/')) && (method === 'GET' || method === 'POST')) {
     return { status: 200, data: createOrVoteGroupPoll(store, body) };
   }
 
   const reviewMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)\/reviews$/);
   if (reviewMatch && method === 'POST') {
     const res = submitGpsVerifiedReview(store, reviewMatch[1], body);
+    return { status: res.verified ? 200 : 400, data: res };
+  }
+  if (pathname === '/api/v1/reviews/gps' && method === 'POST') {
+    const placeId = body.place_id || 'PLACE-401';
+    const res = submitGpsVerifiedReview(store, placeId, body);
     return { status: res.verified ? 200 : 400, data: res };
   }
 
