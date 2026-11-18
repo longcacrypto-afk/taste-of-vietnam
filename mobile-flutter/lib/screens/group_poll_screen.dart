@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class GroupPollScreen extends StatefulWidget {
   const GroupPollScreen({super.key});
@@ -40,16 +41,20 @@ class _GroupPollScreenState extends State<GroupPollScreen> {
     super.dispose();
   }
 
-  void _castVote(String id) {
+  void _castVote(String id) async {
     if (_hasVoted) return;
     setState(() {
       _votes[id] = (_votes[id] ?? 0) + 1;
       _myVote = id;
       _hasVoted = true;
     });
+
+    // Gửi vote lên Cloud API (Render / Local Gateway)
+    ApiService.voteGroupPoll('POLL-701', id);
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('✅ Đã bình chọn! Kết quả cập nhật realtime.'),
+        content: Text('✅ Đã bình chọn! Kết quả đồng bộ realtime lên Cloud API.'),
         duration: Duration(seconds: 2),
       ),
     );
@@ -57,14 +62,14 @@ class _GroupPollScreenState extends State<GroupPollScreen> {
 
   void _checkLocation() async {
     setState(() => _locationChecking = true);
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 1));
     setState(() {
       _locationChecking = false;
       _locationGranted = true;
     });
   }
 
-  void _submitReview() {
+  void _submitReview() async {
     if (_starRating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('⭐ Vui lòng chọn số sao!')),
@@ -78,6 +83,16 @@ class _GroupPollScreenState extends State<GroupPollScreen> {
       );
       return;
     }
+
+    // Gửi đánh giá xác minh GPS lên backend
+    ApiService.submitGpsReview(
+      placeId: 'PLACE-401',
+      lat: 10.9574,
+      lng: 106.8226,
+      rating: _starRating,
+      comment: _commentCtrl.text,
+    );
+
     setState(() => _reviewSubmitted = true);
   }
 
