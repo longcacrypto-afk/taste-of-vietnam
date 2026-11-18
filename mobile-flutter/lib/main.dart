@@ -17,6 +17,8 @@ import 'screens/cultural_story_screen.dart';
 import 'screens/food_trail_screen.dart';
 import 'screens/menu_translator_screen.dart';
 import 'screens/b2g_insights_screen.dart';
+import 'screens/merchant_portal_screen.dart';
+import 'screens/admin_cms_screen.dart';
 import 'screens/profile_expansion_screen.dart';
 
 void main() {
@@ -206,6 +208,25 @@ class _MainShellScreenState extends State<MainShellScreen> {
             onTap: () {
               Navigator.pop(context);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const B2gInsightsScreen()));
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.storefront_rounded, color: AppTheme.goldenAmber),
+            title: const Text('🏪 Cổng Quán Ăn (M6)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('AI Menu OCR · Đơn Live · Tài trợ Ads', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const MerchantPortalScreen()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.admin_panel_settings_rounded, color: Colors.redAccent),
+            title: const Text('🛡️ Quản Trị Hệ Thống (M9)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('Duyệt OCR <95% · Auto-pause · Audit', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminCmsScreen()));
             },
           ),
           const Spacer(),
