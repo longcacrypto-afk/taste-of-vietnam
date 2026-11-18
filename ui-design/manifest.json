@@ -1,0 +1,23 @@
+{
+  "name": "Hôm nay ăn gì · Taste of Vietnam",
+  "short_name": "Ăn Gì?",
+  "description": "Nền tảng khám phá ẩm thực Việt Nam thông minh với AI Chef Măm",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#18181B",
+  "theme_color": "#FBBF24",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["food", "lifestyle", "travel"]
+}

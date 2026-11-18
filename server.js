@@ -50,7 +50,16 @@ export function createAppServer() {
       return res.end(JSON.stringify(result.data, null, 2));
     }
 
-    // 3. Serve 93-Screen UI/UX Studio at / and /studio
+    // 3. Serve PWA Web Manifest
+    if (pathname === '/manifest.json') {
+      const manifestFile = path.join(__dirname, 'ui-design', 'manifest.json');
+      if (fs.existsSync(manifestFile)) {
+        res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8' });
+        return fs.createReadStream(manifestFile).pipe(res);
+      }
+    }
+
+    // 4. Serve 93-Screen UI/UX Studio at / and /studio
     const studioFile = path.join(__dirname, 'ui-design', 'index.html');
     if ((pathname === '/' || pathname === '/studio') && fs.existsSync(studioFile)) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

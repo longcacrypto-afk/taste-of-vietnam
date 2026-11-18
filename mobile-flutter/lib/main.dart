@@ -16,6 +16,7 @@ import 'screens/booking_screen.dart';
 import 'screens/cultural_story_screen.dart';
 import 'screens/food_trail_screen.dart';
 import 'screens/menu_translator_screen.dart';
+import 'screens/b2g_insights_screen.dart';
 import 'screens/profile_expansion_screen.dart';
 
 void main() {
@@ -196,6 +197,15 @@ class _MainShellScreenState extends State<MainShellScreen> {
             onTap: () {
               Navigator.pop(context);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuTranslatorScreen()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.insights_rounded, color: Colors.purpleAccent),
+            title: const Text('📊 B2G Insights & FMCG Brands (M17)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('K-Anonymity k≥50 & Tài trợ nhãn hàng', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const B2gInsightsScreen()));
             },
           ),
           const Spacer(),
