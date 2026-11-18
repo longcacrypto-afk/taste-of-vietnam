@@ -1,0 +1,152 @@
+// =============================================================================
+// AUTOMATED DATABASE MIGRATION & SEED SCRIPT
+// Hôm nay ăn gì · Taste of Vietnam v0.1 (PostgreSQL + PostGIS + pgvector)
+// =============================================================================
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import pg from 'pg';
+import { createInitialStore } from '../data/seed.js';
+
+const { Pool } = pg;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export async function runMigrationAndSeed(customConnectionString = null) {
+  const connectionString = customConnectionString || process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    console.warn('⚠️  No DATABASE_URL provided. Migration skipped (using in-memory store).');
+    return { success: false, reason: 'NO_DATABASE_URL' };
+  }
+
+  console.log('🚀 Connecting to PostgreSQL for migration...');
+  const pool = new Pool({
+    connectionString,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    connectionTimeoutMillis: 10000,
+  });
+
+  try {
+    // 1. Run Schema DDL
+    const schemaPath = path.join(__dirname, 'schema.sql');
+    const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+    console.log('📄 Executing schema DDL (12 tables + PostGIS + pgvector)...');
+    await pool.query(schemaSql);
+    console.log('✅ Schema tables & extensions verified/created.');
+
+    // 2. Load Seed Data from in-memory seed generator
+    const store = createInitialStore();
+
+    // 3. Seed Dishes (M2 Library)
+    console.log(`🍜 Seeding ${store.dishes.length} dishes into 'dishes' table...`);
+    for (const d of store.dishes) {
+      await pool.query(
+        `INSERT INTO dishes (
+          id, name, unaccented_name, region, meal_slots, diet_flags, allergen_flags,
+          spice_level, calories, prep_time_minutes, estimated_price_vnd, ingredients, recipe_steps
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          unaccented_name = EXCLUDED.unaccented_name,
+          estimated_price_vnd = EXCLUDED.estimated_price_vnd;`,
+        [
+          d.id,
+          d.name,
+          d.unaccented_name,
+          d.region,
+          d.meal_slots,
+          d.diet_flags,
+          d.allergen_flags,
+          d.spice_level,
+          d.calories,
+          d.prep_time_minutes,
+          d.estimated_price_vnd,
+          JSON.stringify(d.ingredients),
+          JSON.stringify(d.recipe_steps),
+        ]
+      );
+    }
+
+    // 4. Seed Places with PostGIS Geometries (M4 Places)
+    console.log(`📍 Seeding ${store.places.length} places into 'places' table with PostGIS geometry...`);
+    for (const p of store.places) {
+      await pool.query(
+        `INSERT INTO places (
+          id, name, address, geom, open_time, close_time, rating, review_count, report_count, is_paused, is_verified
+        ) VALUES (
+          $1, $2, $3,
+          ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
+          $6, $7, $8, $9, $10, $11, $12
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          address = EXCLUDED.address,
+          rating = EXCLUDED.rating;`,
+        [
+          p.id,
+          p.name,
+          p.address,
+          p.lng, // PostGIS Point takes (lng, lat)
+          p.lat,
+          p.open_time,
+          p.close_time,
+          p.rating,
+          p.review_count,
+          p.report_count,
+          p.is_paused,
+          p.is_verified,
+        ]
+      );
+
+      // Seed Place Dishes
+      for (const dishId of p.dish_ids) {
+        const dish = store.dishes.find((d) => d.id === dishId);
+        const price = dish ? dish.estimated_price_vnd : 50000;
+        await pool.query(
+          `INSERT INTO place_dishes (place_id, dish_id, price_vnd, is_available)
+           VALUES ($1, $2, $3, true)
+           ON CONFLICT (place_id, dish_id) DO NOTHING;`,
+          [p.id, dishId, price]
+        );
+      }
+    }
+
+    // 5. Seed Ad Campaigns (M7 Sponsored)
+    console.log(`🎯 Seeding ${store.ad_campaigns.length} campaigns into 'ad_campaigns' table...`);
+    for (const c of store.ad_campaigns) {
+      await pool.query(
+        `INSERT INTO ad_campaigns (id, place_id, dish_id, cpc_vnd, balance_vnd, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE SET balance_vnd = EXCLUDED.balance_vnd;`,
+        [c.id, c.place_id, c.dish_id, c.cpc_vnd, c.balance_vnd, c.is_active]
+      );
+    }
+
+    // 6. Seed OCR Queue (M6/M9 Review)
+    console.log(`📋 Seeding ${store.ocr_queue.length} items into 'ocr_review_queue' table...`);
+    for (const q of store.ocr_queue) {
+      await pool.query(
+        `INSERT INTO ocr_review_queue (id, place_id, raw_text, extracted_dish_name, extracted_price_vnd, confidence_score, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (id) DO NOTHING;`,
+        [q.id, q.place_id, q.raw_text, q.extracted_dish_name, q.extracted_price_vnd, q.confidence_score, q.status]
+      );
+    }
+
+    console.log('🎉 Database migration & seeding completed successfully!');
+    return { success: true, seeded: { dishes: store.dishes.length, places: store.places.length } };
+  } catch (err) {
+    console.error('❌ Migration failed:', err.message);
+    throw err;
+  } finally {
+    await pool.end();
+  }
+}
+
+// Auto-run if invoked directly via CLI (node src/db/migrateAndSeed.js)
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  runMigrationAndSeed()
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1));
+}
