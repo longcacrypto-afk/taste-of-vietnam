@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import 'spin_wheel_screen.dart';
 
 class TodayHomeScreen extends StatefulWidget {
   final VoidCallback onOpenRecipe;
@@ -489,7 +490,12 @@ class _TodayHomeScreenState extends State<TodayHomeScreen> {
               ),
             ),
             ElevatedButton(
-              onPressed: widget.onOpenRecipe,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SpinWheelScreen()),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.goldenAmber,
                 foregroundColor: Colors.black,

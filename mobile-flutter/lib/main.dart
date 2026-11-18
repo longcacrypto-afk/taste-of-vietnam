@@ -12,6 +12,7 @@ import 'screens/mam_ai_chef_screen.dart';
 import 'screens/map_places_screen.dart';
 import 'screens/meal_plan_screen.dart';
 import 'screens/group_poll_screen.dart';
+import 'screens/spin_wheel_screen.dart';
 import 'screens/booking_screen.dart';
 import 'screens/cultural_story_screen.dart';
 import 'screens/food_trail_screen.dart';
@@ -145,6 +146,15 @@ class _MainShellScreenState extends State<MainShellScreen> {
                 ),
               ],
             ),
+          ),
+          ListTile(
+            leading: const Text('🎲', style: TextStyle(fontSize: 22)),
+            title: const Text('Vòng Quay Món Ăn (M3-S03)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('Quay 8 món ngẫu nhiên · 3D Luxury Bezel', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const SpinWheelScreen()));
+            },
           ),
           ListTile(
             leading: const Icon(Icons.calendar_today_rounded, color: AppTheme.amberDark),

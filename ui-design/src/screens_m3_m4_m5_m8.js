@@ -301,32 +301,108 @@ window.SCREENS_M3_M4_M5_M8 = {
       const k = window.UI_KIT;
       return `
         <div class="p-4 text-center space-y-3.5 bg-white text-[#0F172A] text-xs">
-          ${k.mobileHeader('Lucky Spin · Quay Món', 'M3-S03 · Đã lọc dị ứng & ngân sách', 'M3-S01')}
+          ${k.mobileHeader('Lucky Food Spin · Vòng Quay Ẩm Thực', 'M3-S03 · Đã lọc 100% dị ứng & Cooldown 3 ngày', 'M3-S01')}
 
-          <div class="relative w-48 h-48 mx-auto">
-            <div class="absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-xl">⭐</div>
-            <svg id="m3-wheel-svg" viewBox="0 0 200 200" class="w-full h-full rounded-full border-4 border-[#18181B] shadow-xl">
-              <path d="M100,100 L100,2 A98,98 0 0,1 198,100 Z" fill="#FBBF24"/>
-              <path d="M100,100 L198,100 A98,98 0 0,1 100,198 Z" fill="#22C55E"/>
-              <path d="M100,100 L100,198 A98,98 0 0,1 2,100 Z" fill="#3B82F6"/>
-              <path d="M100,100 L2,100 A98,98 0 0,1 100,2 Z" fill="#F43F5E"/>
-              <circle cx="100" cy="100" r="24" fill="#FFFFFF" stroke="#18181B" stroke-width="3"/>
-              <text x="142" y="65" font-size="9" font-weight="bold" fill="#0F172A" text-anchor="middle">Phở bò</text>
-              <text x="142" y="140" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Cơm tấm</text>
-              <text x="58" y="140" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Bún bò</text>
-              <text x="58" y="65" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Bánh mì</text>
-              <text x="100" y="103" font-size="9" font-weight="800" fill="#0F172A" text-anchor="middle">SPIN</text>
+          <!-- Hard Allergy Guard Badge -->
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[10px]">
+            <span>🛡️</span>
+            <span>Bộ lọc AI: 0% Dị ứng · 0% Lặp món 3 ngày qua</span>
+          </div>
+
+          <!-- Luxury 8-Segment 3D Spin Wheel -->
+          <div class="relative w-64 h-64 mx-auto my-2">
+            <!-- Top Pointer Indicator (12 o'clock downward arrow with golden gradient & ruby gem) -->
+            <div class="absolute -top-3 left-1/2 -translate-x-1/2 z-30 filter drop-shadow-md">
+              <svg width="24" height="28" viewBox="0 0 24 28">
+                <polygon points="12,28 0,0 24,0" fill="#FBBF24" stroke="#B45309" stroke-width="1.5"/>
+                <circle cx="12" cy="7" r="3" fill="#EF4444"/>
+              </svg>
+            </div>
+
+            <!-- Outer Metallic Golden Bezel with Glow -->
+            <div class="absolute inset-0 rounded-full border-4 border-[#FBBF24] shadow-[0_0_25px_rgba(251,191,36,0.35)] pointer-events-none z-10"></div>
+
+            <svg id="m3-wheel-svg" viewBox="0 0 200 200" class="w-full h-full rounded-full transition-transform duration-[4500ms] ease-out shadow-2xl">
+              <!-- Outer Decorative Metallic Ring -->
+              <circle cx="100" cy="100" r="98" fill="#18181B" stroke="#F59E0B" stroke-width="3"/>
+
+              <!-- 8 Radial Segments (45 deg each) -->
+              <!-- 1. Phở Bò (315° - 360°) -->
+              <path d="M100,100 L163.64,36.36 A90,90 0 0,1 190,100 Z" fill="#F59E0B"/>
+              <!-- 2. Cơm Tấm (0° - 45°) -->
+              <path d="M100,100 L190,100 A90,90 0 0,1 163.64,163.64 Z" fill="#10B981"/>
+              <!-- 3. Bún Bò (45° - 90°) -->
+              <path d="M100,100 L163.64,163.64 A90,90 0 0,1 100,190 Z" fill="#EF4444"/>
+              <!-- 4. Gỏi Cuốn (90° - 135°) -->
+              <path d="M100,100 L100,190 A90,90 0 0,1 36.36,163.64 Z" fill="#06B6D4"/>
+              <!-- 5. Bánh Mì (135° - 180°) -->
+              <path d="M100,100 L36.36,163.64 A90,90 0 0,1 10,100 Z" fill="#8B5CF6"/>
+              <!-- 6. Cá Lóc Kho (180° - 225°) -->
+              <path d="M100,100 L10,100 A90,90 0 0,1 36.36,36.36 Z" fill="#F97316"/>
+              <!-- 7. Bún Chả (225° - 270°) -->
+              <path d="M100,100 L36.36,36.36 A90,90 0 0,1 100,10 Z" fill="#EC4899"/>
+              <!-- 8. Cháo Sườn (270° - 315°) -->
+              <path d="M100,100 L100,10 A90,90 0 0,1 163.64,36.36 Z" fill="#14B8A6"/>
+
+              <!-- Segment Separator Lines -->
+              <line x1="100" y1="100" x2="190" y2="100" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="1.5"/>
+              <line x1="100" y1="100" x2="163.64" y2="163.64" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="1.5"/>
+              <line x1="100" y1="100" x2="100" y2="190" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="1.5"/>
+              <line x1="100" y1="100" x2="36.36" y2="163.64" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="1.5"/>
+              <line x1="100" y1="100" x2="10" y2="100" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="1.5"/>
+              <line x1="100" y1="100" x2="36.36" y2="36.36" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="1.5"/>
+              <line x1="100" y1="100" x2="100" y2="10" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="1.5"/>
+              <line x1="100" y1="100" x2="163.64" y2="36.36" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="1.5"/>
+
+              <!-- Labels & Emojis -->
+              <text x="145" y="70" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle">🍜 Phở Bò</text>
+              <text x="148" y="130" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle">🍚 Cơm Tấm</text>
+              <text x="125" y="160" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle">🍲 Bún Bò</text>
+              <text x="70" y="160" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle">🥗 Gỏi Cuốn</text>
+              <text x="48" y="130" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle">🥖 Bánh Mì</text>
+              <text x="48" y="70" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle">🐟 Cá Lóc</text>
+              <text x="70" y="42" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle">🥓 Bún Chả</text>
+              <text x="125" y="42" font-size="8" font-weight="bold" fill="#FFFFFF" text-anchor="middle">🥣 Cháo Sườn</text>
+
+              <!-- Golden Rivets (16 dots) -->
+              <circle cx="100" cy="5" r="2" fill="#FDE68A"/>
+              <circle cx="136" cy="12" r="2" fill="#FDE68A"/>
+              <circle cx="167" cy="33" r="2" fill="#FDE68A"/>
+              <circle cx="188" cy="64" r="2" fill="#FDE68A"/>
+              <circle cx="195" cy="100" r="2" fill="#FDE68A"/>
+              <circle cx="188" cy="136" r="2" fill="#FDE68A"/>
+              <circle cx="167" cy="167" r="2" fill="#FDE68A"/>
+              <circle cx="136" cy="188" r="2" fill="#FDE68A"/>
+              <circle cx="100" cy="195" r="2" fill="#FDE68A"/>
+              <circle cx="64" cy="188" r="2" fill="#FDE68A"/>
+              <circle cx="33" cy="167" r="2" fill="#FDE68A"/>
+              <circle cx="12" cy="136" r="2" fill="#FDE68A"/>
+              <circle cx="5" cy="100" r="2" fill="#FDE68A"/>
+              <circle cx="12" cy="64" r="2" fill="#FDE68A"/>
+              <circle cx="33" cy="33" r="2" fill="#FDE68A"/>
+              <circle cx="64" cy="12" r="2" fill="#FDE68A"/>
+
+              <!-- 3D Center Embossed Button -->
+              <circle cx="100" cy="100" r="26" fill="#18181B" stroke="#FBBF24" stroke-width="3"/>
+              <circle cx="100" cy="100" r="20" fill="#FBBF24"/>
+              <text x="100" y="104" font-size="10" font-weight="900" fill="#18181B" text-anchor="middle" letter-spacing="1">QUAY</text>
             </svg>
           </div>
 
-          <div class="bg-[#F8FAFC] p-3 rounded-2xl border border-[#E2E8F0] flex items-center gap-3 text-left">
-            <img data-img="304" class="w-12 h-12 rounded-xl object-cover" />
-            <div class="flex-1"><div id="m3-spin-title" class="font-extrabold">Cơm tấm sườn bì chả (40.000đ)</div><div class="text-[10px] text-[#64748B]">Cách 550m · Đang mở cửa</div></div>
-            <button onclick="goScreen('M4-S03')" class="px-3 py-1.5 rounded-full bg-[#18181B] text-white font-bold">Xem quán</button>
+          <!-- Result Card (Selected Dish) -->
+          <div class="bg-[#F8FAFC] p-3 rounded-2xl border border-[#E2E8F0] flex items-center gap-3 text-left shadow-sm">
+            <div class="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-2xl" id="m3-spin-emoji">🍜</div>
+            <div class="flex-1">
+              <div id="m3-spin-title" class="font-extrabold text-[#0F172A]">Phở Bò Tái Nạm (55.000đ)</div>
+              <div id="m3-spin-sub" class="text-[10px] text-[#64748B]">Phở Gia Truyền Phát Tài · Cách 400m · Đang mở cửa</div>
+            </div>
+            <button onclick="goScreen('M4-S03')" class="px-3 py-1.5 rounded-full bg-[#18181B] text-white font-bold hover:bg-[#FBBF24] hover:text-black transition-colors">Xem quán</button>
           </div>
 
-          <button onclick="spinM3Wheel()" class="w-full py-3 rounded-full bg-[#FBBF24] text-[#0F172A] font-extrabold shadow-md">
-            ✨ Quay món ngẫu nhiên khác
+          <!-- Spin Action Button -->
+          <button onclick="spinM3Wheel()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#FBBF24] to-[#F59E0B] text-[#0F172A] font-extrabold shadow-lg hover:shadow-xl transition-all transform active:scale-95 flex items-center justify-center gap-2">
+            <span>🎲</span>
+            <span>BẤM ĐỂ QUAY MÓN NGẪU NHIÊN</span>
           </button>
         </div>
       `;
