@@ -199,4 +199,45 @@ class ApiService {
     }
     return null;
   }
+
+  // ─── 9. M7: THANH TOÁN VIETQR / PAYOS TỰ ĐỘNG NẠP TIỀN QUẢNG CÁO ─────────
+  static Future<Map<String, dynamic>?> createVietQrInvoice({
+    required String campaignId,
+    required int amountVnd,
+    String? description,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/ads/payments/vietqr/create'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'campaign_id': campaignId,
+          'amount_vnd': amountVnd,
+          'description': description,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return null;
+  }
+
+  // ─── 10. M2: TÌM KIẾM NGỮ NGHĨA SEMANTIC DISH SEARCH (PGVECTOR / NLU) ─────
+  static Future<Map<String, dynamic>?> searchDishesSemantically(String query) async {
+    try {
+      final uri = Uri.parse('$baseUrl/dishes/semantic-search').replace(queryParameters: {'q': query});
+      final res = await http.get(uri).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return null;
+  }
 }

@@ -17,6 +17,8 @@ import {
   translateVietnameseMenu
 } from '../services/expansionServices.js';
 import { callGeminiChat, generateDishStory } from '../services/geminiService.js';
+import { generateVietQrInvoice, verifyPaymentWebhookSignature, processSuccessfulPayment } from '../services/paymentService.js';
+import { searchDishesSemantically } from '../services/semanticSearch.js';
 
 export async function handleApiRequest(store, method, pathname, searchParams, body = {}) {
   // ===========================================================================
@@ -106,6 +108,12 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       return true;
     });
     return { status: 200, data: { total: items.length, items } };
+  }
+
+  if (pathname === '/api/v1/dishes/semantic-search' && method === 'GET') {
+    const q = searchParams.get('q') || '';
+    const results = searchDishesSemantically(q, store.dishes, store.userProfile);
+    return { status: 200, data: results };
   }
 
   const storyMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)\/story$/);
@@ -408,19 +416,35 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 200, data: res };
   }
 
-  if (pathname === '/api/v1/ads/payments/vietqr' && method === 'POST') {
-    return {
-      status: 200,
-      data: {
-        invoice_id: `INV-${Date.now()}`,
-        amount_vnd: body.amount_vnd || 500000,
-        bank_name: 'Vietcombank',
-        account_no: '0121000889999',
-        account_holder: 'CONG TY HOM NAY AN GI VIET NAM',
-        transfer_memo: `HNAG ADS ${body.campaign_id || 'CMP701'}`,
-        status: 'paid_verified'
-      }
-    };
+  if ((pathname === '/api/v1/ads/payments/vietqr' || pathname === '/api/v1/ads/payments/vietqr/create') && method === 'POST') {
+    const invoice = generateVietQrInvoice({
+      campaignId: body.campaign_id || 'CMP-701',
+      amountVnd: body.amount_vnd || 500000,
+      merchantName: body.merchant_name || 'Quán Ngon',
+      description: body.description,
+    });
+    return { status: 200, data: invoice };
+  }
+
+  // Webhook từ cổng thanh toán PayOS / Ngân hàng NAPAS
+  if (pathname === '/api/v1/payments/webhook' && method === 'POST') {
+    const { orderId, campaignId, amountVnd } = body;
+    if (!orderId || !campaignId || !amountVnd) {
+      return { status: 400, data: { error: 'Missing required webhook fields' } };
+    }
+    const result = processSuccessfulPayment(store, { orderId, campaignId, amountVnd });
+    return { status: 200, data: result };
+  }
+
+  const paymentOrderMatch = pathname.match(/^\/api\/v1\/payments\/orders\/([^/]+)$/);
+  if (paymentOrderMatch && method === 'GET') {
+    const orderId = paymentOrderMatch[1];
+    store.paymentOrders = store.paymentOrders || {};
+    const order = store.paymentOrders[orderId];
+    if (order) {
+      return { status: 200, data: order };
+    }
+    return { status: 404, data: { error: 'Order not found', order_id: orderId } };
   }
 
   // ===========================================================================

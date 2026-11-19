@@ -20,10 +20,14 @@ export function createAppServer() {
     const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost:3000'}`);
     const pathname = urlObj.pathname;
 
-    // CORS headers
+    // CORS & Production Security headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       return res.end();

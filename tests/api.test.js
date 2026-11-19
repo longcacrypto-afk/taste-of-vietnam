@@ -237,3 +237,69 @@ test('M13, M14, M15, M16 & M17: Expansion modules (Bookings, Cultural Stories, F
   assert.equal(mealPlannerRes.status, 200);
   assert.equal(mealPlannerRes.data.days.length, 7);
 });
+
+test('M7 (VietQR & PayOS Webhook): Invoice generation, EMVCo payload, webhook top-up & idempotency', async () => {
+  const store = createInitialStore();
+
+  // 1. Generate VietQR invoice
+  const invRes = await handleApiRequest(store, 'POST', '/api/v1/ads/payments/vietqr/create', new URLSearchParams(), {
+    campaign_id: 'CMP-701',
+    amount_vnd: 200000
+  });
+  assert.equal(invRes.status, 200);
+  assert.equal(invRes.data.amount_vnd, 200000);
+  assert.ok(invRes.data.qr_image_url.includes('vietqr.io'));
+  assert.ok(invRes.data.qr_emvco_raw.startsWith('000201'));
+
+  const orderId = invRes.data.order_id;
+  const campaignsList = store.campaigns || store.ad_campaigns;
+  const initialBalance = campaignsList.find(c => c.id === 'CMP-701').budget_monthly_vnd || 0;
+
+  // 2. Webhook triggers successful payment
+  const webhookRes = await handleApiRequest(store, 'POST', '/api/v1/payments/webhook', new URLSearchParams(), {
+    orderId,
+    campaignId: 'CMP-701',
+    amountVnd: 200000
+  });
+  assert.equal(webhookRes.status, 200);
+  assert.equal(webhookRes.data.success, true);
+  assert.equal(webhookRes.data.already_processed, false);
+
+  const updatedBalance = campaignsList.find(c => c.id === 'CMP-701').balance_vnd;
+  assert.equal(updatedBalance, initialBalance + 200000);
+
+  // 3. Webhook idempotency test (duplicate delivery doesn't double-charge)
+  const dupWebhookRes = await handleApiRequest(store, 'POST', '/api/v1/payments/webhook', new URLSearchParams(), {
+    orderId,
+    campaignId: 'CMP-701',
+    amountVnd: 200000
+  });
+  assert.equal(dupWebhookRes.status, 200);
+  assert.equal(dupWebhookRes.data.already_processed, true);
+  assert.equal(campaignsList.find(c => c.id === 'CMP-701').balance_vnd, updatedBalance);
+
+  // 4. Order status query
+  const statusRes = await handleApiRequest(store, 'GET', `/api/v1/payments/orders/${orderId}`, new URLSearchParams());
+  assert.equal(statusRes.status, 200);
+  assert.equal(statusRes.data.status, 'COMPLETED');
+});
+
+test('M2/M3 (Semantic Dish Search): Concept matching, allergy safety, and similarity scoring', async () => {
+  const store = createInitialStore();
+
+  // Query: món nước ấm bụng trời mưa
+  const searchRes = await handleApiRequest(store, 'GET', '/api/v1/dishes/semantic-search', new URLSearchParams({ q: 'mon nuoc am bung troi mua' }));
+  assert.equal(searchRes.status, 200);
+  assert.ok(searchRes.data.results.length > 0);
+  assert.ok(searchRes.data.detected_concepts.includes('warm_soup'));
+  
+  // Verify top result has high similarity and reasons
+  const top = searchRes.data.results[0];
+  assert.ok(top.similarity_pct >= 70);
+  assert.ok(top.match_reasons.length > 0);
+
+  // Hard allergy block verification: User allergic to shrimp shouldn't get dishes with shrimp allergen
+  for (const r of searchRes.data.results) {
+    assert.ok(!(r.allergen_tags || []).includes('shrimp'), `Dish ${r.name} should not contain shrimp`);
+  }
+});

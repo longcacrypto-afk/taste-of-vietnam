@@ -1,0 +1,31 @@
+name: Hôm Nay Ăn Gì — CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Automated QA & Compliance Tests (Node 20)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Execute QA Acceptance Suite (21 Tests)
+        run: npm test
+
+      - name: Verify Docker Compose Build
+        run: docker compose config -q
