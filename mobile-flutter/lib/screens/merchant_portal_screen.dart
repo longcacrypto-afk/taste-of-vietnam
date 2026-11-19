@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class MerchantPortalScreen extends StatefulWidget {
   const MerchantPortalScreen({super.key});
@@ -37,25 +38,178 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
     super.dispose();
   }
 
-  void _triggerOcrScan() {
-    setState(() {
-      _isOcrScanning = true;
-      _ocrSuccess = false;
-    });
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _isOcrScanning = false;
-          _ocrSuccess = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✨ AI OCR: Nhận diện thành công 4 món, độ tin cậy trung bình 97.8% (Tự động duyệt)'),
-            backgroundColor: Color(0xFF22C55E),
-          ),
+  void _showVietQrTopupSheet() async {
+    int selectedAmount = 500000;
+    bool isGenerating = true;
+    Map<String, dynamic>? invoiceData;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.charcoalHero,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            if (isGenerating && invoiceData == null) {
+              ApiService.createVietQrInvoice(
+                campaignId: 'CMP-701',
+                amountVnd: selectedAmount,
+              ).then((inv) {
+                setModalState(() {
+                  invoiceData = inv;
+                  isGenerating = false;
+                });
+              });
+            }
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Nạp Ngân Sách Tài Trợ VietQR',
+                      style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  const Text('Chuẩn NAPAS 24/7 · Tự động kích hoạt sau 3 giây',
+                      style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  const SizedBox(height: 16),
+
+                  // Quick amount selector
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [200000, 500000, 1000000].map((amt) {
+                      final isSel = selectedAmount == amt;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: ChoiceChip(
+                          label: Text('${amt ~/ 1000}k'),
+                          selected: isSel,
+                          selectedColor: AppTheme.goldenAmber,
+                          labelStyle: TextStyle(
+                            color: isSel ? Colors.black : Colors.white70,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                          onSelected: (val) {
+                            if (val) {
+                              setModalState(() {
+                                selectedAmount = amt;
+                                isGenerating = true;
+                                invoiceData = null;
+                              });
+                            }
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (isGenerating)
+                    const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(color: AppTheme.goldenAmber),
+                    )
+                  else if (invoiceData != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Image.network(
+                        invoiceData!['qr_image_url'] ?? '',
+                        width: 200,
+                        height: 200,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.qr_code_2_rounded, size: 180, color: Colors.black87),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceElevated,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          _invoiceRow('Ngân hàng', invoiceData!['bank_name'] ?? 'Vietcombank'),
+                          _invoiceRow('Số tài khoản', invoiceData!['account_number'] ?? '0121000889999'),
+                          _invoiceRow('Chủ tài khoản', invoiceData!['account_holder'] ?? 'CONG TY HOM NAY AN GI'),
+                          _invoiceRow('Số tiền', '${_fmt(invoiceData!['amount_vnd'] ?? selectedAmount)}đ', isHighlight: true),
+                          _invoiceRow('Nội dung CK', invoiceData!['transfer_memo'] ?? 'HNAG CMP-701', isCopyable: true),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Đã xác nhận! Hệ thống đang chờ tín hiệu webhook từ Napas.'),
+                          backgroundColor: Color(0xFF22C55E),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.goldenAmber,
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size(double.infinity, 44),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Tôi Đã Chuyển Khoản', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          },
         );
-      }
-    });
+      },
+    );
+  }
+
+  Widget _invoiceRow(String label, String value, {bool isHighlight = false, bool isCopyable = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          Row(
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: isHighlight ? AppTheme.goldenAmber : Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+              if (isCopyable) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.copy_rounded, color: AppTheme.goldenAmber, size: 12),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -431,9 +585,7 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
             Row(
               children: [
                 ElevatedButton.icon(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('📱 Đã tạo mã VietQR nạp tiền qua MoMo / Ngân Hàng')),
-                  ),
+                  onPressed: _showVietQrTopupSheet,
                   icon: const Icon(Icons.qr_code_2_rounded, size: 16),
                   label: const Text('Nạp Thêm Tiền'),
                   style: ElevatedButton.styleFrom(

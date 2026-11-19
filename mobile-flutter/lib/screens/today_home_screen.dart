@@ -27,6 +27,8 @@ class _TodayHomeScreenState extends State<TodayHomeScreen> {
   String _weatherText = '🌧️ 26°C · Biên Hòa · Trời dịu mát';
   List<Map<String, dynamic>> _suggestions = [];
   int _selectedCategory = 0;
+  final TextEditingController _searchCtrl = TextEditingController();
+  bool _isSearching = false;
 
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Breakfast', 'vn': 'Sáng', 'icon': '☀️', 'color': Color(0xFFFEF3C7)},
@@ -40,6 +42,49 @@ class _TodayHomeScreenState extends State<TodayHomeScreen> {
   void initState() {
     super.initState();
     _loadTodaySuggestions();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSemanticSearch(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) {
+      setState(() => _isSearching = false);
+      _loadTodaySuggestions();
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _isSearching = true;
+    });
+
+    final res = await ApiService.searchDishesSemantically(q);
+    if (mounted && res != null && res['results'] is List) {
+      final list = res['results'] as List;
+      setState(() {
+        _suggestions = list.map((item) => {
+          'id': item['id'] ?? 'DISH-101',
+          'name': item['name'] ?? 'Món ngon',
+          'desc': (item['match_reasons'] is List && (item['match_reasons'] as List).isNotEmpty)
+              ? (item['match_reasons'] as List).first
+              : '${item['similarity_pct'] ?? 85}% phù hợp',
+          'time': '${item['prep_minutes'] ?? 25} min',
+          'difficulty': item['difficulty'] ?? 'Dễ nấu',
+          'calories': item['calories'] ?? 450,
+          'price': item['ref_price'] ?? 50000,
+          'emoji': '🍲',
+          'isSponsored': false,
+        }).toList();
+        _isLoading = false;
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _loadTodaySuggestions() async {
@@ -238,15 +283,26 @@ class _TodayHomeScreenState extends State<TodayHomeScreen> {
           children: [
             const Icon(Icons.search_rounded, color: Colors.white54, size: 22),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: TextField(
-                style: TextStyle(color: Colors.white, fontSize: 13),
+                controller: _searchCtrl,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                onSubmitted: _handleSemanticSearch,
                 decoration: InputDecoration(
-                  hintText: 'Tìm món ăn, nguyên liệu, quán gần bạn...',
-                  hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
+                  hintText: 'Tìm món theo ngữ nghĩa (VD: ấm bụng, giải cảm)...',
+                  hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
                   border: BorderSide.none,
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  suffixIcon: _isSearching
+                      ? IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 16, color: Colors.white54),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            _handleSemanticSearch('');
+                          },
+                        )
+                      : null,
                 ),
               ),
             ),
@@ -257,7 +313,7 @@ class _TodayHomeScreenState extends State<TodayHomeScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.tune_rounded, color: AppTheme.goldenAmber, size: 18),
-              onPressed: () {},
+              onPressed: () => _handleSemanticSearch(_searchCtrl.text),
             ),
           ],
         ),
