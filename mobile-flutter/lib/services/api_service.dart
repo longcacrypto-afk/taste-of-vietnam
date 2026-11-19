@@ -102,6 +102,21 @@ class ApiService {
   }
 
   // ─── 5. M12: BÌNH CHỌN ĂN NHÓM & XÁC MINH GPS 500M ─────────────────────
+  static Future<Map<String, dynamic>?> fetchGroupPoll([String? pollId]) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/polls'),
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return null;
+  }
+
   static Future<Map<String, dynamic>?> voteGroupPoll(String pollId, String optionId) async {
     try {
       final res = await http.post(

@@ -36,6 +36,29 @@ class _GroupPollScreenState extends State<GroupPollScreen> {
       _votes.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
 
   @override
+  void initState() {
+    super.initState();
+    _loadLivePoll();
+  }
+
+  Future<void> _loadLivePoll() async {
+    final data = await ApiService.fetchGroupPoll();
+    if (mounted && data != null) {
+      setState(() {
+        if (data['options'] is List) {
+          final opts = data['options'] as List;
+          for (final o in opts) {
+            final id = o['dish_id'] ?? o['id'];
+            if (id != null && o['votes'] != null) {
+              _votes[id.toString()] = o['votes'] as int;
+            }
+          }
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _commentCtrl.dispose();
     super.dispose();

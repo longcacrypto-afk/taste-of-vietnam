@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'map_places_screen.dart';
 
 class DishDetailScreen extends StatefulWidget {
   final Map<String, dynamic>? dish;
@@ -565,7 +566,21 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const MapPlacesScreen()));
+            },
+            icon: const Icon(Icons.place_outlined, size: 16),
+            label: const Text('Quán 3km'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.goldenAmber,
+              side: const BorderSide(color: AppTheme.goldenAmber),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              minimumSize: const Size(0, 50),
+            ),
+          ),
+          const SizedBox(width: 8),
           // Start Cooking button
           Expanded(
             child: ElevatedButton.icon(
