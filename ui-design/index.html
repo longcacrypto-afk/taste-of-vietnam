@@ -135,11 +135,14 @@
 
       <!-- Primary Mode Switcher -->
       <div class="flex flex-wrap items-center gap-1.5 bg-[var(--bg-elevated)] p-1 rounded-2xl">
-        <button onclick="setMainView('screens')" id="mview-screens" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#E87935] text-white shadow-sm transition">
-          📱 1. Triển Khai 93 Màn Hình &amp; Chạy Thử API (M1–M17)
+        <button onclick="setMainView('liveapp')" id="mview-liveapp" class="px-4 py-1.5 rounded-xl text-xs font-extrabold bg-[#FBBF24] text-[#0F172A] shadow-sm transition">
+          🚀 Ứng Dụng Web Trực Tiếp (Live App)
+        </button>
+        <button onclick="setMainView('screens')" id="mview-screens" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition">
+          📐 Studio Thiết Kế (93 Màn Hình Spec)
         </button>
         <button onclick="setMainView('chatgpt')" id="mview-chatgpt" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition">
-          ✨ 2. Bản Thiết Kế Gốc Trên ChatGPT (13 Mục &amp; GenUI)
+          ✨ Bản Thiết Kế Gốc Trên ChatGPT
         </button>
       </div>
 
@@ -152,9 +155,330 @@
   </header>
 
   <!-- =========================================================================
-       VIEW 1: 84-SCREEN MASTER EXPLORER & MULTI-SCREEN STORYBOARD
+       VIEW 0: FULL-SCREEN LIVE CONSUMER WEB APP (PRODUCTION WEB RUNTIME)
        ========================================================================= -->
-  <div id="main-screens" class="flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-6 py-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+  <div id="main-liveapp" class="flex-1 max-w-[1440px] w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
+
+    <!-- Top Greeting, Live Weather & Semantic Search Header -->
+    <div class="genui-card p-5 lg:p-6 bg-gradient-to-r from-[#18181B] to-[#27272A] text-white border-0 shadow-xl rounded-3xl">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#FBBF24] text-[#0F172A]">AI FOOD DISCOVERY</span>
+            <span id="live-weather-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/10 text-white/90">🌧️ 26°C · Biên Hòa · Trời dịu mát</span>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#22C55E]/20 text-[#4ADE80] flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse"></span> Gemini 2.0 Flash Active
+            </span>
+          </div>
+          <h1 class="text-2xl lg:text-3xl font-black tracking-tight text-white">Hôm nay bạn muốn ăn hay nấu món gì?</h1>
+          <p class="text-xs text-white/70 mt-1">Trí tuệ nhân tạo gợi ý bữa ăn chuẩn vị 3 miền · Chặn 100% dị ứng · Kết nối quán bán kính 3km</p>
+        </div>
+
+        <!-- Quick Profile / Action Badge -->
+        <div class="flex items-center gap-2 self-start md:self-auto">
+          <button onclick="setLiveAppTab('wheel')" class="px-4 py-2.5 rounded-2xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-xs flex items-center gap-2 shadow-lg hover:brightness-105 transition">
+            <span>🎲</span> Quay Món 3D
+          </button>
+          <button onclick="setLiveAppTab('chat')" class="px-4 py-2.5 rounded-2xl bg-white/15 text-white font-extrabold text-xs flex items-center gap-2 hover:bg-white/20 transition">
+            <span>👨‍🍳</span> Chat AI Măm
+          </button>
+        </div>
+      </div>
+
+      <!-- Realtime Semantic Search Bar -->
+      <div class="mt-5 pt-4 border-t border-white/10">
+        <div class="relative">
+          <div class="flex items-center bg-white/10 backdrop-blur rounded-2xl px-4 py-2 border border-white/15 focus-within:border-[#FBBF24] transition">
+            <span class="text-lg mr-3">🔍</span>
+            <input id="live-semantic-input" onkeydown="if(event.key==='Enter') executeLiveSemanticSearch()" type="text" placeholder="Tìm theo cảm xúc (VD: thèm món nước ấm bụng, đồ thanh đạm giải nhiệt, nhiều đạm gym)..." class="w-full bg-transparent text-sm text-white placeholder-white/40 focus:outline-none" />
+            <button onclick="executeLiveSemanticSearch()" class="px-4 py-1.5 rounded-xl bg-[#FBBF24] text-[#0F172A] text-xs font-extrabold shrink-0 hover:bg-[#F59E0B] transition">
+              Tìm Ngay
+            </button>
+          </div>
+          <div id="live-search-tags" class="flex flex-wrap gap-1.5 mt-2.5 text-[11px]">
+            <span class="text-white/50 text-[10px] self-center mr-1">Gợi ý nhanh:</span>
+            <button onclick="quickFillSearch('món nước ấm bụng trời mưa')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 transition">🍜 Món nước ấm bụng</button>
+            <button onclick="quickFillSearch('thanh mát giải nhiệt ít dầu mỡ')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 transition">🥗 Thanh mát giải nhiệt</button>
+            <button onclick="quickFillSearch('nhiều đạm protein tập gym')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 transition">🥩 Nhiều đạm tập gym</button>
+            <button onclick="quickFillSearch('chua cay đậm đà kích thích vị giác')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 transition">🌶️ Chua cay sả ớt</button>
+            <button onclick="quickFillSearch('cơm nhà ấm cúng gia đình')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 transition">🍚 Cơm nhà chuẩn vị</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live App Navigation Tabs -->
+    <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+      <button onclick="setLiveAppTab('today')" id="ltab-today" class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#18181B] text-white shadow transition shrink-0 flex items-center gap-2">
+        <span>🍜</span> Gợi Ý Bữa Ăn Hôm Nay
+      </button>
+      <button onclick="setLiveAppTab('chat')" id="ltab-chat" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>👨‍🍳</span> Trò Chuyện AI Chef Măm
+      </button>
+      <button onclick="setLiveAppTab('wheel')" id="ltab-wheel" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>🎲</span> Vòng Quay Ẩm Thực 3D
+      </button>
+      <button onclick="setLiveAppTab('places')" id="ltab-places" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>📍</span> Quán Gần Bán Kính 3km
+      </button>
+      <button onclick="setLiveAppTab('mealplan')" id="ltab-mealplan" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>📅</span> Thực Đơn Tuần 7 Ngày
+      </button>
+      <button onclick="setLiveAppTab('poll')" id="ltab-poll" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>🗳️</span> Bình Chọn Ăn Nhóm
+      </button>
+      <button onclick="setLiveAppTab('merchant')" id="ltab-merchant" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>🏪</span> Cổng Quán Ăn &amp; Nạp VietQR
+      </button>
+    </div>
+
+    <!-- TAB PANEL 1: GỢI Ý HÔM NAY (TODAY SUGGESTIONS) -->
+    <div id="lpanel-today" class="space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-extrabold tracking-tight">Thực đơn chọn lọc cho buổi trưa hôm nay</h2>
+          <p class="text-xs text-[var(--text-muted)]">Cá nhân hóa theo thời tiết 26°C · Đã loại trừ hải sản &amp; đậu phộng · Tối đa 1/3 vị trí tài trợ</p>
+        </div>
+        <button onclick="refreshLiveSuggestions()" class="px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] text-xs font-bold hover:border-[#FBBF24] flex items-center gap-1">
+          <span>🔄</span> Đổi gợi ý khác
+        </button>
+      </div>
+
+      <div id="live-suggestions-grid" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Rendered via JS fetch from /api/v1/suggestions/today -->
+      </div>
+    </div>
+
+    <!-- TAB PANEL 2: TRÒ CHUYỆN AI CHEF MĂM -->
+    <div id="lpanel-chat" class="hidden genui-card p-0 overflow-hidden flex flex-col h-[650px] shadow-lg rounded-3xl">
+      <div class="bg-[#18181B] text-white px-5 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-[#FBBF24] text-[#0F172A] font-extrabold flex items-center justify-center text-lg">
+            🧑‍🍳
+          </div>
+          <div>
+            <div class="font-extrabold text-sm flex items-center gap-2">
+              Măm AI Chef
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#22C55E]/20 text-[#4ADE80]">Gemini 2.0 Flash</span>
+            </div>
+            <div class="text-[11px] text-white/60">Trợ lý đầu bếp thông minh · Am hiểu 600+ món ăn Việt Nam</div>
+          </div>
+        </div>
+        <button onclick="clearLiveChat()" class="text-xs text-white/60 hover:text-white">Xóa đoạn chat</button>
+      </div>
+
+      <div id="live-chat-messages" class="flex-1 p-5 overflow-y-auto space-y-4 bg-[var(--bg-elevated)]">
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-[#FBBF24] text-[#0F172A] font-bold flex items-center justify-center shrink-0 text-sm">Măm</div>
+          <div class="bg-[var(--bg-card)] border border-[var(--border-subtle)] p-3.5 rounded-2xl max-w-lg text-xs space-y-1.5 shadow-sm">
+            <p class="font-medium text-[var(--text-main)]">Chào anh Long! Hôm nay Biên Hòa 26°C trời mát lành, em có thể gợi ý món nước nóng hổi hoặc công thức nấu tại nhà cho anh nè. Anh đang tìm món cho mấy người ăn và ngân sách khoảng bao nhiêu ạ?</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Chat Prompts -->
+      <div class="px-4 py-2 bg-[var(--bg-card)] border-t border-[var(--border-subtle)] flex items-center gap-2 overflow-x-auto no-scrollbar text-xs">
+        <span class="text-[11px] text-[var(--text-muted)] shrink-0">Hỏi nhanh:</span>
+        <button onclick="sendQuickPrompt('Trưa nay 4 người ăn ngân sách 200k có trẻ nhỏ')" class="px-2.5 py-1 rounded-xl bg-[var(--bg-elevated)] hover:bg-[#FBBF24]/20 text-[11px] whitespace-nowrap transition">👨‍👩‍👧‍👦 Trưa 4 người 200k có trẻ nhỏ</button>
+        <button onclick="sendQuickPrompt('Tủ lạnh còn trứng và cà chua nấu món gì?')" class="px-2.5 py-1 rounded-xl bg-[var(--bg-elevated)] hover:bg-[#FBBF24]/20 text-[11px] whitespace-nowrap transition">🧊 Tủ lạnh còn trứng và cà chua</button>
+        <button onclick="sendQuickPrompt('Tìm quán bún bò Huế gần đây ngon chuẩn vị')" class="px-2.5 py-1 rounded-xl bg-[var(--bg-elevated)] hover:bg-[#FBBF24]/20 text-[11px] whitespace-nowrap transition">🍲 Bún bò Huế gần đây</button>
+      </div>
+
+      <!-- Chat Input -->
+      <div class="p-3 bg-[var(--bg-card)] border-t border-[var(--border-subtle)] flex items-center gap-2">
+        <input id="live-chat-input" onkeydown="if(event.key==='Enter') sendLiveChatMessage()" type="text" placeholder="Nhập câu hỏi cho AI Chef Măm (VD: Gợi ý món ăn ít cay cho 2 người)..." class="flex-1 bg-[var(--bg-elevated)] px-4 py-2.5 rounded-xl text-xs focus:outline-none border border-transparent focus:border-[#FBBF24]" />
+        <button onclick="sendLiveChatMessage()" class="px-5 py-2.5 rounded-xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-xs hover:bg-[#F59E0B] transition">
+          Gửi
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB PANEL 3: VÒNG QUAY ẨM THỰC 3D -->
+    <div id="lpanel-wheel" class="hidden genui-card p-6 flex flex-col items-center justify-center space-y-6 rounded-3xl">
+      <div class="text-center max-w-md">
+        <span class="px-3 py-1 rounded-full text-xs font-extrabold bg-[#FBBF24]/20 text-[#B45309]">M3-S03 · LUXURY 3D WHEEL</span>
+        <h2 class="text-2xl font-black mt-2">Vòng Quay Quyết Định Bữa Ăn</h2>
+        <p class="text-xs text-[var(--text-muted)] mt-1">Đắn đo mãi không biết ăn gì? Hãy để thần may mắn chọn giúp bạn món ngon trưa nay!</p>
+      </div>
+
+      <!-- 3D Casino Wheel Display -->
+      <div class="relative w-80 h-80 flex items-center justify-center">
+        <!-- Top Ruby Gem Arrow Pointer -->
+        <div class="absolute -top-3 z-20 flex flex-col items-center pointer-events-none drop-shadow-md">
+          <div class="w-4 h-4 bg-gradient-to-br from-[#EF4444] to-[#B91C1C] rounded-full border-2 border-white shadow"></div>
+          <div class="w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[16px] border-t-[#B91C1C] -mt-1"></div>
+        </div>
+
+        <svg id="live-wheel-svg" viewBox="0 0 300 300" class="w-full h-full drop-shadow-2xl transition-transform duration-[4000ms] cubic-bezier(0.12, 0.8, 0.2, 1)">
+          <defs>
+            <radialGradient id="liveWheelRim" cx="50%" cy="50%" r="50%">
+              <stop offset="85%" stop-color="#18181B" />
+              <stop offset="93%" stop-color="#FBBF24" />
+              <stop offset="97%" stop-color="#D97706" />
+              <stop offset="100%" stop-color="#78350F" />
+            </radialGradient>
+            <linearGradient id="liveHubGold" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FEF3C7" />
+              <stop offset="50%" stop-color="#FBBF24" />
+              <stop offset="100%" stop-color="#D97706" />
+            </linearGradient>
+          </defs>
+          <!-- Outer Bezel -->
+          <circle cx="150" cy="150" r="148" fill="url(#liveWheelRim)" stroke="#FBBF24" stroke-width="4" />
+          <!-- 16 Metallic Rivets -->
+          <g fill="#FEF3C7" stroke="#78350F" stroke-width="0.8">
+            <circle cx="150" cy="8" r="3" /><circle cx="205" cy="19" r="3" /><circle cx="250" cy="50" r="3" /><circle cx="281" cy="95" r="3" />
+            <circle cx="292" cy="150" r="3" /><circle cx="281" cy="205" r="3" /><circle cx="250" cy="250" r="3" /><circle cx="205" cy="281" r="3" />
+            <circle cx="150" cy="292" r="3" /><circle cx="95" cy="281" r="3" /><circle cx="50" cy="250" r="3" /><circle cx="19" cy="205" r="3" />
+            <circle cx="8" cy="150" r="3" /><circle cx="19" cy="95" r="3" /><circle cx="50" cy="50" r="3" /><circle cx="95" cy="19" r="3" />
+          </g>
+          <!-- Inner Rim -->
+          <circle cx="150" cy="150" r="136" fill="#18181B" stroke="#D97706" stroke-width="2" />
+          <!-- 8 Alternating Slices -->
+          <g transform="translate(150,150)">
+            <path d="M0,0 L0,-134 A134,134 0 0,1 94.7,-94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
+            <path d="M0,0 L94.7,-94.7 A134,134 0 0,1 134,0 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
+            <path d="M0,0 L134,0 A134,134 0 0,1 94.7,94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
+            <path d="M0,0 L94.7,94.7 A134,134 0 0,1 0,134 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
+            <path d="M0,0 L0,134 A134,134 0 0,1 -94.7,94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
+            <path d="M0,0 L-94.7,94.7 A134,134 0 0,1 -134,0 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
+            <path d="M0,0 L-134,0 A134,134 0 0,1 -94.7,-94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
+            <path d="M0,0 L-94.7,-94.7 A134,134 0 0,1 0,-134 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
+          </g>
+          <!-- Slice Labels & Emojis -->
+          <g font-family="Be Vietnam Pro, sans-serif" font-weight="700" text-anchor="middle" font-size="10" fill="#FFFFFF">
+            <text transform="translate(185, 60) rotate(22.5)"><tspan x="0" y="-8" font-size="16">🍜</tspan><tspan x="0" y="8" fill="#FBBF24">Phở Bò</tspan></text>
+            <text transform="translate(240, 115) rotate(67.5)"><tspan x="0" y="-8" font-size="16">🍚</tspan><tspan x="0" y="8">Cơm Tấm</tspan></text>
+            <text transform="translate(240, 185) rotate(112.5)"><tspan x="0" y="-8" font-size="16">🍲</tspan><tspan x="0" y="8" fill="#FBBF24">Bún Bò</tspan></text>
+            <text transform="translate(185, 240) rotate(157.5)"><tspan x="0" y="-8" font-size="16">🥖</tspan><tspan x="0" y="8">Bánh Mì</tspan></text>
+            <text transform="translate(115, 240) rotate(-157.5)"><tspan x="0" y="-8" font-size="16">🐟</tspan><tspan x="0" y="8" fill="#FBBF24">Cá Kho</tspan></text>
+            <text transform="translate(60, 185) rotate(-112.5)"><tspan x="0" y="-8" font-size="16">🥗</tspan><tspan x="0" y="8">Gỏi Cuốn</tspan></text>
+            <text transform="translate(60, 115) rotate(-67.5)"><tspan x="0" y="-8" font-size="16">🍤</tspan><tspan x="0" y="8" fill="#FBBF24">Bún Riêu</tspan></text>
+            <text transform="translate(115, 60) rotate(-22.5)"><tspan x="0" y="-8" font-size="16">🥓</tspan><tspan x="0" y="8">Bún Chả</tspan></text>
+          </g>
+          <!-- Center Gold Hub -->
+          <circle cx="150" cy="150" r="32" fill="url(#liveHubGold)" stroke="#FFFFFF" stroke-width="2" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.4))" />
+          <circle cx="150" cy="150" r="24" fill="#18181B" />
+          <text x="150" y="154" fill="#FBBF24" font-family="Be Vietnam Pro, sans-serif" font-weight="900" font-size="10" text-anchor="middle">QUAY</text>
+        </svg>
+      </div>
+
+      <div id="live-spin-result" class="text-center min-h-[50px]">
+        <div class="text-xs text-[var(--text-muted)]">Bấm nút để quay món</div>
+        <div id="live-spin-title" class="text-xl font-black text-[#FBBF24] mt-1">Sẵn sàng quay</div>
+      </div>
+
+      <button onclick="startLiveSpin()" id="btn-spin-live" class="px-8 py-3 rounded-2xl bg-gradient-to-r from-[#FBBF24] to-[#F59E0B] text-[#0F172A] font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition">
+        🎯 QUAY NGAY (4.5 GIÂY)
+      </button>
+    </div>
+
+    <!-- TAB PANEL 4: QUÁN ĂN BÁN KÍNH 3KM (POSTGIS) -->
+    <div id="lpanel-places" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-extrabold tracking-tight">Quán ngon đang mở cửa trong bán kính 3km</h2>
+          <p class="text-xs text-[var(--text-muted)]">Truy vấn PostGIS ST_DWithin không gian thực · Đặt trực tiếp qua GrabFood / ShopeeFood</p>
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-bold bg-[#DCFCE7] text-[#15803D]">📍 P. Bửu Long, Biên Hòa</span>
+      </div>
+
+      <div id="live-places-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Rendered via JS fetch from /api/v1/places -->
+      </div>
+    </div>
+
+    <!-- TAB PANEL 5: THỰC ĐƠN TUẦN 7 NGÀY (M11) -->
+    <div id="lpanel-mealplan" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-extrabold tracking-tight">Kế hoạch bữa ăn 7 ngày &amp; Giỏ đi chợ</h2>
+          <p class="text-xs text-[var(--text-muted)]">Cân bằng 2200–2400 kcal/ngày · Tự động khấu trừ nguyên liệu có sẵn trong tủ lạnh</p>
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-bold bg-[#FEF3C7] text-[#B45309]">Ngân sách tuần: ~472.000đ</span>
+      </div>
+
+      <div id="live-mealplan-container" class="space-y-4">
+        <!-- Rendered via JS fetch from /api/v1/meal-plans/weekly -->
+      </div>
+    </div>
+
+    <!-- TAB PANEL 6: BÌNH CHỌN ĂN NHÓM (M12) -->
+    <div id="lpanel-poll" class="hidden genui-card p-6 rounded-3xl space-y-5 max-w-2xl mx-auto">
+      <div class="flex items-center justify-between">
+        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-[#EF4444]/15 text-[#EF4444] flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-[#EF4444] animate-ping"></span> BÌNH CHỌN TRỰC TIẾP
+        </span>
+        <span class="text-xs text-[var(--text-muted)]">Hạn chót: 11:30 Trưa nay</span>
+      </div>
+      <div>
+        <h2 class="text-xl font-black">Trưa thứ 6 phòng mình ăn gì?</h2>
+        <p class="text-xs text-[var(--text-muted)] mt-1">Đã tự động loại bỏ món chứa dị ứng chung của 4 thành viên</p>
+      </div>
+
+      <div id="live-poll-options" class="space-y-3">
+        <!-- Poll options -->
+      </div>
+
+      <div class="pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-muted)]">
+        <span>📍 Đánh giá sau bữa ăn chỉ chấp nhận trong phạm vi GPS ≤ 500m</span>
+        <span class="font-bold text-[#22C55E]">GPS Guard: Active</span>
+      </div>
+    </div>
+
+    <!-- TAB PANEL 7: CỔNG QUÁN ĂN & NẠP TIỀN VIETQR (M6/M7) -->
+    <div id="lpanel-merchant" class="hidden genui-card p-6 rounded-3xl space-y-6 max-w-3xl mx-auto">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-[#18181B] text-[#FBBF24] font-black text-xl flex items-center justify-center">
+            🍜
+          </div>
+          <div>
+            <h2 class="text-lg font-black">Phở Gia Truyền Phát Tài</h2>
+            <p class="text-xs text-[var(--text-muted)]">📍 128 Nguyễn Ái Quốc, P. Tân Tiến, Biên Hòa · Quán đối tác xác minh</p>
+          </div>
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-bold bg-[#DCFCE7] text-[#15803D]">🟢 Đang Mở Cửa</span>
+      </div>
+
+      <!-- Balance Card -->
+      <div class="p-5 rounded-2xl bg-gradient-to-r from-[#18181B] to-[#27272A] text-white flex items-center justify-between shadow-lg">
+        <div>
+          <div class="text-xs text-white/70">Số dư chiến dịch tài trợ vị trí (M7)</div>
+          <div id="live-merchant-balance" class="text-2xl font-black text-[#FBBF24] mt-1">1.840.000đ</div>
+          <div class="text-[11px] text-[#4ADE80] mt-0.5">Bảo vệ chống click tặc 60s (Anti-Fraud Active)</div>
+        </div>
+        <button onclick="openLiveVietQrModal(500000)" class="px-5 py-2.5 rounded-xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-xs shadow hover:bg-[#F59E0B] transition flex items-center gap-2">
+          <span>💳</span> Nạp Thêm VietQR
+        </button>
+      </div>
+
+      <!-- VietQR Modal / Card -->
+      <div id="live-vietqr-box" class="hidden p-5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="font-extrabold text-sm text-[#FBBF24]">Hóa đơn thanh toán VietQR (NAPAS 24/7)</span>
+          <button onclick="document.getElementById('live-vietqr-box').classList.add('hidden')" class="text-xs text-[var(--text-muted)]">Đóng ✕</button>
+        </div>
+        <div class="flex flex-col md:flex-row items-center gap-5">
+          <img id="live-vietqr-img" src="" alt="VietQR" class="w-48 h-48 rounded-xl bg-white p-2 shadow shrink-0" />
+          <div class="space-y-1.5 text-xs flex-1 w-full">
+            <div class="flex justify-between py-1 border-b border-[var(--border-subtle)]"><span class="text-[var(--text-muted)]">Ngân hàng:</span><span class="font-bold">Vietcombank (970436)</span></div>
+            <div class="flex justify-between py-1 border-b border-[var(--border-subtle)]"><span class="text-[var(--text-muted)]">Số tài khoản:</span><span class="font-bold font-mono">0121000889999</span></div>
+            <div class="flex justify-between py-1 border-b border-[var(--border-subtle)]"><span class="text-[var(--text-muted)]">Chủ tài khoản:</span><span class="font-bold">CONG TY HOM NAY AN GI</span></div>
+            <div class="flex justify-between py-1 border-b border-[var(--border-subtle)]"><span class="text-[var(--text-muted)]">Số tiền nạp:</span><span id="live-qr-amt" class="font-extrabold text-[#FBBF24]">500.000đ</span></div>
+            <div class="flex justify-between py-1 border-b border-[var(--border-subtle)]"><span class="text-[var(--text-muted)]">Nội dung CK:</span><span id="live-qr-memo" class="font-extrabold text-[#22C55E] font-mono">HNAG CMP-701</span></div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="confirmLivePayment()" class="px-5 py-2 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs">
+            Tôi đã chuyển khoản thành công
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div id="main-screens" class="hidden flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-6 py-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
     <!-- LEFT SIDEBAR: MODULE & SCREEN TREE NAVIGATOR (3 cols) -->
     <aside class="lg:col-span-3 genui-card p-3.5 space-y-3 lg:sticky lg:top-16 max-h-[85vh] flex flex-col">
@@ -4582,15 +4906,463 @@ export async function load${activeScr.id.replace('-','')}() {
     }
 
     function setMainView(v) {
+      document.getElementById('main-liveapp').classList.toggle('hidden', v !== 'liveapp');
       document.getElementById('main-screens').classList.toggle('hidden', v !== 'screens');
       document.getElementById('main-chatgpt').classList.toggle('hidden', v !== 'chatgpt');
+
+      const btnLive = document.getElementById('mview-liveapp');
+      if (btnLive) {
+        btnLive.className = v === 'liveapp'
+          ? 'px-4 py-1.5 rounded-xl text-xs font-extrabold bg-[#FBBF24] text-[#0F172A] shadow-sm transition'
+          : 'px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition';
+      }
+
       document.getElementById('mview-screens').className = v === 'screens'
         ? 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#E87935] text-white shadow-sm transition'
         : 'px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition';
+
       document.getElementById('mview-chatgpt').className = v === 'chatgpt'
         ? 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#E87935] text-white shadow-sm transition'
         : 'px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] transition';
+
+      if (v === 'liveapp') {
+        initLiveApp();
+      }
       hydrateImages();
+    }
+
+    // ─── LIVE APP RUNTIME (FULL-SCREEN CONSUMER INTERACTION) ─────────────────
+    let currentLiveTab = 'today';
+    let liveWheelRotation = 0;
+    let livePollData = {
+      votes: { pho: 4, bunbo: 2, comtam: 1 },
+      hasVoted: false
+    };
+
+    function setLiveAppTab(tab) {
+      currentLiveTab = tab;
+      const tabs = ['today', 'chat', 'wheel', 'places', 'mealplan', 'poll', 'merchant'];
+      tabs.forEach(t => {
+        const p = document.getElementById(`lpanel-${t}`);
+        if (p) p.classList.toggle('hidden', t !== tab);
+        const b = document.getElementById(`ltab-${t}`);
+        if (b) {
+          if (t === tab) {
+            b.className = 'px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#18181B] text-white shadow transition shrink-0 flex items-center gap-2';
+          } else {
+            b.className = 'px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2';
+          }
+        }
+      });
+
+      if (tab === 'places') loadLivePlaces();
+      if (tab === 'mealplan') loadLiveMealPlan();
+      if (tab === 'poll') renderLivePoll();
+    }
+
+    async function initLiveApp() {
+      refreshLiveSuggestions();
+    }
+
+    async function refreshLiveSuggestions() {
+      const grid = document.getElementById('live-suggestions-grid');
+      if (!grid) return;
+      grid.innerHTML = '<div class="col-span-3 text-center py-12 text-xs text-[var(--text-muted)]">⏳ Đang phân tích thời tiết và tính toán gợi ý AI...</div>';
+
+      try {
+        const res = await fetch('/api/v1/suggestions/today');
+        const data = await res.json();
+        if (data && data.items) {
+          if (data.weather && data.weather.label) {
+            const wBadge = document.getElementById('live-weather-badge');
+            if (wBadge) wBadge.textContent = data.weather.label;
+          }
+          grid.innerHTML = data.items.map((item, idx) => {
+            const isSponsored = item.is_sponsored;
+            const place = item.nearest_place || {};
+            return `
+              <div class="genui-card p-5 space-y-4 hover:border-[#FBBF24] transition flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${isSponsored ? 'bg-[#FBBF24] text-[#0F172A]' : 'bg-[#DCFCE7] text-[#15803D]'}">
+                      ${isSponsored ? '★ Tài trợ quán gần' : '🌿 Gợi ý hôm nay'}
+                    </span>
+                    <span class="text-xs font-extrabold text-[#FBBF24]">${(item.price_vnd || 45000).toLocaleString('vi-VN')}đ</span>
+                  </div>
+                  <h3 class="font-black text-base mt-2">${item.name}</h3>
+                  <p class="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">${item.description || item.reason}</p>
+                  
+                  <div class="flex items-center gap-2 mt-3 text-[11px] text-[var(--text-muted)]">
+                    <span>🔥 ${item.calories || 450} kcal</span>
+                    <span>•</span>
+                    <span>⏱️ ${item.prep_minutes || 25} phút</span>
+                    <span>•</span>
+                    <span>⭐ ${place.rating || 4.8} (${place.distance_m || 350}m)</span>
+                  </div>
+                </div>
+
+                <div class="pt-3 border-t border-[var(--border-subtle)] space-y-2">
+                  <div class="text-[11px] font-semibold text-[var(--text-main)] flex items-center gap-1.5">
+                    <span>📍</span> ${place.place_name || 'Quán Ngon Gần Bạn'}
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <a href="${place.links?.grabfood || '#'}" target="_blank" class="flex-1 py-2 text-center rounded-xl bg-[#00B14F] text-white font-extrabold text-[11px] hover:opacity-90">
+                      GrabFood ↗
+                    </a>
+                    <a href="${place.links?.shopeefood || '#'}" target="_blank" class="flex-1 py-2 text-center rounded-xl bg-[#EE4D2D] text-white font-extrabold text-[11px] hover:opacity-90">
+                      ShopeeFood ↗
+                    </a>
+                    <button onclick="setLiveAppTab('chat')" class="px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-bold">
+                      Hỏi AI
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        grid.innerHTML = '<div class="col-span-3 text-center py-8 text-xs text-red-500">Không thể kết nối API. Vui lòng thử lại.</div>';
+      }
+    }
+
+    function quickFillSearch(query) {
+      const input = document.getElementById('live-semantic-input');
+      if (input) {
+        input.value = query;
+        executeLiveSemanticSearch();
+      }
+    }
+
+    async function executeLiveSemanticSearch() {
+      const input = document.getElementById('live-semantic-input');
+      const q = (input ? input.value : '').trim();
+      if (!q) {
+        refreshLiveSuggestions();
+        return;
+      }
+      setLiveAppTab('today');
+      const grid = document.getElementById('live-suggestions-grid');
+      if (!grid) return;
+      grid.innerHTML = `<div class="col-span-3 text-center py-10 text-xs text-[var(--text-muted)]">🧠 Đang tìm kiếm ngữ nghĩa theo: "${q}"...</div>`;
+
+      try {
+        const res = await fetch(`/api/v1/dishes/semantic-search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (data && data.results && data.results.length > 0) {
+          grid.innerHTML = data.results.map(item => `
+            <div class="genui-card p-5 space-y-4 border-2 border-[#FBBF24]/50 hover:border-[#FBBF24] transition flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FBBF24] text-[#0F172A]">
+                    ${item.similarity_pct || 85}% Phù hợp
+                  </span>
+                  <span class="text-xs font-bold text-[#FBBF24]">${(item.ref_price || item.estimated_price_vnd || 45000).toLocaleString('vi-VN')}đ</span>
+                </div>
+                <h3 class="font-black text-base mt-2">${item.name}</h3>
+                <p class="text-xs text-[var(--text-muted)] mt-1">${(item.match_reasons || []).join(' · ')}</p>
+                <div class="flex items-center gap-2 mt-3 text-[11px] text-[var(--text-muted)]">
+                  <span>🔥 ${item.calories || 450} kcal</span>
+                  <span>•</span>
+                  <span>⏱️ ${item.prep_minutes || 25} phút</span>
+                  <span>•</span>
+                  <span>🌿 An toàn dị ứng 100%</span>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-[var(--border-subtle)] flex gap-2">
+                <button onclick="setLiveAppTab('chat');sendQuickPrompt('Hướng dẫn tôi nấu món ${item.name}')" class="flex-1 py-2 text-center rounded-xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-[11px]">
+                  Xem Công Thức Nấu
+                </button>
+                <button onclick="setLiveAppTab('places')" class="flex-1 py-2 text-center rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-bold">
+                  Tìm Quán Bán
+                </button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          grid.innerHTML = '<div class="col-span-3 text-center py-8 text-xs text-[var(--text-muted)]">Không tìm thấy món phù hợp với tiêu chí tìm kiếm.</div>';
+        }
+      } catch (err) {
+        grid.innerHTML = '<div class="col-span-3 text-center py-8 text-xs text-red-500">Lỗi khi tìm kiếm ngữ nghĩa.</div>';
+      }
+    }
+
+    async function sendLiveChatMessage() {
+      const inp = document.getElementById('live-chat-input');
+      const text = (inp ? inp.value : '').trim();
+      if (!text) return;
+      inp.value = '';
+
+      const container = document.getElementById('live-chat-messages');
+      if (!container) return;
+
+      // Append user bubble
+      container.innerHTML += `
+        <div class="flex items-start justify-end gap-3">
+          <div class="bg-[#18181B] text-white p-3.5 rounded-2xl max-w-lg text-xs shadow-sm">
+            ${text}
+          </div>
+        </div>
+      `;
+      container.scrollTop = container.scrollHeight;
+
+      // Loading bubble
+      const loadId = `load-${Date.now()}`;
+      container.innerHTML += `
+        <div id="${loadId}" class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-[#FBBF24] text-[#0F172A] font-bold flex items-center justify-center shrink-0 text-sm">Măm</div>
+          <div class="bg-[var(--bg-card)] border border-[var(--border-subtle)] p-3.5 rounded-2xl text-xs space-y-1 text-[var(--text-muted)]">
+            <span>Đang suy nghĩ...</span>
+          </div>
+        </div>
+      `;
+      container.scrollTop = container.scrollHeight;
+
+      try {
+        const res = await fetch('/api/v1/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: text })
+        });
+        const data = await res.json();
+        const loadEl = document.getElementById(loadId);
+        if (loadEl) loadEl.remove();
+
+        const answer = data.reply || data.text || 'Dạ Măm đã ghi nhận yêu cầu của anh!';
+        container.innerHTML += `
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-xl bg-[#FBBF24] text-[#0F172A] font-bold flex items-center justify-center shrink-0 text-sm">Măm</div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border-subtle)] p-3.5 rounded-2xl max-w-lg text-xs space-y-2 shadow-sm text-[var(--text-main)]">
+              <p class="whitespace-pre-line">${answer}</p>
+              ${data.matched_dishes && data.matched_dishes.length > 0 ? `
+                <div class="pt-2 border-t border-[var(--border-subtle)] space-y-1">
+                  <div class="font-bold text-[11px] text-[#FBBF24]">Món gợi ý phù hợp:</div>
+                  ${data.matched_dishes.map(d => `<div class="p-2 rounded-xl bg-[var(--bg-elevated)] flex justify-between items-center font-semibold"><span>🍲 ${d.name}</span><span class="text-[10px] text-[var(--text-muted)]">${(d.price_vnd || 45000).toLocaleString('vi-VN')}đ</span></div>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+        container.scrollTop = container.scrollHeight;
+      } catch (err) {
+        const loadEl = document.getElementById(loadId);
+        if (loadEl) loadEl.remove();
+      }
+    }
+
+    function sendQuickPrompt(promptText) {
+      const inp = document.getElementById('live-chat-input');
+      if (inp) {
+        inp.value = promptText;
+        sendLiveChatMessage();
+      }
+    }
+
+    function clearLiveChat() {
+      const container = document.getElementById('live-chat-messages');
+      if (container) {
+        container.innerHTML = `
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-xl bg-[#FBBF24] text-[#0F172A] font-bold flex items-center justify-center shrink-0 text-sm">Măm</div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border-subtle)] p-3.5 rounded-2xl max-w-lg text-xs space-y-1.5 shadow-sm">
+              <p class="font-medium text-[var(--text-main)]">Chào anh Long! Hôm nay anh muốn ăn món gì, cứ nói với Măm nhé!</p>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function startLiveSpin() {
+      const wheel = document.getElementById('live-wheel-svg');
+      const btn = document.getElementById('btn-spin-live');
+      const title = document.getElementById('live-spin-title');
+      if (!wheel || btn.disabled) return;
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Đang quay...';
+      title.textContent = 'Đang chọn món...';
+
+      const slices = [
+        'Phở Bò Tái Nạm Hà Nội (45k)',
+        'Cơm Tấm Sườn Bì Chả (40k)',
+        'Bún Bò Huế O Xuân (50k)',
+        'Bánh Mì Thịt Nướng (25k)',
+        'Cá Lóc Kho Tộ (45k)',
+        'Gỏi Cuốn Chay Đậu Hũ (35k)',
+        'Bún Riêu Cua Đồng (40k)',
+        'Bún Chả Nem Cua Bể (55k)'
+      ];
+
+      // Rotate between 5 and 8 full spins + random target angle
+      const targetIndex = Math.floor(Math.random() * slices.length);
+      const anglePerSlice = 360 / slices.length;
+      const extraRotations = 360 * 5;
+      liveWheelRotation += extraRotations + (360 - (targetIndex * anglePerSlice));
+      wheel.style.transform = `rotate(${liveWheelRotation}deg)`;
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '🎯 QUAY LẠI';
+        title.textContent = `🎉 Chúc mừng! Món trưa nay: ${slices[targetIndex]}`;
+      }, 4200);
+    }
+
+    async function loadLivePlaces() {
+      const grid = document.getElementById('live-places-grid');
+      if (!grid) return;
+      grid.innerHTML = '<div class="col-span-2 text-center py-10 text-xs text-[var(--text-muted)]">Đang tải danh sách quán bán kính 3km từ PostGIS...</div>';
+
+      try {
+        const res = await fetch('/api/v1/places');
+        const data = await res.json();
+        if (data && data.places) {
+          grid.innerHTML = data.places.map(p => `
+            <div class="genui-card p-4 space-y-3 rounded-2xl flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-[var(--bg-elevated)] flex items-center justify-center text-2xl border border-[var(--border-subtle)]">
+                  🍜
+                </div>
+                <div>
+                  <div class="font-extrabold text-sm flex items-center gap-1.5">
+                    ${p.name}
+                    ${p.is_sponsored ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#FBBF24] text-[#0F172A]">Tài trợ</span>' : ''}
+                  </div>
+                  <div class="text-[11px] text-[var(--text-muted)]">${p.address}</div>
+                  <div class="text-[10px] text-[#22C55E] font-bold mt-0.5">
+                    Cách bạn ${p.distance_meters || 500}m · ⭐ ${p.rating || 4.8} · Mở cửa đến 21:30
+                  </div>
+                </div>
+              </div>
+              <div class="flex flex-col gap-1.5 shrink-0">
+                <a href="${p.order_link || 'https://food.grab.com'}" target="_blank" class="px-3.5 py-1.5 rounded-xl bg-[#00B14F] text-white font-extrabold text-[11px] text-center">
+                  GrabFood ↗
+                </a>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        grid.innerHTML = '<div class="col-span-2 text-center py-8 text-xs text-red-500">Lỗi kết nối quán.</div>';
+      }
+    }
+
+    async function loadLiveMealPlan() {
+      const c = document.getElementById('live-mealplan-container');
+      if (!c) return;
+      c.innerHTML = '<div class="text-center py-10 text-xs text-[var(--text-muted)]">Đang tải thực đơn tuần 7 ngày & giỏ đi chợ...</div>';
+
+      try {
+        const res = await fetch('/api/v1/meal-plans/weekly');
+        const data = await res.json();
+        if (data && data.days) {
+          c.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-7 gap-2.5">
+              ${data.days.map(d => `
+                <div class="genui-card p-3 rounded-2xl space-y-2 border border-[var(--border-subtle)] text-center">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FBBF24]/20 text-[#B45309]">${d.day}</span>
+                  <div class="font-black text-xs line-clamp-2 mt-1">${d.dish_name}</div>
+                  <div class="text-[10px] text-[var(--text-muted)]">🔥 ${d.calories} kcal</div>
+                  <div class="text-[10px] font-bold text-[#22C55E]">${(d.est_market_cost_vnd || 50000).toLocaleString('vi-VN')}đ</div>
+                </div>
+              `).join('')}
+            </div>
+            <div class="genui-card p-4 rounded-2xl space-y-2 mt-4">
+              <div class="font-extrabold text-xs text-[#FBBF24]">🛒 Giỏ đi chợ gộp (Đã khấu trừ nguyên liệu có sẵn trong tủ lạnh):</div>
+              <div class="flex flex-wrap gap-2 text-xs">
+                ${(data.consolidated_groceries || []).filter(g => !g.in_fridge).slice(0, 10).map(g => `
+                  <span class="px-2.5 py-1 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] font-medium">
+                    ${g.name}: ${g.amount} ${g.unit}
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
+      } catch (err) {}
+    }
+
+    function renderLivePoll() {
+      const c = document.getElementById('live-poll-options');
+      if (!c) return;
+      const opts = [
+        { id: 'pho', name: 'Phở Bò Tái Nạm Hà Nội', place: 'Phở Phát Tài · 390m', emoji: '🍜' },
+        { id: 'bunbo', name: 'Bún Bò Huế O Xuân', place: 'Bún Bò O Xuân · 628m', emoji: '🍲' },
+        { id: 'comtam', name: 'Cơm Tấm Sườn Bì Chả', place: 'Cơm Tấm Ba Ghiền · 510m', emoji: '🍚' }
+      ];
+      const total = Object.values(livePollData.votes).reduce((a, b) => a + b, 0);
+
+      c.innerHTML = opts.map(o => {
+        const votes = livePollData.votes[o.id] || 0;
+        const pct = total > 0 ? Math.round((votes / total) * 100) : 0;
+        return `
+          <div class="p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">${o.emoji}</span>
+              <div>
+                <div class="font-extrabold text-sm">${o.name}</div>
+                <div class="text-[11px] text-[var(--text-muted)]">${o.place}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="text-right">
+                <div class="font-black text-xs">${votes} phiếu (${pct}%)</div>
+                <div class="w-20 bg-[var(--border-subtle)] h-1.5 rounded-full mt-1 overflow-hidden">
+                  <div class="bg-[#FBBF24] h-full" style="width: ${pct}%"></div>
+                </div>
+              </div>
+              <button onclick="voteLivePoll('${o.id}')" ${livePollData.hasVoted ? 'disabled' : ''} class="px-3 py-1.5 rounded-xl ${livePollData.hasVoted ? 'bg-white/10 text-white/40' : 'bg-[#FBBF24] text-[#0F172A] hover:bg-[#F59E0B]'} font-extrabold text-xs">
+                ${livePollData.hasVoted ? 'Đã Chọn' : 'Chọn'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function voteLivePoll(optId) {
+      if (livePollData.hasVoted) return;
+      livePollData.votes[optId] = (livePollData.votes[optId] || 0) + 1;
+      livePollData.hasVoted = true;
+      renderLivePoll();
+
+      try {
+        await fetch('/api/v1/polls/POLL-701/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ option_id: optId })
+        });
+      } catch (e) {}
+    }
+
+    async function openLiveVietQrModal(amount) {
+      const box = document.getElementById('live-vietqr-box');
+      if (!box) return;
+      box.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/v1/ads/payments/vietqr/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaign_id: 'CMP-701', amount_vnd: amount })
+        });
+        const data = await res.json();
+        if (data) {
+          const img = document.getElementById('live-vietqr-img');
+          if (img) img.src = data.qr_image_url;
+          const amt = document.getElementById('live-qr-amt');
+          if (amt) amt.textContent = `${(data.amount_vnd || amount).toLocaleString('vi-VN')}đ`;
+          const memo = document.getElementById('live-qr-memo');
+          if (memo) memo.textContent = data.transfer_memo || 'HNAG CMP-701';
+        }
+      } catch (err) {}
+    }
+
+    function confirmLivePayment() {
+      const box = document.getElementById('live-vietqr-box');
+      if (box) box.classList.add('hidden');
+      const bal = document.getElementById('live-merchant-balance');
+      if (bal) bal.textContent = '2.340.000đ';
+      alert('✅ Đã xác nhận! Hệ thống đã tự động nạp 500.000đ vào số dư chiến dịch Phở Phát Tài.');
     }
 
     function filterSidebarScreens(val) {
@@ -4697,6 +5469,7 @@ export async function load${activeScr.id.replace('-','')}() {
     renderSidebar();
     renderStage();
     hydrateImages();
+    initLiveApp();
   </script>
 </body>
 </html>
