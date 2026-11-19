@@ -230,6 +230,18 @@
       <button onclick="setLiveAppTab('merchant')" id="ltab-merchant" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
         <span>🏪</span> Cổng Quán Ăn &amp; Nạp VietQR
       </button>
+      <button onclick="setLiveAppTab('booking')" id="ltab-booking" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>🎫</span> Đặt Bàn &amp; Voucher (M13)
+      </button>
+      <button onclick="setLiveAppTab('stories')" id="ltab-stories" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>📖</span> Văn Hóa &amp; Food Trail (M14-M15)
+      </button>
+      <button onclick="setLiveAppTab('translator')" id="ltab-translator" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>🌐</span> Dịch Menu Đa Ngữ (M16)
+      </button>
+      <button onclick="setLiveAppTab('insights')" id="ltab-insights" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>📈</span> B2G &amp; B2B Insights (M17)
+      </button>
     </div>
 
     <!-- TAB PANEL 1: GỢI Ý HÔM NAY (TODAY SUGGESTIONS) -->
@@ -473,6 +485,194 @@
           <button onclick="confirmLivePayment()" class="px-5 py-2 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs">
             Tôi đã chuyển khoản thành công
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB PANEL 8: ĐẶT BÀN & VOUCHER ĂN TẠI QUÁN (M13) -->
+    <div id="lpanel-booking" class="hidden space-y-6 max-w-4xl mx-auto">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Booking Form -->
+        <div class="genui-card p-6 rounded-3xl space-y-4">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FBBF24]/20 text-[#B45309]">M13-S01</span>
+            <h2 class="text-base font-black">Đặt Bàn Giữ Chỗ Tức Thì</h2>
+          </div>
+          <p class="text-xs text-[var(--text-muted)]">Xác nhận trực tiếp với quán · Không qua trung gian thu phí</p>
+
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block font-bold mb-1">Quán ăn:</label>
+              <select id="book-place-id" class="w-full p-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] focus:outline-none">
+                <option value="PLACE-401">Phở Gia Truyền Phát Tài (Biên Hòa)</option>
+                <option value="PLACE-403">Bún Bò Huế O Xuân (Tân Mai)</option>
+                <option value="PLACE-402">Cơm Tấm Sài Gòn Xưa (Q.1)</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold mb-1">Số khách:</label>
+                <input id="book-party-size" type="number" value="4" min="1" max="20" class="w-full p-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] focus:outline-none" />
+              </div>
+              <div>
+                <label class="block font-bold mb-1">Thời gian:</label>
+                <input id="book-time-slot" type="text" value="19:00 Tối nay" class="w-full p-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] focus:outline-none" />
+              </div>
+            </div>
+            <div class="flex items-center gap-2 pt-1">
+              <input id="book-baby-chair" type="checkbox" checked class="rounded" />
+              <label for="book-baby-chair" class="text-xs">Yêu cầu ghế ngồi cho em bé</label>
+            </div>
+            <button onclick="submitLiveBooking()" class="w-full py-3 rounded-xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-xs shadow hover:bg-[#F59E0B] transition">
+              Xác Nhận Đặt Bàn Ngay
+            </button>
+          </div>
+
+          <!-- Result -->
+          <div id="live-booking-result" class="hidden p-4 rounded-2xl bg-[#DCFCE7] border border-[#86EFAC] text-[#15803D] text-xs space-y-1">
+            <!-- Dynamic confirmation -->
+          </div>
+        </div>
+
+        <!-- Dine-in QR Vouchers -->
+        <div class="genui-card p-6 rounded-3xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#22C55E]/20 text-[#15803D]">M13-S02</span>
+              <h2 class="text-base font-black">Voucher Ăn Tại Quán (Dine-in QR)</h2>
+            </div>
+          </div>
+          <p class="text-xs text-[var(--text-muted)]">Mở mã QR tại bàn để nhân viên quét giảm trực tiếp trên hóa đơn</p>
+
+          <div id="live-vouchers-list" class="space-y-3">
+            <!-- Loaded via loadLiveBooking -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB PANEL 9: VĂN HÓA ẨM THỰC & FOOD TRAIL (M14-M15) -->
+    <div id="lpanel-stories" class="hidden space-y-6 max-w-5xl mx-auto">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left: Stories (7 cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-black flex items-center gap-2">
+              <span>📖</span> Chuyện Văn Hóa Ẩm Thực Việt Nam (M14)
+            </h2>
+            <span class="text-xs text-[var(--text-muted)]">Khám phá cội nguồn món ăn</span>
+          </div>
+          <div id="live-stories-list" class="space-y-4">
+            <!-- Loaded via loadLiveStories -->
+          </div>
+        </div>
+
+        <!-- Right: Food Trail 4 Stops & Passport (5 cols) -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="genui-card p-5 rounded-3xl space-y-4 bg-gradient-to-b from-[var(--bg-card)] to-[var(--bg-elevated)]">
+            <div class="flex items-center justify-between">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FBBF24]/20 text-[#B45309]">M15 FOOD TRAIL</span>
+              <span class="text-[11px] text-[#22C55E] font-bold">📍 Biên Hòa</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-black">Food Trail 1 Ngày Khám Phá Ẩm Thực</h3>
+              <p class="text-xs text-[var(--text-muted)] mt-0.5">Hành trình 4 trạm trải nghiệm trọn vẹn phong vị Đông Nam Bộ</p>
+            </div>
+
+            <div id="live-trail-stops" class="space-y-2.5 text-xs">
+              <!-- Stops loaded via loadLiveStories -->
+            </div>
+
+            <div id="live-passport-box" class="p-3.5 rounded-2xl bg-[#18181B] text-white space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-[#FBBF24] font-bold">🎖️ Hộ Chiếu Ẩm Thực</span>
+                <span id="passport-stamp-counter" class="text-white/60">0/4 Trạm Đã Đóng Dấu</span>
+              </div>
+              <button onclick="stampPassport()" class="w-full py-2 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs shadow hover:bg-[#16A34A] transition">
+                Quét Mã QR Đóng Dấu Trạm Này
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB PANEL 10: DỊCH MENU AI ĐA NGỮ (M16) -->
+    <div id="lpanel-translator" class="hidden space-y-6 max-w-4xl mx-auto">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#22C55E]/20 text-[#15803D]">M16 MULTILINGUAL AI</span>
+            <span class="text-xs text-[var(--text-muted)]">Giữ nguyên tên tiếng Việt gốc · Phiên âm chuẩn · Cảnh báo dị ứng</span>
+          </div>
+          <h2 class="text-xl font-black">Trợ Lý Dịch Thực Đơn Cho Du Khách Quốc Tế</h2>
+        </div>
+
+        <!-- Language Switcher -->
+        <div class="flex items-center gap-1.5 bg-[var(--bg-elevated)] p-1 rounded-2xl border border-[var(--border-subtle)] shrink-0">
+          <button onclick="changeTranslatorLang('EN')" id="tlang-EN" class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-[#18181B] text-white">
+            🇬🇧 English
+          </button>
+          <button onclick="changeTranslatorLang('KO')" id="tlang-KO" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)]">
+            🇰🇷 한국어
+          </button>
+          <button onclick="changeTranslatorLang('JA')" id="tlang-JA" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)]">
+            🇯🇵 日本語
+          </button>
+        </div>
+      </div>
+
+      <div id="live-translator-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Rendered via loadLiveTranslator -->
+      </div>
+    </div>
+
+    <!-- TAB PANEL 11: B2G & B2B INSIGHTS DASHBOARD (M17) -->
+    <div id="lpanel-insights" class="hidden space-y-6 max-w-4xl mx-auto">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#6366F1]/20 text-[#4F46E5]">M17 B2G &amp; FMCG INSIGHTS</span>
+            <span class="text-xs text-[#22C55E] font-bold">🔒 K-Anonymity Tuân Thủ 100%</span>
+          </div>
+          <h2 class="text-xl font-black">Bảng Dữ Liệu Ẩm Thực Du Lịch Tỉnh &amp; Thương Hiệu</h2>
+        </div>
+        <span class="text-xs text-[var(--text-muted)]">Dữ liệu 30 ngày tổng hợp</span>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="genui-card p-4 rounded-2xl border border-[var(--border-subtle)]">
+          <div class="text-xs text-[var(--text-muted)]">Tra cứu món đặc sản địa phương</div>
+          <div id="insight-queries" class="text-2xl font-black text-[#FBBF24] mt-1">142.500</div>
+          <div class="text-[11px] text-[#22C55E] mt-1">▲ +24% so với tháng trước</div>
+        </div>
+        <div class="genui-card p-4 rounded-2xl border border-[var(--border-subtle)]">
+          <div class="text-xs text-[var(--text-muted)]">Du khách quốc tế dùng AI Translator</div>
+          <div id="insight-visitors" class="text-2xl font-black text-[#6366F1] mt-1">18.400</div>
+          <div class="text-[11px] text-[#6366F1] mt-1">Hàn Quốc (42%) · Anh/Mỹ (35%)</div>
+        </div>
+        <div class="genui-card p-4 rounded-2xl border border-[var(--border-subtle)]">
+          <div class="text-xs text-[var(--text-muted)]">Tỷ lệ tương tác nhãn hàng FMCG</div>
+          <div class="text-2xl font-black text-[#22C55E] mt-1">8.4% CTR</div>
+          <div class="text-[11px] text-[var(--text-muted)] mt-1">Công thức tài trợ gia vị chuẩn vị</div>
+        </div>
+      </div>
+
+      <!-- Trending Dishes & Brand Placement -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="genui-card p-5 rounded-2xl space-y-3">
+          <h3 class="text-sm font-black text-[#FBBF24]">🔥 Top 3 Món Ăn Được Tìm Kiếm Nhiều Nhất</h3>
+          <div id="insight-trending-dishes" class="space-y-2 text-xs">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <div class="genui-card p-5 rounded-2xl space-y-3">
+          <h3 class="text-sm font-black text-[#22C55E]">🏷️ Chiến Dịch Tài Trợ Thương Hiệu FMCG</h3>
+          <div id="insight-brand-campaigns" class="space-y-2 text-xs">
+            <!-- Loaded dynamically -->
+          </div>
         </div>
       </div>
     </div>
@@ -1070,7 +1270,7 @@ export async function load${activeScr.id.replace('-','')}() {
 
     function setLiveAppTab(tab) {
       currentLiveTab = tab;
-      const tabs = ['today', 'chat', 'wheel', 'places', 'mealplan', 'poll', 'merchant'];
+      const tabs = ['today', 'chat', 'wheel', 'places', 'mealplan', 'poll', 'merchant', 'booking', 'stories', 'translator', 'insights'];
       tabs.forEach(t => {
         const p = document.getElementById(`lpanel-${t}`);
         if (p) p.classList.toggle('hidden', t !== tab);
@@ -1087,6 +1287,10 @@ export async function load${activeScr.id.replace('-','')}() {
       if (tab === 'places') loadLivePlaces();
       if (tab === 'mealplan') loadLiveMealPlan();
       if (tab === 'poll') renderLivePoll();
+      if (tab === 'booking') loadLiveBooking();
+      if (tab === 'stories') loadLiveStories();
+      if (tab === 'translator') loadLiveTranslator(currentTranslatorLang || 'EN');
+      if (tab === 'insights') loadLiveInsights();
     }
 
     async function initLiveApp() {
@@ -1492,6 +1696,242 @@ export async function load${activeScr.id.replace('-','')}() {
       const bal = document.getElementById('live-merchant-balance');
       if (bal) bal.textContent = '2.340.000đ';
       alert('✅ Đã xác nhận! Hệ thống đã tự động nạp 500.000đ vào số dư chiến dịch Phở Phát Tài.');
+    }
+
+    async function loadLiveBooking() {
+      const list = document.getElementById('live-vouchers-list');
+      if (!list) return;
+      list.innerHTML = '<div class="text-center py-6 text-xs text-[var(--text-muted)]">Đang tải danh sách voucher tại bàn...</div>';
+      try {
+        const res = await fetch('/api/v1/vouchers');
+        const data = await res.json();
+        if (data && data.vouchers) {
+          list.innerHTML = data.vouchers.map(v => `
+            <div class="p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#22C55E]/15 text-[#15803D]">${v.code}</span>
+                <span class="text-[10px] text-[#FBBF24] font-bold">Quét Tại Bàn</span>
+              </div>
+              <div class="font-extrabold text-xs">${v.title}</div>
+              <div class="pt-1 flex items-center justify-between">
+                <span class="text-[10px] font-mono text-[var(--text-muted)]">${v.qr_payload}</span>
+                <button onclick="alert('📱 Mã QR Voucher: ${v.code}\\nNhân viên đối soát thành công qua M6 Portal!')" class="px-3 py-1 rounded-xl bg-[#18181B] text-white text-[10px] font-bold">
+                  Hiện Mã QR
+                </button>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (e) {
+        list.innerHTML = '<div class="text-xs text-red-500 text-center py-4">Lỗi tải voucher</div>';
+      }
+    }
+
+    async function submitLiveBooking() {
+      const placeId = document.getElementById('book-place-id').value;
+      const partySize = parseInt(document.getElementById('book-party-size').value, 10) || 4;
+      const timeSlot = document.getElementById('book-time-slot').value;
+      const babyChair = document.getElementById('book-baby-chair').checked;
+      const resBox = document.getElementById('live-booking-result');
+
+      try {
+        const res = await fetch('/api/v1/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ place_id: placeId, party_size: partySize, time_slot: timeSlot, has_baby_chair: babyChair })
+        });
+        const data = await res.json();
+        if (data && data.booking_id) {
+          resBox.classList.remove('hidden');
+          resBox.innerHTML = `
+            <div class="font-black text-sm">🎉 Đặt bàn thành công!</div>
+            <div>Mã đặt chỗ: <span class="font-mono font-bold">${data.booking_id}</span></div>
+            <div>Quán: <span class="font-bold">${data.place_name}</span> · ${data.party_size} khách (${data.time_slot})</div>
+            <div>Ghế trẻ em: <span class="font-bold">${data.has_baby_chair ? 'Có chuẩn bị sẵn' : 'Không'}</span></div>
+            <div class="text-[10px] text-green-700 mt-1">Trạng thái: Xác nhận tức thì (Instant Confirmed)</div>
+          `;
+        }
+      } catch (e) {
+        alert('Lỗi đặt bàn.');
+      }
+    }
+
+    let passportStampsCount = 0;
+
+    async function loadLiveStories() {
+      const sList = document.getElementById('live-stories-list');
+      const tStops = document.getElementById('live-trail-stops');
+
+      try {
+        const resStories = await fetch('/api/v1/stories');
+        const sData = await resStories.json();
+        if (sList && sData && sData.stories) {
+          sList.innerHTML = sData.stories.map(s => `
+            <div class="genui-card p-5 rounded-3xl space-y-2 border border-[var(--border-subtle)]">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FBBF24]/20 text-[#B45309]">${s.region}</span>
+                <span class="text-[11px] text-[var(--text-muted)]">⏱️ ${s.read_min} phút đọc</span>
+              </div>
+              <h3 class="font-black text-sm text-[var(--text-main)]">${s.title}</h3>
+              <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+                Khám phá chiều sâu văn hóa ẩm thực Việt Nam, cách các nghệ nhân gìn giữ công thức nước dùng từ xương ống hầm 12 tiếng cùng hoa hồi và quế chi nướng thơm lừng.
+              </p>
+            </div>
+          `).join('');
+        }
+
+        const resTrails = await fetch('/api/v1/tourism/trails');
+        const tData = await resTrails.json();
+        if (tStops && tData && tData.stops) {
+          tStops.innerHTML = tData.stops.map((st, idx) => `
+            <div class="p-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-[#FBBF24] text-[#0F172A] font-black text-[10px] flex items-center justify-center shrink-0">${idx+1}</span>
+                <div>
+                  <div class="font-bold text-[11px]">${st.dish}</div>
+                  <div class="text-[10px] text-[var(--text-muted)]">${st.place} · ${st.slot}</div>
+                </div>
+              </div>
+              <span id="stamp-badge-${idx}" class="text-xs text-white/30">⚪ Chưa đi</span>
+            </div>
+          `).join('');
+        }
+      } catch (e) {}
+    }
+
+    async function stampPassport() {
+      try {
+        const res = await fetch('/api/v1/tourism/passport/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ place_id: 'PLACE-401' })
+        });
+        const data = await res.json();
+        if (data && data.stamped) {
+          passportStampsCount = Math.min(4, passportStampsCount + 1);
+          const counter = document.getElementById('passport-stamp-counter');
+          if (counter) counter.textContent = `${passportStampsCount}/4 Trạm Đã Đóng Dấu`;
+          for (let i = 0; i < passportStampsCount; i++) {
+            const b = document.getElementById(`stamp-badge-${i}`);
+            if (b) {
+              b.className = 'text-xs text-[#22C55E] font-bold';
+              b.textContent = '🟢 Đã đóng dấu';
+            }
+          }
+          if (passportStampsCount >= 4) {
+            alert('🎉 Chúc mừng bạn đã hoàn thành Food Trail 4 trạm và mở khóa danh hiệu: ' + data.badge_unlocked + '!');
+          } else {
+            alert(`✅ Đã đóng dấu thành công trạm thứ ${passportStampsCount}! Tiếp tục hành trình nhé.`);
+          }
+        }
+      } catch (e) {}
+    }
+
+    let currentTranslatorLang = 'EN';
+
+    function changeTranslatorLang(lang) {
+      currentTranslatorLang = lang;
+      ['EN', 'KO', 'JA'].forEach(l => {
+        const b = document.getElementById(`tlang-${l}`);
+        if (b) {
+          b.className = l === lang
+            ? 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-[#18181B] text-white'
+            : 'px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)]';
+        }
+      });
+      loadLiveTranslator(lang);
+    }
+
+    async function loadLiveTranslator(lang) {
+      const grid = document.getElementById('live-translator-grid');
+      if (!grid) return;
+      grid.innerHTML = '<div class="col-span-3 text-center py-10 text-xs text-[var(--text-muted)]">Đang dịch thực đơn đa ngữ AI...</div>';
+
+      try {
+        const res = await fetch('/api/v1/translate/menu', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_lang: lang })
+        });
+        const data = await res.json();
+        if (data && data.translated_items) {
+          grid.innerHTML = data.translated_items.map(item => `
+            <div class="genui-card p-5 rounded-3xl space-y-3 border border-[var(--border-subtle)] flex flex-col justify-between">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FBBF24]/20 text-[#B45309]">${lang}</span>
+                  <span class="text-xs">🍜</span>
+                </div>
+                <div>
+                  <h4 class="font-black text-sm text-[var(--text-main)]">${item.name_vi}</h4>
+                  <div class="font-bold text-xs text-[#22C55E] mt-0.5">${item.translation}</div>
+                </div>
+                <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">${item.cultural_note || ''}</p>
+                ${item.allergen_warning ? `<div class="p-2 rounded-xl bg-amber-500/10 text-amber-600 text-[10px] font-medium border border-amber-500/20">⚠️ ${item.allergen_warning}</div>` : ''}
+              </div>
+
+              <div class="pt-2 border-t border-[var(--border-subtle)] space-y-1.5">
+                <div class="text-[10px] text-[var(--text-muted)]">Câu gọi món tại quán:</div>
+                <div class="p-2 rounded-xl bg-[var(--bg-elevated)] text-[11px] font-medium flex items-center justify-between">
+                  <span class="italic">"${item.order_audio_phrase_vi || item.name_vi}"</span>
+                  <button onclick="speakPhrase('${(item.order_audio_phrase_vi || item.name_vi).replace(/'/g, "\\'")}')" class="px-2 py-1 rounded-lg bg-[#FBBF24] text-[#0F172A] text-[10px] font-black shrink-0 hover:brightness-105">
+                    🔊 Nghe
+                  </button>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (e) {
+        grid.innerHTML = '<div class="col-span-3 text-center py-6 text-xs text-red-500">Lỗi dịch thực đơn.</div>';
+      }
+    }
+
+    function speakPhrase(text) {
+      if ('speechSynthesis' in window) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'vi-VN';
+        u.rate = 0.9;
+        window.speechSynthesis.speak(u);
+      } else {
+        alert('Phát âm tiếng Việt: ' + text);
+      }
+    }
+
+    async function loadLiveInsights() {
+      try {
+        const res = await fetch('/api/v1/enterprise/tourism-insights');
+        const data = await res.json();
+        if (data) {
+          const qEl = document.getElementById('insight-queries');
+          if (qEl && data.local_specialty_queries_30d) qEl.textContent = Number(data.local_specialty_queries_30d).toLocaleString('vi-VN');
+          const vEl = document.getElementById('insight-visitors');
+          if (vEl && data.international_visitors_m16) vEl.textContent = Number(data.international_visitors_m16).toLocaleString('vi-VN');
+
+          const tBox = document.getElementById('insight-trending-dishes');
+          if (tBox && data.top_trending_dishes) {
+            tBox.innerHTML = data.top_trending_dishes.map((dish, i) => `
+              <div class="p-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
+                <span class="font-bold">#${i+1} ${dish}</span>
+                <span class="text-[10px] font-bold text-[#22C55E]">Xu hướng tăng trưởng</span>
+              </div>
+            `).join('');
+          }
+        }
+
+        const resBrand = await fetch('/api/v1/enterprise/brand-campaigns');
+        const bData = await resBrand.json();
+        const bBox = document.getElementById('insight-brand-campaigns');
+        if (bBox && bData && bData.campaigns) {
+          bBox.innerHTML = bData.campaigns.map(c => `
+            <div class="p-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-1">
+              <div class="font-bold text-xs">${c.brand}</div>
+              <div class="text-[10px] text-[var(--text-muted)]">${c.placements}</div>
+              <div class="text-[10px] text-[#22C55E] font-bold">Tỷ lệ tương tác: ${c.ctr_pct}% CTR</div>
+            </div>
+          `).join('');
+        }
+      } catch (e) {}
     }
 
     function filterSidebarScreens(val) {
