@@ -1,9 +1,9 @@
 // =============================================================================
-// SERVICE WORKER: Hôm nay ăn gì · Taste of Vietnam v0.1 — hnag-v5
+// SERVICE WORKER: Hôm nay ăn gì · Taste of Vietnam v0.1 — hnag-v6
 // Strategy: Network First with graceful offline fallback (Never crashes)
 // =============================================================================
 
-const CACHE_NAME = 'hnag-v5';
+const CACHE_NAME = 'hnag-v6';
 
 // ---------------------------------------------------------------------------
 // INSTALL: Skip waiting immediately
@@ -39,6 +39,9 @@ self.addEventListener('fetch', (event) => {
 
   // Skip chrome-extension or non-http
   if (!url.protocol.startsWith('http')) return;
+
+  // Let browser natively handle cross-origin assets (e.g. Google Fonts)
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
     fetch(event.request)

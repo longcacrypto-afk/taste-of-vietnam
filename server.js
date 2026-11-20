@@ -75,6 +75,33 @@ export function createAppServer() {
       }
     }
 
+    // 3b. Serve Static Assets (/assets/*)
+    if (pathname.startsWith('/assets/')) {
+      const assetRelative = pathname.replace(/^\/assets\//, '');
+      const assetPath = path.normalize(path.join(__dirname, 'ui-design', 'assets', assetRelative));
+      const assetsRoot = path.normalize(path.join(__dirname, 'ui-design', 'assets'));
+      if (assetPath.startsWith(assetsRoot) && fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
+        const ext = path.extname(assetPath).toLowerCase();
+        const mimeMap = {
+          '.js': 'application/javascript; charset=utf-8',
+          '.css': 'text/css; charset=utf-8',
+          '.json': 'application/json; charset=utf-8',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.svg': 'image/svg+xml',
+          '.ico': 'image/x-icon',
+          '.webp': 'image/webp'
+        };
+        const contentType = mimeMap[ext] || 'application/octet-stream';
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=86400'
+        });
+        return fs.createReadStream(assetPath).pipe(res);
+      }
+    }
+
     // 4. Serve 93-Screen UI/UX Studio at / and /studio (Streaming with no memory overhead)
     const studioFile = path.join(__dirname, 'ui-design', 'index.html');
     if ((pathname === '/' || pathname === '/studio') && fs.existsSync(studioFile)) {
