@@ -217,6 +217,11 @@ test('M13, M14, M15, M16 & M17: Expansion modules (Bookings, Cultural Stories, F
   assert.equal(trans.data.preserved_original_names, true);
   assert.equal(trans.data.items[0].original_vietnamese_name, 'Phở Bò Tái Nạm Hà Nội');
 
+  const transZh = await handleApiRequest(store, 'POST', '/api/v1/translate/menu', new URLSearchParams(), { target_lang: 'ZH' });
+  assert.equal(transZh.status, 200);
+  assert.equal(transZh.data.language, 'ZH');
+  assert.ok(transZh.data.items[0].translated_title.includes('牛肉粉'));
+
   // M17 B2G Tourism Insights enforces K-Anonymity
   const b2g = await handleApiRequest(store, 'GET', '/api/v1/enterprise/tourism-insights', new URLSearchParams());
   assert.equal(b2g.status, 200);

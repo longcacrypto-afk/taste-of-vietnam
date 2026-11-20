@@ -243,6 +243,11 @@ export function translateVietnameseMenu(store, targetLang = 'EN') {
       'DISH-101': { trans: 'ハノイ風牛肉フォー（レア＆ブリスケット）', note: '牛骨を12時間煮込んだ澄んだスープと香草', audio_vi: 'Cho tôi một tô Phở bò tái nạm' },
       'DISH-102': { trans: 'サイゴン風炭火焼きポークチョップライス（コムタム）', note: 'ハチミツ漬け炭火焼き豚肉とベトナム風茶碗蒸し', audio_vi: 'Cho tôi một dĩa Cơm tấm sườn bì chả' },
       'DISH-103': { trans: 'フエ風ピリ辛レモングラス牛肉麺（ブンボーフエ）', note: 'レモングラス香る中部フエの伝統麺', audio_vi: 'Cho tôi một tô Bún bò Huế ít cay' }
+    },
+    ZH: {
+      'DISH-101': { trans: '河内半熟牛腩牛肉粉', note: '12小时牛骨高汤慢火慢熬，散发八角与姜香', audio_vi: 'Cho tôi một tô Phở bò tái nạm không hành' },
+      'DISH-102': { trans: '西贡蜜汁炭烤猪排碎米饭', note: '搭配炭烤猪排、蒸蛋肉饼与酸甜爽脆泡菜', audio_vi: 'Cho tôi một dĩa Cơm tấm sườn bì chả' },
+      'DISH-103': { trans: '顺化香茅微辣牛肉米粉', note: '源自越南古都顺化的浓香香茅与炖牛腱高汤', audio_vi: 'Cho tôi một tô Bún bò Huế ít cay' }
     }
   };
 

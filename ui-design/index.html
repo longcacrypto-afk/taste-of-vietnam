@@ -813,6 +813,9 @@
           <button onclick="changeTranslatorLang('JA')" id="tlang-JA" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)]">
             🇯🇵 日本語
           </button>
+          <button onclick="changeTranslatorLang('ZH')" id="tlang-ZH" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)]">
+            🇨🇳 中文
+          </button>
         </div>
       </div>
 
@@ -5539,7 +5542,11 @@ export async function load${activeScr.id.replace('-','')}() {
                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${isSponsored ? 'bg-[#FBBF24] text-[#0F172A]' : 'bg-[#DCFCE7] text-[#15803D]'}">
                       ${isSponsored ? '★ Tài trợ quán gần' : '🌿 Gợi ý hôm nay'}
                     </span>
-                    <span class="text-xs font-extrabold text-[#FBBF24]">${(item.price_vnd || 45000).toLocaleString('vi-VN')}đ</span>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-extrabold text-[#FBBF24]">${(item.price_vnd || 45000).toLocaleString('vi-VN')}đ</span>
+                      <button onclick="likeDish('${item.dish_id}', '${item.name}')" class="text-white/60 hover:text-red-400 text-xs transition" title="Lưu vào món yêu thích">❤️</button>
+                      <button onclick="skipDish('${item.dish_id}', '${item.name}')" class="text-white/40 hover:text-white text-xs transition" title="Đổi gợi ý món khác">✕</button>
+                    </div>
                   </div>
                   <h3 class="font-black text-base mt-2">${item.name}</h3>
                   <p class="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">${item.description || item.reason}</p>
@@ -5595,6 +5602,40 @@ export async function load${activeScr.id.replace('-','')}() {
         refreshLiveSuggestions();
       } catch (e) {
         showFloatingToast('Lỗi Kết Nối', 'Không thể ghi nhận món ăn.', '⚠️');
+      }
+    }
+
+    async function likeDish(dishId, dishName) {
+      try {
+        await Promise.all([
+          fetch('/api/v1/suggestions/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dish_id: dishId, action: 'liked' })
+          }),
+          fetch('/api/v1/me/collections', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dish_id: dishId })
+          })
+        ]);
+        showFloatingToast('Đã Lưu Món Yêu Thích!', `Món "${dishName}" đã được thêm vào bộ sưu tập của bạn.`, '❤️');
+      } catch (e) {
+        showFloatingToast('Lỗi Kết Nối', 'Không thể lưu món.', '⚠️');
+      }
+    }
+
+    async function skipDish(dishId, dishName) {
+      try {
+        await fetch('/api/v1/suggestions/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dish_id: dishId, action: 'skipped', skip_reason: 'not_in_the_mood' })
+        });
+        showFloatingToast('Đã Đổi Gợi Ý!', `AI Chef Măm đang tìm món khác phù hợp hơn thay cho "${dishName}".`, '🔄');
+        refreshLiveSuggestions();
+      } catch (e) {
+        showFloatingToast('Lỗi Kết Nối', 'Không thể đổi món.', '⚠️');
       }
     }
 
@@ -6486,7 +6527,7 @@ export async function load${activeScr.id.replace('-','')}() {
 
     function changeTranslatorLang(lang) {
       currentTranslatorLang = lang;
-      ['EN', 'KO', 'JA'].forEach(l => {
+      ['EN', 'KO', 'JA', 'ZH'].forEach(l => {
         const b = document.getElementById(`tlang-${l}`);
         if (b) {
           b.className = l === lang
