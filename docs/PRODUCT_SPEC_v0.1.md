@@ -163,6 +163,70 @@ Recommendation Engine (Search Dishes + Search Places + Weather + User Taste Prof
 
 ### M10 — Analytics & Event
 - **6 màn hình (`M10-S01` → `M10-S06`):** Theo dõi toàn bộ phễu chuyển đổi từ `app_open` → `suggestion_shown` → `dish_view` / `place_view` → `order_click` / `direction_click` / `call_click`.
+- **API:** `/v1/events`, `/v1/analytics/funnel`, `/v1/analytics/ai-benchmark`.
+
+### M11 — Kế hoạch bữa & Đi chợ thông minh (Meal Planning & Smart Grocery)
+- **3 màn hình (`M11-S01` → `M11-S03`):** Lập thực đơn tuần 7 ngày theo khẩu vị gia đình, tự động cân đối calo & ngân sách; Giỏ đi chợ gộp thông minh tự động cộng dồn nguyên liệu và **khấu trừ nguyên liệu có sẵn trong tủ lạnh** (`in_fridge = true`); Quản lý kho tủ lạnh gia đình.
+- **API:** `/v1/meal-plans/weekly`.
+
+### M12 — Xã hội, Bình chọn ăn nhóm & Đánh giá GPS (Group Dining & GPS Reviews)
+- **3 màn hình (`M12-S01` → `M12-S03`):** Tạo phòng bình chọn ăn nhóm theo mã PIN/QR, tự động tính **giao thoa dị ứng cứng** giữa tất cả thành viên trong nhóm; Bảng theo dõi kết quả biểu quyết thời gian thực; Đánh giá quán ăn có **xác thực GPS bán kính ≤ 500m** chống review ảo.
+- **API:** `/v1/polls`, `/v1/polls/{id}/vote`, `/v1/places/{id}/reviews`.
+
+### M13 — Đặt bàn trực tiếp & Voucher tại quán (Table Booking & In-Store Vouchers)
+- **2 màn hình (`M13-S01` → `M13-S02`):** Đặt bàn giữ chỗ tức thì (Instant Confirmed) chọn số người, khung giờ và yêu cầu đặc biệt (ghế trẻ em, máy lạnh); Sinh mã QR Voucher điện tử độc quyền để quét trừ tiền trực tiếp tại quầy thu ngân của quán.
+- **API:** `/v1/bookings`, `/v1/vouchers`.
+
+### M14 — Văn hóa ẩm thực & Câu chuyện cội nguồn (Culinary Culture & Origin Stories)
+- **2 màn hình (`M14-S01` → `M14-S02`):** Kho tư liệu lịch sử, sự tích văn hóa và giai thoại dân gian về từng món ăn truyền thống 3 miền; Bản đồ biến thể vùng miền (so sánh Phở Bắc vs Phở Nam, Bún Bò Huế gốc vs Bún Bò Sài Gòn).
+- **API:** `/v1/dishes/{id}/story`, `/v1/dishes/{id}/regional-variants`.
+
+### M15 — Lộ trình Food Trail & Hộ chiếu du lịch ẩm thực (Curated Food Trails & Digital Passport)
+- **2 màn hình (`M15-S01` → `M15-S02`):** Các tuyến food tour ẩm thực tuyển chọn (Phố Bún Sài Gòn, Ẩm thực Chợ Đêm, Tuyến Trà Chiều Thảo Mộc); Hộ chiếu ẩm thực số tích dấu QR khi ghé thăm từng quán trên lộ trình để đổi huy hiệu & phần thưởng đặc biệt.
+- **API:** `/v1/tourism/trails`, `/v1/tourism/passport/stamp`.
+
+### M16 — Đa ngôn ngữ du khách quốc tế & Audio phát âm (Multilingual Tourist Menu AI)
+- **2 màn hình (`M16-S01` → `M16-S02`):** Dịch thuật ngữ ẩm thực Việt Nam chuẩn xác sang 4 thứ tiếng (Tiếng Anh EN, Hàn KO, Trung ZH, Nhật JA), giữ nguyên tên món gốc kèm mô tả nguyên liệu chi tiết; Tích hợp audio phát âm chuẩn giọng người bản xứ và hướng dẫn cách ăn chuẩn vị (VD: ăn kèm rau sống nào, cách pha nước chấm).
+- **API:** `/v1/translate/menu`.
+
+### M17 — B2G / Brand Enterprise Insights (Regional Tourism & Co-Marketing)
+- **2 màn hình (`M17-S01` → `M17-S02`):** Cổng dữ liệu phân tích vĩ mô dành cho Sở Du lịch / Ban Quản lý văn hóa địa phương (báo cáo món ăn được quan tâm nhất, bản đồ nhiệt ẩm thực, lưu lượng khách quốc tế); Bảng quản trị chiến dịch đồng tiếp thị dành cho nhãn hàng F&B / FMCG (tài trợ hiển thị gia vị, đồ uống dùng kèm chuẩn vị).
+- **API:** `/v1/enterprise/insights/regional`, `/v1/enterprise/brand-campaigns`.
+
+---
+
+## 7. Ma trận 93 Màn hình Toàn Ứng Dụng (M1 → M17)
+
+| Nhóm Nền Tảng | Mã Module | Số lượng Màn hình | Ghi chú & Phạm vi |
+| :--- | :--- | :---: | :--- |
+| **Consumer Mobile MVP** | M1 → M5 | **40 Màn hình** | Onboarding, Gợi ý 3 món AI hằng ngày, Vòng quay 3D & Mini-game, Chat AI Măm, Bản đồ quán 3km, Chi tiết quán & Đặt món. |
+| **Consumer Web & PWA** | Web Core | **5 Màn hình** | Trang chủ Responsive, Khám phá món & quán, Chi tiết công thức nấu ăn, Thư viện ẩm thực SEO. |
+| **Merchant & Quảng Cáo** | M6 → M7 | **17 Màn hình** | Đăng ký quán, Quản lý thực đơn thủ công & AI Menu OCR, Tạo chiến dịch quảng cáo, Cổng thanh toán VietQR Napas247. |
+| **Quản Trị & Phân Tích** | M9 → M10 | **15 Màn hình** | Admin CMS, Hàng đợi duyệt ghép món OCR, Xử lý quán tự động tạm dừng, Phân quyền RBAC 6 roles, Phễu PostHog & AI Benchmark. |
+| **Tăng Trưởng & Mở Rộng**| M11 → M17 | **16 Màn hình** | Thực đơn tuần & Giỏ đi chợ, Bình chọn nhóm & Đánh giá GPS, Đặt bàn & Voucher, Chuyện văn hóa, Food Trail, Dịch menu AI, B2G Insights. |
+| **TỔNG CỘNG** | **M1 → M17** | **93 Màn hình** | **Hoàn chỉnh 100% trên cả Web Runtime (Live) và Flutter Mobile Screens.** |
+
+---
+
+## 8. Kiến trúc Kỹ thuật & Tiêu chuẩn Nghiệm thu (SLAs)
+
+### 8.1. Tech Stack Hoàn Chỉnh
+- **Mobile Client:** Flutter 3.x (Dart) — Kiến trúc Clean Architecture với Riverpod / Provider.
+- **Web Runtime:** HTML5, Tailwind CSS v3 tự lưu trữ tại chỗ (`/assets/tailwindcss.min.js`), Service Worker PWA `hnag-v6`.
+- **Backend Gateway:** Node.js HTTP/2 REST Gateway (Modular Services Architecture), hỗ trợ High-Speed In-Memory Store & PostgreSQL fallback.
+- **Database:** PostgreSQL + PostGIS (tìm kiếm không gian bán kính 3km) + pgvector (tìm kiếm tương đồng ngữ nghĩa món ăn).
+- **AI Core:** Gemini 2.0 Flash (Chat ẩm thực thông minh, giải thích lý do gợi ý) + Regex Intent Parser tốc độ cao.
+- **Thanh toán:** VietQR chuẩn EMVCo (NAPAS 24/7) + PayOS Webhook xác thực chữ ký HMAC-SHA256 & kiểm tra Idempotency.
+
+### 8.2. Tiêu chí Nghiệm thu Hệ thống (Quality SLAs)
+1. **Độ trễ gợi ý (Daily Recommendation Latency):** Phản hồi `GET /api/v1/suggestions/today` đạt `p95 < 1500ms`.
+2. **Nguyên tắc an toàn dị ứng tuyệt đối (Zero Allergy Tolerance):** $100\%$ không bao giờ đề xuất món chứa chất gây dị ứng đã khai báo của người dùng trên cả gợi ý tự nhiên lẫn vị trí tài trợ.
+3. **Giới hạn vị trí tài trợ (Sponsored Cap):** Tối đa $1/3$ tổng số món gợi ý là vị trí tài trợ (`Sponsored`) và bắt buộc hiển thị nhãn nhận diện rõ ràng.
+4. **Chu kỳ làm mới món (3-Day Non-Repeat Cooldown):** Không gợi ý lại các món người dùng đã ăn hoặc đã xem trong vòng 3 ngày gần nhất.
+5. **Độ chính xác NLU tiếng Việt (Vietnamese Intent SLA):** Đạt độ chính xác $\ge 90\%$ trên bộ kiểm thử 200 câu hỏi tiếng Việt tự nhiên phức tạp (đạt $100\%$ trong bộ benchmark thực tế).
+6. **Bảo vệ người dùng khỏi quán đóng cửa (Auto-Pause Guard):** Tự động tạm ẩn quán khỏi kết quả gợi ý khi nhận $\ge 3$ phản ánh đóng cửa trong ngày.
+7. **Chống làm phiền thông báo (Anti-Fatigue Push Rule):** Nghiêm ngặt giới hạn $\le 2$ thông báo đẩy mỗi ngày vào khung giờ trưa (10:30) và tối (17:00).
+8. **Tuân thủ Nghị định 13/2023/NĐ-CP (PDPD Compliance):** Cho phép người dùng xuất toàn bộ dữ liệu cá nhân dạng JSON và hỗ trợ xóa sạch dữ liệu tức thì (*Right to be Forgotten*).
 
 ---
 

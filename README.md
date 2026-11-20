@@ -1,21 +1,24 @@
 # 🍲 Hôm Nay Ăn Gì? · Taste of Vietnam v0.1
 
 [![Render Status](https://img.shields.io/badge/Render-Deployed%20Live-22C55E?style=for-the-badge&logo=render)](https://taste-of-vietnam.onrender.com)
-[![QA Tests](https://img.shields.io/badge/QA%20Tests-21%2F21%20PASS-22C55E?style=for-the-badge&logo=node.js)](https://github.com/longcacrypto-afk/taste-of-vietnam)
-[![Flutter](https://img.shields.io/badge/Flutter-16%20Screens%20(6.8k%20LOC)-02569B?style=for-the-badge&logo=flutter)](mobile-flutter/)
+[![QA Tests](https://img.shields.io/badge/QA%20Tests-23%2F23%20PASS-22C55E?style=for-the-badge&logo=node.js)](https://github.com/longcacrypto-afk/taste-of-vietnam)
+[![Flutter](https://img.shields.io/badge/Flutter-16%20Screens%20(7.3k%20LOC)-02569B?style=for-the-badge&logo=flutter)](mobile-flutter/)
 [![PDPD](https://img.shields.io/badge/Tuân%20thủ-Nghị%20định%2013%2F2023%2FNĐ--CP-FBBF24?style=for-the-badge)](docs/PRODUCT_SPEC_v0.1.md)
 
 > **Hôm nay ăn gì · Taste of Vietnam** là nền tảng khám phá ẩm thực Việt Nam thông minh hỗ trợ bởi AI, cá nhân hóa dựa trên thời tiết địa phương, số lượng người, ngân sách, dị ứng thực phẩm và văn hóa ẩm thực 3 miền Bắc – Trung – Nam.
 
 ---
 
-## 🚀 New in Latest Build (Phase F–J Production Hardening)
+## 🚀 Trạng Thái Phát Hành & Tính Năng Mới Nhất
 
-- 🔒 **Security & Performance (Phase F):** In-memory Rate Limiting (60 req/min/IP), Strict CSP, Referrer-Policy, Permissions-Policy, ETag MD5 caching với 304 Not Modified, và Gzip compression tự động.
-- 📱 **PWA Offline-First (Phase G):** Service Worker `hnag-v3` Stale-While-Revalidate, Push Notification handlers, Background Sync queue khi vote poll offline, và Web Manifest v3 đầy đủ shortcuts + share_target.
-- 🌱 **Seed Expansion (Phase H):** Mở rộng lên 12 món ăn chuẩn 3 miền (thêm Bánh Xèo Miền Trung, Canh Chua Cá Lóc, Mì Quảng Gà Ta, Chả Giò Chay), 8 quán ăn PostGIS, 5 chiến dịch tài trợ và store polls/bookings/reviews.
-- 🌐 **Interactive Live Panels (Phase I):** Bổ sung Panel **Khám Phá Món Ăn (M2)** với bộ lọc vùng miền + categories, Panel **Chi Tiết Công Thức & Scale Khẩu Phần (M2-S04)** với bộ điều chỉnh khẩu phần 1–12 người, và nút **Chia sẻ Món (Web Share API)**.
-- ⚙️ **CI/CD Quality Gate (Phase J):** Tự động kiểm tra kích thước bundle (< 4MB) và xác thực tính toàn vẹn của API Gateway trên mọi commit.
+- 🌐 **Toàn bộ 17/17 Module Hoàn Chỉnh (Live Panels):** Tất cả 17 module theo đặc tả `docs/PRODUCT_SPEC_v0.1.md` đều đã có bảng điều khiển trực tiếp trên web [taste-of-vietnam.onrender.com](https://taste-of-vietnam.onrender.com).
+- 👤 **Hồ sơ Vị Giác & Tuân Thủ PDPD (M1):** Lọc theo 3 miền, chỉnh mức cay (0–3), chế độ ăn (Cân bằng, Ăn chay, Thuần chay, Low-Carb, Eat Clean), bộ lọc cứng dị ứng 100%, xuất dữ liệu JSON cá nhân & xóa tài khoản tức thì theo Nghị định 13/2023/NĐ-CP.
+- 🎲 **3-in-1 Decision Mini-Games Hub (M3):** Vòng quay 3D chuẩn xác tâm ô (+22.5° offset), Rút quẻ thẻ tre cổ truyền dân gian & Xé túi mù (Blind Box) trúng mã voucher `TUIMU-MAM-25K`.
+- 🔔 **Nhắc Nhở Bữa Ăn & Thông Báo Thời Tiết (M8):** Nhắc trưa (10:30) & tối (17:00), giới hạn nghiêm ngặt $\le 2$ push/ngày, tự động tích hợp thời tiết, kèm Simulator bắn thử Web Push & Toast nổi.
+- ⚙️ **Cổng Quản Trị CMS & Kiểm Duyệt Tự Động (M9):** Duyệt ghép món OCR, từ chối OCR kèm lý do cụ thể, tự động tạm dừng khi $\ge 3$ báo cáo lỗi và nút *Mở lại quán* tự phục hồi.
+- 📊 **Phễu Chuyển Đổi & NLU Benchmark (M10):** Phễu 4 bước PostHog (WAMD 18.420 quyết định/tuần) và bộ benchmark NLU 200 câu tiếng Việt đạt 100% SLA (yêu cầu $\ge 90\%$).
+- 🛡️ **Khắc phục triệt để vỡ UI & Offline-First:** Tự lưu trữ Tailwind CSS v3 tại chỗ (`/assets/tailwindcss.min.js`), Service Worker `hnag-v6` không chặn cross-origin, và Critical CSS Reset.
+- 🧪 **23/23 Automated QA Tests PASS:** Đảm bảo toàn vẹn từ hợp đồng dữ liệu, logic nghiệp vụ đến an toàn dị ứng tuyệt đối.
 
 ---
 
