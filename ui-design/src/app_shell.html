@@ -235,6 +235,9 @@
           <button onclick="setLiveAppTab('chat')" class="px-4 py-2.5 rounded-2xl bg-white/15 text-white font-extrabold text-xs flex items-center gap-2 hover:bg-white/20 transition">
             <span>👨‍🍳</span> Chat AI Măm
           </button>
+          <button onclick="setLiveAppTab('profile')" class="px-3.5 py-2.5 rounded-2xl bg-white/10 text-white font-extrabold text-xs flex items-center gap-1.5 hover:bg-white/20 transition">
+            <span>👤</span> Khẩu Vị
+          </button>
         </div>
       </div>
 
@@ -1690,6 +1693,9 @@ export async function load${activeScr.id.replace('-','')}() {
                     <a href="${place.links?.shopeefood || '#'}" target="_blank" class="flex-1 py-2 text-center rounded-xl bg-[#EE4D2D] text-white font-extrabold text-[11px] hover:opacity-90">
                       Shopee ↗
                     </a>
+                    <button onclick="markDishEaten('${item.dish_id}', '${item.name}')" class="px-2 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[#22C55E] text-[11px] font-bold text-[#22C55E] transition" title="Đánh dấu đã ăn hôm nay (Cooldown 3 ngày)">
+                      ✓ Đã Ăn
+                    </button>
                     <button onclick="openLiveRecipe('${item.dish_id}')" class="px-2.5 py-2 rounded-xl bg-[#FBBF24] text-[#0F172A] text-[11px] font-extrabold hover:brightness-105" title="Xem công thức & scale khẩu phần">
                       Công Thức
                     </button>
@@ -1704,6 +1710,20 @@ export async function load${activeScr.id.replace('-','')}() {
         }
       } catch (err) {
         grid.innerHTML = '<div class="col-span-3 text-center py-8 text-xs text-red-500">Không thể kết nối API. Vui lòng thử lại.</div>';
+      }
+    }
+
+    async function markDishEaten(dishId, dishName) {
+      try {
+        const res = await fetch('/api/v1/suggestions/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dish_id: dishId, action: 'eaten' })
+        });
+        showFloatingToast('Đã Ghi Nhận Món Ăn!', `Món "${dishName}" đã được đưa vào chu kỳ cooldown 3 ngày không lặp lại.`, '🍲');
+        refreshLiveSuggestions();
+      } catch (e) {
+        showFloatingToast('Lỗi Kết Nối', 'Không thể ghi nhận món ăn.', '⚠️');
       }
     }
 

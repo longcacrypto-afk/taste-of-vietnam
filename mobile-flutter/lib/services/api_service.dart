@@ -255,4 +255,66 @@ class ApiService {
     }
     return null;
   }
+
+  // ─── 11. M1: HỒ SƠ KHẨU VỊ & BẢO VỆ DỮ LIỆU PDPD (NGHỊ ĐỊNH 13/2023/NĐ-CP) ──
+  static Future<Map<String, dynamic>?> fetchUserProfile() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/me/profile')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> updateUserProfile(Map<String, dynamic> data) async {
+    try {
+      final res = await http.put(
+        Uri.parse('$baseUrl/me/profile'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> deleteUserAccount() async {
+    try {
+      final res = await http.delete(Uri.parse('$baseUrl/me')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 12. M8: NHẮC NHỞ BỮA ĂN & THÔNG BÁO THỜI TIẾT ────────────────────────
+  static Future<Map<String, dynamic>?> fetchNotifications() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/notifications')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> updateMealReminderSchedule(Map<String, dynamic> schedule) async {
+    try {
+      final res = await http.put(
+        Uri.parse('$baseUrl/me/meal-schedule'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(schedule),
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
 }

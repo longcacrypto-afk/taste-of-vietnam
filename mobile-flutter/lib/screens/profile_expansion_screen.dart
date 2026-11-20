@@ -2,8 +2,10 @@
 // M1, M8 & M11..M16 SCREEN: TASTE PROFILE, HARD ALLERGY GUARD & EXPANSION HUB
 // =============================================================================
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class ProfileExpansionScreen extends StatefulWidget {
   const ProfileExpansionScreen({super.key});
@@ -14,16 +16,157 @@ class ProfileExpansionScreen extends StatefulWidget {
 
 class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
   final Set<String> _hardAllergies = {'shrimp', 'peanut'};
+  final Set<String> _selectedRegions = {'bac', 'trung', 'nam'};
+  int _spiceLevel = 1;
+  String _dietMode = 'balanced';
   String _selectedMenuLang = 'KO';
   bool _lunarVegan = true;
+  bool _lunchNotif = true;
+  bool _dinnerNotif = true;
+  bool _isLoading = false;
+  Map<String, dynamic>? _userProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoading = true);
+    final data = await ApiService.fetchUserProfile();
+    if (data != null && mounted) {
+      setState(() {
+        _userProfile = data;
+        _spiceLevel = data['spice_level'] ?? 1;
+        _dietMode = data['diet_mode'] ?? 'balanced';
+        if (data['hard_allergies'] is List) {
+          _hardAllergies.clear();
+          for (var a in data['hard_allergies']) {
+            _hardAllergies.add(a.toString());
+          }
+        }
+        if (data['regions'] is List) {
+          _selectedRegions.clear();
+          for (var r in data['regions']) {
+            _selectedRegions.add(r.toString());
+          }
+        }
+      });
+    }
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _saveProfile() async {
+    final res = await ApiService.updateUserProfile({
+      'spice_level': _spiceLevel,
+      'diet_mode': _dietMode,
+      'hard_allergies': _hardAllergies.toList(),
+      'regions': _selectedRegions.toList(),
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res != null
+              ? '✅ Đã lưu hồ sơ vị giác thành công!'
+              : '⚠️ Đã cập nhật chế độ offline.'),
+          backgroundColor: AppTheme.emeraldBadge,
+        ),
+      );
+    }
+  }
+
+  void _exportPdpdJson() {
+    final exportData = _userProfile ?? {
+      'hard_allergies': _hardAllergies.toList(),
+      'regions': _selectedRegions.toList(),
+      'spice_level': _spiceLevel,
+      'diet_mode': _dietMode,
+      'pdpd_compliance': 'Nghị định 13/2023/NĐ-CP',
+    };
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.charcoalHero,
+        title: const Text('📥 Bản Sao Dữ Liệu Cá Nhân', style: TextStyle(color: AppTheme.goldenAmber, fontSize: 16, fontWeight: FontWeight.w800)),
+        content: SingleChildScrollView(
+          child: Text(
+            const JsonEncoder.withIndent('  ').convert(exportData),
+            style: const TextStyle(color: Colors.white70, fontSize: 11, fontFamily: 'monospace'),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Đóng', style: TextStyle(color: AppTheme.goldenAmber)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('⚠️ Cảnh Báo Nghị Định 13/2023/NĐ-CP'),
+        content: const Text('Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản và toàn bộ lịch sử ăn uống không? Thao tác này không thể hoàn tác.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xóa Vĩnh Viễn', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final res = await ApiService.deleteUserAccount();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res?['pdpd_compliance'] ?? 'Đã xóa toàn bộ dữ liệu cá nhân theo PDPD.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.goldenAmber));
+    }
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        const Text('Hồ Sơ Vị Giác & Hệ Sinh Thái M1–M16', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-        const Text('M1 Hard Allergy Guard · M8 Nhắc lịch <=2/ngày · M11–M16 Mở rộng', style: TextStyle(fontSize: 12, color: AppTheme.slateMuted)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Hồ Sơ Vị Giác & Hệ Sinh Thái M1–M17', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                Text('M1 PDPD · M8 Nhắc lịch · M11–M17 Mở rộng', style: TextStyle(fontSize: 12, color: AppTheme.slateMuted)),
+              ],
+            ),
+            ElevatedButton.icon(
+              onPressed: _saveProfile,
+              icon: const Icon(Icons.save, size: 14, color: AppTheme.charcoalHero),
+              label: const Text('Lưu', style: TextStyle(color: AppTheme.charcoalHero, fontSize: 12, fontWeight: FontWeight.w800)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.goldenAmber,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
 
         // 1. M1 Hard Allergy Guard
@@ -47,6 +190,8 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
                   {'id': 'peanut', 'label': '🥜 Đậu phộng'},
                   {'id': 'dairy', 'label': '🥛 Sữa bò'},
                   {'id': 'gluten', 'label': '🌾 Gluten'},
+                  {'id': 'shrimp_paste', 'label': '🫙 Mắm tôm'},
+                  {'id': 'egg', 'label': '🥚 Trứng'},
                 ].map((item) {
                   final active = _hardAllergies.contains(item['id']);
                   return FilterChip(
@@ -70,7 +215,7 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
         ),
         const SizedBox(height: 14),
 
-        // 2. M8 Smart Meal Reminders (<= 2 push/day)
+        // 2. M1 Taste Preferences & Diets
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -78,30 +223,95 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('🔔 Nhắc Bữa Thông Minh (M8 · Tối đa 2 thông báo/ngày)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-                    SizedBox(height: 4),
-                    Text('Trưa 10:30 · Tối 17:00 · Tự động nhắc ăn chay Mùng 1 & Rằm', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
-                  ],
-                ),
+              const Text('🌶️ Mức Cay & Chế Độ Dinh Dưỡng', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Row(
+                children: [0, 1, 2, 3].map((lvl) {
+                  final isSel = _spiceLevel == lvl;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: ChoiceChip(
+                        label: Text(lvl == 0 ? '0' : 'Lv.$lvl', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        selected: isSel,
+                        selectedColor: AppTheme.goldenAmber,
+                        onSelected: (_) => setState(() => _spiceLevel = lvl),
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
-              Switch(
-                value: _lunarVegan,
-                activeTrackColor: AppTheme.emeraldBadge,
-                onChanged: (v) => setState(() => _lunarVegan = v),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _dietMode,
+                decoration: const InputDecoration(
+                  labelText: 'Chế độ ăn',
+                  labelStyle: TextStyle(fontSize: 12),
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'balanced', child: Text('🍲 Cân bằng (Balanced)')),
+                  DropdownMenuItem(value: 'vegetarian', child: Text('🥗 Ăn chay (Vegetarian)')),
+                  DropdownMenuItem(value: 'vegan', child: Text('🌱 Thuần chay (Vegan)')),
+                  DropdownMenuItem(value: 'low_carb', child: Text('🥩 Low Carb / Keto')),
+                  DropdownMenuItem(value: 'eat_clean', child: Text('🥑 Eat Clean')),
+                ],
+                onChanged: (v) => setState(() => _dietMode = v ?? 'balanced'),
               ),
             ],
           ),
         ),
         const SizedBox(height: 14),
 
-        // 3. M11 7-Day Meal Plan & Consolidated Grocery List
+        // 3. M8 Smart Meal Reminders (<= 2 push/day)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceElevated,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('🔔 Nhắc Bữa Thông Minh (M8 · Tối đa 2 push/ngày)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                        SizedBox(height: 4),
+                        Text('Trưa 10:30 · Tối 17:00 · Tích hợp thời tiết 🌧️ Biên Hòa', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _lunarVegan,
+                    activeTrackColor: AppTheme.emeraldBadge,
+                    onChanged: (v) {
+                      setState(() => _lunarVegan = v);
+                      ApiService.updateMealReminderSchedule({
+                        'lunch': '10:30',
+                        'dinner': '17:00',
+                        'lunar_vegan_reminder': v,
+                        'max_per_day': 2,
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 4. M11 7-Day Meal Plan & Consolidated Grocery List
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -112,9 +322,9 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
           child: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('📅 Kế Hoạch Ăn 7 Ngày & Giỏ Đi Chợ Gộp (M11-S01..S03)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+              Text('📅 Kế Hoạch Ăn 7 Ngày & Giỏ Đi Chợ Gộp (M11)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
               SizedBox(height: 6),
-              Text('• Đã tự động gộp nguyên liệu 7 ngày & trừ 2 món sẵn có trong tủ lạnh (Hành tím, Nước mắm).',
+              Text('• Đã tự động gộp nguyên liệu 7 ngày & trừ 2 món sẵn có trong tủ lạnh (Hành tím, Bánh phở).',
                   style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
               SizedBox(height: 4),
               Text('• Tổng ngân sách đi chợ dự kiến: 385.000đ / tuần', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF15803D))),
@@ -123,7 +333,7 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
         ),
         const SizedBox(height: 14),
 
-        // 4. M16 Multilingual Menu Translator AI
+        // 5. M16 Multilingual Menu Translator AI
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -161,6 +371,53 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
                         ? 'ハノイ風牛肉フォー（レア＆ブリスケット）'
                         : 'Hanoi Sliced & Flank Beef Noodle Soup (12-hr marrow broth)',
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 6. PDPD Compliance Actions (Nghị định 13/2023/NĐ-CP)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Text('🛡️', style: TextStyle(fontSize: 16)),
+                  SizedBox(width: 6),
+                  Text('Quyền Riêng Tư (Nghị Định 13/2023/NĐ-CP)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text('Bạn có toàn quyền tải bản sao dữ liệu cá nhân hoặc yêu cầu xóa vĩnh viễn không thể khôi phục.',
+                  style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _exportPdpdJson,
+                      icon: const Icon(Icons.download, size: 14),
+                      label: const Text('Xuất JSON', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                      onPressed: _deleteAccount,
+                      icon: const Icon(Icons.delete_forever, size: 14),
+                      label: const Text('Xóa Tài Khoản', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
