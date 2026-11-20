@@ -1,23 +1,60 @@
 {
+  "id": "hnag-taste-of-vietnam-v01",
   "name": "Hôm nay ăn gì · Taste of Vietnam",
   "short_name": "Ăn Gì?",
-  "description": "Nền tảng khám phá ẩm thực Việt Nam thông minh với AI Chef Măm",
+  "description": "AI-powered Vietnamese food discovery. Get personalized meal suggestions, discover local restaurants, 7-day meal plans & group polls.",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#18181B",
   "theme_color": "#FBBF24",
   "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "categories": ["food", "lifestyle", "utilities"],
   "icons": [
     {
       "src": "/assets/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/assets/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
-  "categories": ["food", "lifestyle", "travel"]
+  "shortcuts": [
+    {
+      "name": "Gợi ý hôm nay",
+      "short_name": "Gợi ý",
+      "description": "Xem gợi ý bữa ăn AI cá nhân hóa hôm nay",
+      "url": "/",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Quay Món 3D",
+      "short_name": "Quay Món",
+      "description": "Vòng quay ẩm thực ngẫu nhiên hợp khẩu vị",
+      "url": "/#wheel",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Chat AI Măm",
+      "short_name": "AI Măm",
+      "description": "Trợ lý ẩm thực AI thông minh",
+      "url": "/#chat",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

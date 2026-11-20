@@ -212,6 +212,12 @@
       <button onclick="setLiveAppTab('today')" id="ltab-today" class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-[#18181B] text-white shadow transition shrink-0 flex items-center gap-2">
         <span>🍜</span> Gợi Ý Bữa Ăn Hôm Nay
       </button>
+      <button onclick="setLiveAppTab('explore')" id="ltab-explore" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>🔎</span> Khám Phá Món Ăn (M2)
+      </button>
+      <button onclick="setLiveAppTab('recipe')" id="ltab-recipe" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>🍲</span> Công Thức Nấu Ăn (M2)
+      </button>
       <button onclick="setLiveAppTab('chat')" id="ltab-chat" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
         <span>👨‍🍳</span> Trò Chuyện AI Chef Măm
       </button>
@@ -674,6 +680,82 @@
             <!-- Loaded dynamically -->
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- TAB PANEL: KHÁM PHÁ MÓN ĂN (M2 EXPLORE) -->
+    <div id="lpanel-explore" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FBBF24]/20 text-[#B45309]">M2 DISH LIBRARY</span>
+            <span class="text-xs text-[var(--text-muted)]">Thư viện 600+ món ăn truyền thống 3 miền Bắc – Trung – Nam</span>
+          </div>
+          <h2 class="text-xl font-black">Khám Phá Món Ăn &amp; Ẩm Thực Việt Nam</h2>
+        </div>
+
+        <!-- Region Filter Pills -->
+        <div class="flex items-center gap-1.5 bg-[var(--bg-elevated)] p-1 rounded-2xl border border-[var(--border-subtle)] shrink-0">
+          <button onclick="filterExploreRegion('')" id="reg-all" class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-[#18181B] text-white">Tất cả</button>
+          <button onclick="filterExploreRegion('bac')" id="reg-bac" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)]">Miền Bắc</button>
+          <button onclick="filterExploreRegion('trung')" id="reg-trung" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)]">Miền Trung</button>
+          <button onclick="filterExploreRegion('nam')" id="reg-nam" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)]">Miền Nam</button>
+        </div>
+      </div>
+
+      <!-- Category Shortcuts -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <button onclick="quickFilterExplore('phở bún')" class="genui-card p-3.5 rounded-2xl border border-[var(--border-subtle)] hover:border-[#FBBF24] transition text-left flex items-center gap-3">
+          <span class="text-2xl">🍜</span>
+          <div>
+            <div class="font-extrabold text-xs">Món Nước</div>
+            <div class="text-[10px] text-[var(--text-muted)]">Phở, bún bò, canh chua</div>
+          </div>
+        </button>
+        <button onclick="quickFilterExplore('cơm')" class="genui-card p-3.5 rounded-2xl border border-[var(--border-subtle)] hover:border-[#FBBF24] transition text-left flex items-center gap-3">
+          <span class="text-2xl">🍚</span>
+          <div>
+            <div class="font-extrabold text-xs">Cơm &amp; Bún Đĩa</div>
+            <div class="text-[10px] text-[var(--text-muted)]">Cơm tấm, bò kho</div>
+          </div>
+        </button>
+        <button onclick="quickFilterExplore('chay')" class="genui-card p-3.5 rounded-2xl border border-[var(--border-subtle)] hover:border-[#FBBF24] transition text-left flex items-center gap-3">
+          <span class="text-2xl">🥗</span>
+          <div>
+            <div class="font-extrabold text-xs">Ăn Chay Thanh Tịnh</div>
+            <div class="text-[10px] text-[var(--text-muted)]">Chả giò, gỏi cuốn chay</div>
+          </div>
+        </button>
+        <button onclick="quickFilterExplore('bánh')" class="genui-card p-3.5 rounded-2xl border border-[var(--border-subtle)] hover:border-[#FBBF24] transition text-left flex items-center gap-3">
+          <span class="text-2xl">🥖</span>
+          <div>
+            <div class="font-extrabold text-xs">Bánh Xèo &amp; Bánh Mì</div>
+            <div class="text-[10px] text-[var(--text-muted)]">Bánh xèo, bánh mì thịt</div>
+          </div>
+        </button>
+      </div>
+
+      <!-- Search Input Bar -->
+      <div class="flex items-center gap-2">
+        <div class="flex-1 flex items-center bg-[var(--bg-elevated)] rounded-2xl px-4 py-2.5 border border-[var(--border-subtle)] focus-within:border-[#FBBF24]">
+          <span class="text-base mr-2">🔍</span>
+          <input id="live-explore-search" oninput="debounceExploreSearch()" type="text" placeholder="Tìm kiếm món ăn, công thức (VD: phở bò, bún riêu, canh chua, bánh xèo)..." class="w-full bg-transparent text-xs text-[var(--text-main)] focus:outline-none" />
+        </div>
+        <button onclick="loadLiveExplore()" class="px-4 py-2.5 rounded-2xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-xs shrink-0">
+          Làm Mới
+        </button>
+      </div>
+
+      <!-- Explore Dishes Grid -->
+      <div id="live-explore-grid" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- TAB PANEL: CHI TIẾT CÔNG THỨC & SCALE KHẨU PHẦN (M2 RECIPE) -->
+    <div id="lpanel-recipe" class="hidden space-y-6 max-w-4xl mx-auto">
+      <div id="live-recipe-card" class="genui-card p-6 rounded-3xl space-y-6 border border-[var(--border-subtle)]">
+        <!-- Rendered dynamically via loadLiveRecipe -->
       </div>
     </div>
 
@@ -5141,7 +5223,7 @@ export async function load${activeScr.id.replace('-','')}() {
 
     function setLiveAppTab(tab) {
       currentLiveTab = tab;
-      const tabs = ['today', 'chat', 'wheel', 'places', 'mealplan', 'poll', 'merchant', 'booking', 'stories', 'translator', 'insights'];
+      const tabs = ['today', 'explore', 'recipe', 'chat', 'wheel', 'places', 'mealplan', 'poll', 'merchant', 'booking', 'stories', 'translator', 'insights'];
       tabs.forEach(t => {
         const p = document.getElementById(`lpanel-${t}`);
         if (p) p.classList.toggle('hidden', t !== tab);
@@ -5155,6 +5237,8 @@ export async function load${activeScr.id.replace('-','')}() {
         }
       });
 
+      if (tab === 'explore') loadLiveExplore();
+      if (tab === 'recipe') loadLiveRecipe();
       if (tab === 'places') loadLivePlaces();
       if (tab === 'mealplan') loadLiveMealPlan();
       if (tab === 'poll') renderLivePoll();
@@ -5209,15 +5293,18 @@ export async function load${activeScr.id.replace('-','')}() {
                   <div class="text-[11px] font-semibold text-[var(--text-main)] flex items-center gap-1.5">
                     <span>📍</span> ${place.place_name || 'Quán Ngon Gần Bạn'}
                   </div>
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1.5">
                     <a href="${place.links?.grabfood || '#'}" target="_blank" class="flex-1 py-2 text-center rounded-xl bg-[#00B14F] text-white font-extrabold text-[11px] hover:opacity-90">
                       GrabFood ↗
                     </a>
                     <a href="${place.links?.shopeefood || '#'}" target="_blank" class="flex-1 py-2 text-center rounded-xl bg-[#EE4D2D] text-white font-extrabold text-[11px] hover:opacity-90">
-                      ShopeeFood ↗
+                      Shopee ↗
                     </a>
-                    <button onclick="setLiveAppTab('chat')" class="px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-bold">
-                      Hỏi AI
+                    <button onclick="openLiveRecipe('${item.dish_id}')" class="px-2.5 py-2 rounded-xl bg-[#FBBF24] text-[#0F172A] text-[11px] font-extrabold hover:brightness-105" title="Xem công thức & scale khẩu phần">
+                      Công Thức
+                    </button>
+                    <button onclick="shareItem('${item.name}', 'Hôm nay ăn gì gợi ý: ${item.name} (${(item.price_vnd || 45000).toLocaleString('vi-VN')}đ) - ${place.place_name || ''}')" class="px-2 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-bold" title="Chia sẻ món">
+                      📤
                     </button>
                   </div>
                 </div>
@@ -5803,6 +5890,239 @@ export async function load${activeScr.id.replace('-','')}() {
           `).join('');
         }
       } catch (e) {}
+    }
+
+    let currentExploreRegion = '';
+    let exploreSearchTimeout = null;
+    let currentRecipeDishId = 'DISH-101';
+    let currentRecipeServings = 2;
+
+    function filterExploreRegion(reg) {
+      currentExploreRegion = reg;
+      ['all', 'bac', 'trung', 'nam'].forEach(r => {
+        const b = document.getElementById(`reg-${r}`);
+        if (b) {
+          const isActive = (r === 'all' && !reg) || (r === reg);
+          b.className = isActive
+            ? 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-[#18181B] text-white'
+            : 'px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)]';
+        }
+      });
+      loadLiveExplore();
+    }
+
+    function quickFilterExplore(kw) {
+      const input = document.getElementById('live-explore-search');
+      if (input) input.value = kw;
+      loadLiveExplore();
+    }
+
+    function debounceExploreSearch() {
+      clearTimeout(exploreSearchTimeout);
+      exploreSearchTimeout = setTimeout(() => {
+        loadLiveExplore();
+      }, 300);
+    }
+
+    async function loadLiveExplore() {
+      const grid = document.getElementById('live-explore-grid');
+      if (!grid) return;
+      grid.innerHTML = '<div class="col-span-3 text-center py-10 text-xs text-[var(--text-muted)]">⏳ Đang tải thư viện món ăn...</div>';
+
+      const q = document.getElementById('live-explore-search')?.value || '';
+      let url = `/api/v1/dishes?safe_only=false`;
+      if (q) url += `&q=${encodeURIComponent(q)}`;
+      if (currentExploreRegion) url += `&region=${encodeURIComponent(currentExploreRegion)}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.items) {
+          if (data.items.length === 0) {
+            grid.innerHTML = '<div class="col-span-3 text-center py-10 text-xs text-[var(--text-muted)]">Không tìm thấy món ăn phù hợp. Thử tìm từ khóa khác nhé!</div>';
+            return;
+          }
+          grid.innerHTML = data.items.map(dish => `
+            <div class="genui-card p-5 space-y-3 rounded-3xl border border-[var(--border-subtle)] hover:border-[#FBBF24] transition flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-[#FBBF24]/20 text-[#B45309]">
+                    ${dish.region === 'bac' ? 'Miền Bắc' : dish.region === 'trung' ? 'Miền Trung' : dish.region === 'nam' ? 'Miền Nam' : 'Toàn Quốc'}
+                  </span>
+                  <span class="text-xs font-extrabold text-[#FBBF24]">${(dish.ref_price || 45000).toLocaleString('vi-VN')}đ</span>
+                </div>
+                <h3 class="font-black text-sm mt-2 text-[var(--text-main)]">${dish.name}</h3>
+                <p class="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2 leading-relaxed">${dish.description || ''}</p>
+                <div class="flex items-center gap-2 mt-2.5 text-[10px] text-[var(--text-muted)]">
+                  <span>🔥 ${dish.calories || 400} kcal</span>
+                  <span>•</span>
+                  <span>⏱️ ${dish.prep_minutes || 25}p</span>
+                  <span>•</span>
+                  <span>${dish.difficulty || 'Dễ nấu'}</span>
+                </div>
+              </div>
+
+              <div class="pt-2.5 border-t border-[var(--border-subtle)] flex items-center gap-2">
+                <button onclick="openLiveRecipe('${dish.id}')" class="flex-1 py-1.5 rounded-xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-[11px] hover:brightness-105">
+                  Công Thức
+                </button>
+                <button onclick="setLiveAppTab('places')" class="flex-1 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] font-bold text-[11px]">
+                  Tìm Quán
+                </button>
+                <button onclick="shareItem('${dish.name}', 'Xem món ${dish.name} trên Hôm Nay Ăn Gì!')" class="px-2.5 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px]" title="Chia sẻ">
+                  📤
+                </button>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        grid.innerHTML = '<div class="col-span-3 text-center py-6 text-xs text-red-500">Lỗi tải dữ liệu món.</div>';
+      }
+    }
+
+    function openLiveRecipe(dishId) {
+      currentRecipeDishId = dishId;
+      currentRecipeServings = 2;
+      setLiveAppTab('recipe');
+      loadLiveRecipe(dishId, currentRecipeServings);
+    }
+
+    function changeRecipeServings(delta) {
+      currentRecipeServings = Math.max(1, Math.min(12, currentRecipeServings + delta));
+      loadLiveRecipe(currentRecipeDishId, currentRecipeServings);
+    }
+
+    async function loadLiveRecipe(dishId = currentRecipeDishId, servings = currentRecipeServings) {
+      const card = document.getElementById('live-recipe-card');
+      if (!card) return;
+      card.innerHTML = '<div class="text-center py-10 text-xs text-[var(--text-muted)]">⏳ Đang tải công thức và tính toán khẩu phần...</div>';
+
+      try {
+        const res = await fetch(`/api/v1/dishes/${dishId}?servings=${servings}`);
+        const dish = await res.json();
+        if (dish && dish.id) {
+          card.innerHTML = `
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FBBF24]/20 text-[#B45309]">M2-S04 CÔNG THỨC</span>
+                  <span class="text-xs text-[var(--text-muted)]">${dish.region === 'bac' ? 'Hà Nội & Miền Bắc' : dish.region === 'trung' ? 'Huế & Miền Trung' : 'Sài Gòn & Miền Nam'}</span>
+                </div>
+                <h2 class="text-2xl font-black">${dish.name}</h2>
+                <p class="text-xs text-[var(--text-muted)] mt-1">${dish.description || ''}</p>
+              </div>
+
+              <!-- Portion Scaler Interactive -->
+              <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center gap-3 shrink-0">
+                <span class="text-xs font-bold text-[var(--text-muted)]">Khẩu phần:</span>
+                <div class="flex items-center gap-2">
+                  <button onclick="changeRecipeServings(-1)" class="w-8 h-8 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] font-black text-sm hover:border-[#FBBF24]">-</button>
+                  <span class="font-mono font-black text-base text-[#FBBF24] min-w-[2ch] text-center">${dish.servings || servings}</span>
+                  <button onclick="changeRecipeServings(1)" class="w-8 h-8 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] font-black text-sm hover:border-[#FBBF24]">+</button>
+                </div>
+                <span class="text-[11px] text-[var(--text-muted)]">người ăn</span>
+              </div>
+            </div>
+
+            <!-- Macros Bar -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                <div class="text-[10px] text-[var(--text-muted)]">Tổng Năng Lượng</div>
+                <div class="text-base font-black text-[#FBBF24] mt-0.5">${dish.scaled_calories_total || dish.calories} kcal</div>
+              </div>
+              <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                <div class="text-[10px] text-[var(--text-muted)]">Carbs (Tinh bột)</div>
+                <div class="text-base font-black text-[#60A5FA] mt-0.5">${dish.macros?.carbs || 50}g</div>
+              </div>
+              <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                <div class="text-[10px] text-[var(--text-muted)]">Protein (Chất đạm)</div>
+                <div class="text-base font-black text-[#4ADE80] mt-0.5">${dish.macros?.protein || 30}g</div>
+              </div>
+              <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                <div class="text-[10px] text-[var(--text-muted)]">Fat (Chất béo)</div>
+                <div class="text-base font-black text-[#F87171] mt-0.5">${dish.macros?.fat || 15}g</div>
+              </div>
+            </div>
+
+            <!-- Scaled Ingredients Grid -->
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-black text-[#FBBF24]">🛒 Nguyên Liệu Định Lượng (${dish.servings || servings} Người Ăn):</h3>
+                <span class="text-[11px] text-[#22C55E] font-bold">Ước tính chợ: ~${(dish.scaled_market_cost_vnd || 50000).toLocaleString('vi-VN')}đ</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                ${(dish.ingredients || []).map(ing => `
+                  <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
+                    <span class="font-bold">${ing.name}</span>
+                    <span class="font-mono font-black text-[#FBBF24]">${ing.amount} ${ing.unit}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Cooking Steps -->
+            <div class="space-y-3">
+              <h3 class="text-sm font-black text-[#22C55E]">👨‍🍳 Các Bước Nấu Ăn Từng Bước (M2-S06):</h3>
+              <div class="space-y-2.5 text-xs">
+                ${(dish.recipe_steps || dish.steps || []).map((step, idx) => `
+                  <div class="p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-start gap-3">
+                    <span class="w-6 h-6 rounded-full bg-[#FBBF24] text-[#0F172A] font-black text-xs flex items-center justify-center shrink-0 mt-0.5">${step.step || idx+1}</span>
+                    <div class="space-y-1">
+                      <div class="font-bold text-[var(--text-main)]">${step.title || 'Bước ' + (idx+1)} ${step.duration_min ? `(⏱️ ${step.duration_min} phút)` : ''}</div>
+                      <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">${step.text || step.instruction || ''}</p>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="pt-4 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-3">
+              <button onclick="setLiveAppTab('places')" class="flex-1 py-3 rounded-xl bg-[#00B14F] text-white font-extrabold text-xs text-center shadow">
+                📍 Tìm Quán Bán Món Này Gần Tôi (3km)
+              </button>
+              <button onclick="addToCollection('${dish.id}')" class="px-5 py-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs font-bold hover:border-[#FBBF24]">
+                ⭐ Lưu Bộ Sưu Tập
+              </button>
+              <button onclick="shareItem('${dish.name}', 'Công thức nấu ${dish.name} cho ${dish.servings} người ăn')" class="px-5 py-3 rounded-xl bg-[#FBBF24] text-[#0F172A] text-xs font-extrabold shadow">
+                📤 Chia Sẻ
+              </button>
+            </div>
+          `;
+        }
+      } catch (err) {
+        card.innerHTML = '<div class="text-center py-6 text-xs text-red-500">Lỗi tải công thức.</div>';
+      }
+    }
+
+    async function addToCollection(dishId) {
+      try {
+        const res = await fetch('/api/v1/me/collections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dish_id: dishId })
+        });
+        const data = await res.json();
+        alert('⭐ Đã lưu món vào Bộ sưu tập yêu thích của bạn!');
+      } catch (e) {
+        alert('Lỗi lưu món.');
+      }
+    }
+
+    async function shareItem(title, text) {
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, text, url: window.location.href });
+        } catch (e) {}
+      } else {
+        try {
+          await navigator.clipboard.writeText(`${text} - ${window.location.href}`);
+          alert('📋 Đã sao chép liên kết vào clipboard: ' + text);
+        } catch (e) {
+          alert(text);
+        }
+      }
     }
 
     function filterSidebarScreens(val) {

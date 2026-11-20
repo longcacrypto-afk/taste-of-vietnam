@@ -245,6 +245,126 @@ export function createInitialStore() {
         steps: [
           { step: 1, title: 'Hầm mềm thịt bò với cà rốt khoai tây', duration_min: 25, text: 'Hầm lửa nhỏ cho thịt bò và rau củ mềm ngọt tự nhiên.' }
         ]
+      },
+      {
+        id: 'DISH-109',
+        name: 'Bánh Xèo Giòn Rụm Miền Trung',
+        region: 'trung',
+        meal_slots: ['lunch', 'dinner'],
+        ref_price: 55000,
+        calories: 520,
+        macros: { carbs: 54, protein: 24, fat: 22 },
+        prep_minutes: 25,
+        difficulty: 'Trung bình',
+        spice_level: 1,
+        allergen_tags: ['shrimp', 'egg'],
+        diet_flags: [],
+        weather_fit: ['rain_cool', 'any'],
+        tags: ['Đặc sản', 'Giòn ngon'],
+        img_key: '310',
+        description: 'Vỏ bánh vàng ươm giòn tan đúc tôm thịt, giá đỗ, cuốn bánh tráng rau rừng chấm nước mắm chua ngọt.',
+        base_servings: 2,
+        market_cost_base: 60000,
+        ingredients: [
+          { name: 'Bột bánh xèo nghệ', amount: 250, unit: 'g', img_key: '034' },
+          { name: 'Tôm đất & Thịt ba rọi', amount: 200, unit: 'g', img_key: '298' },
+          { name: 'Giá đỗ & Rau rừng', amount: 250, unit: 'g', img_key: '304' },
+          { name: 'Nước mắm chấm tỏi ớt', amount: 100, unit: 'ml', img_key: '310' }
+        ],
+        steps: [
+          { step: 1, title: 'Khuấy bột & Chuẩn bị nhân', duration_min: 5, text: 'Pha bột với nước cốt dừa và hành lá, xào sơ tôm thịt.' },
+          { step: 2, title: 'Đổ bánh xèo lửa lớn', duration_min: 10, text: 'Tráng chảo mỏng, đậy nắp 3 phút cho vành bánh giòn rụm rồi gập đôi.' }
+        ]
+      },
+      {
+        id: 'DISH-110',
+        name: 'Canh Chua Cá Lóc Đồng Bông Điên Điển',
+        region: 'nam',
+        meal_slots: ['lunch', 'dinner'],
+        ref_price: 50000,
+        calories: 380,
+        macros: { carbs: 32, protein: 35, fat: 12 },
+        prep_minutes: 20,
+        difficulty: 'Dễ nấu',
+        spice_level: 0,
+        allergen_tags: ['fish'],
+        diet_flags: [],
+        weather_fit: ['hot_sunny', 'any'],
+        tags: ['Thanh mát', 'Cơm nhà'],
+        img_key: '034',
+        description: 'Nước canh chua thanh vị me non kết hợp cá lóc đồng tươi ngọt, bạc hà, cà chua và bông điên điển.',
+        base_servings: 3,
+        market_cost_base: 70000,
+        ingredients: [
+          { name: 'Cá lóc đồng làm sạch', amount: 400, unit: 'g', img_key: '298' },
+          { name: 'Me vắt & Cà chua', amount: 100, unit: 'g', img_key: '304' },
+          { name: 'Bạc hà, Đậu bắp, Giá', amount: 250, unit: 'g', img_key: '034' },
+          { name: 'Ngò gai & Rau om', amount: 30, unit: 'g', img_key: '310' }
+        ],
+        steps: [
+          { step: 1, title: 'Nấu nước cốt me & Thả cá', duration_min: 8, text: 'Dầm me lấy nước chua, đun sôi rồi cho cá lóc vào nấu chín vớt bọt.' },
+          { step: 2, title: 'Cho rau bổi & Nêm nếm', duration_min: 4, text: 'Thêm đậu bắp, bạc hà, cà chua, nêm đường nước mắm vừa ăn rồi tắt bếp rắc rau thơm.' }
+        ]
+      },
+      {
+        id: 'DISH-111',
+        name: 'Mì Quảng Gà Ta Trứng Cút',
+        region: 'trung',
+        meal_slots: ['breakfast', 'lunch', 'dinner'],
+        ref_price: 45000,
+        calories: 490,
+        macros: { carbs: 58, protein: 34, fat: 14 },
+        prep_minutes: 30,
+        difficulty: 'Trung bình',
+        spice_level: 1,
+        allergen_tags: ['egg'],
+        diet_flags: [],
+        weather_fit: ['any'],
+        tags: ['Đậm đà', 'Đặc sản'],
+        img_key: '298',
+        description: 'Sợi mì gạo mềm mượt chan nước nhưỡng gà ta đậm đà, ăn kèm bánh tráng mè nướng giòn và đậu phộng rang.',
+        base_servings: 2,
+        market_cost_base: 55000,
+        ingredients: [
+          { name: 'Sợi mì Quảng vàng', amount: 350, unit: 'g', img_key: '034' },
+          { name: 'Gà ta rút xương', amount: 250, unit: 'g', img_key: '298' },
+          { name: 'Trứng cút luộc', amount: 6, unit: 'quả', img_key: '304' },
+          { name: 'Rau sống bắp chuối', amount: 150, unit: 'g', img_key: '310' }
+        ],
+        steps: [
+          { step: 1, title: 'Xào rim gà ta', duration_min: 12, text: 'Ướp gà với củ nén, nghệ tươi rồi xào săn, om nhỏ lửa làm nước nhưỡng sánh vàng.' },
+          { step: 2, title: 'Trình bày tô mì Quảng', duration_min: 3, text: 'Xếp mì, rau sống, gà, trứng cút, chan xâm xấp nước nhưỡng và bẻ bánh tráng.' }
+        ]
+      },
+      {
+        id: 'DISH-112',
+        name: 'Chả Giò Nấm Hạt Sen Chay',
+        region: 'toan_quoc',
+        meal_slots: ['lunch', 'dinner', 'snack'],
+        ref_price: 35000,
+        calories: 310,
+        macros: { carbs: 38, protein: 14, fat: 11 },
+        prep_minutes: 20,
+        difficulty: 'Dễ nấu',
+        spice_level: 0,
+        allergen_tags: ['gluten'],
+        diet_flags: ['vegan', 'vegetarian'],
+        weather_fit: ['any'],
+        tags: ['Thực dưỡng', 'Ăn chay'],
+        img_key: '304',
+        description: 'Bánh tráng xốp bọc nấm đùi gà, khoai môn và hạt sen bùi béo chiên vàng rụm, thanh tịnh cho ngày rằm.',
+        base_servings: 3,
+        market_cost_base: 45000,
+        ingredients: [
+          { name: 'Bánh tráng bò bía đậu xanh', amount: 1, unit: 'gói', img_key: '034' },
+          { name: 'Nấm đùi gà & Nấm mèo', amount: 200, unit: 'g', img_key: '298' },
+          { name: 'Hạt sen Huế & Khoai môn', amount: 150, unit: 'g', img_key: '304' },
+          { name: 'Miến dong & Cà rốt', amount: 100, unit: 'g', img_key: '310' }
+        ],
+        steps: [
+          { step: 1, title: 'Trộn nhân chả giò chay', duration_min: 6, text: 'Cắt nhỏ nấm, bào sợi khoai môn cà rốt, trộn đều với miến và tiêu sọ.' },
+          { step: 2, title: 'Cuốn và chiên giòn', duration_min: 10, text: 'Cuốn tròn chặt tay, chiên ngập dầu lửa vừa đến khi vỏ vàng xốp.' }
+        ]
       }
     ],
 
@@ -381,6 +501,81 @@ export function createInitialStore() {
         menu: [
           { dish_id: 'DISH-101', name: 'Phở bò tái', price: 45000, available: false }
         ]
+      },
+      {
+        id: 'PLACE-406',
+        name: 'Bánh Xèo Phương Nam',
+        address: '215 Võ Thị Sáu, P. Quyết Thắng, Biên Hòa',
+        lat: 10.9540,
+        lng: 106.8390,
+        open_hour: 10,
+        close_hour: 22,
+        is_open_override: true,
+        is_verified: true,
+        rating: 4.6,
+        review_count: 85,
+        has_ac: true,
+        has_kids_seat: true,
+        closed_report_count: 0,
+        phone: '02513888555',
+        img_key: '310',
+        links: {
+          grabfood: 'https://food.grab.com/vn/vi/restaurant/banh-xeo-phuong-nam',
+          maps: 'https://maps.google.com/?q=10.9540,106.8390'
+        },
+        menu: [
+          { dish_id: 'DISH-109', name: 'Bánh Xèo Giòn Rụm Miền Trung', price: 55000, available: true }
+        ]
+      },
+      {
+        id: 'PLACE-407',
+        name: 'Quán Cơm Chay An Lành',
+        address: '42 Nguyễn Ái Quốc, P. Tân Phong, Biên Hòa',
+        lat: 10.9610,
+        lng: 106.8450,
+        open_hour: 7,
+        close_hour: 20,
+        is_open_override: true,
+        is_verified: true,
+        rating: 4.9,
+        review_count: 142,
+        has_ac: true,
+        has_kids_seat: true,
+        closed_report_count: 0,
+        phone: '02513999666',
+        img_key: '034',
+        links: {
+          grabfood: 'https://food.grab.com/vn/vi/restaurant/com-chay-an-lanh',
+          maps: 'https://maps.google.com/?q=10.9610,106.8450'
+        },
+        menu: [
+          { dish_id: 'DISH-112', name: 'Chả Giò Nấm Hạt Sen Chay', price: 35000, available: true }
+        ]
+      },
+      {
+        id: 'PLACE-408',
+        name: 'Mì Quảng Bà Ba Xứ Quảng',
+        address: '76 Đồng Khởi, P. Tân Hiệp, Biên Hòa',
+        lat: 10.9590,
+        lng: 106.8480,
+        open_hour: 6,
+        close_hour: 21,
+        is_open_override: true,
+        is_verified: true,
+        rating: 4.7,
+        review_count: 110,
+        has_ac: false,
+        has_kids_seat: true,
+        closed_report_count: 0,
+        phone: '02513777888',
+        img_key: '298',
+        links: {
+          grabfood: 'https://food.grab.com/vn/vi/restaurant/mi-quang-ba-ba',
+          maps: 'https://maps.google.com/?q=10.9590,106.8480'
+        },
+        menu: [
+          { dish_id: 'DISH-111', name: 'Mì Quảng Gà Ta Trứng Cút', price: 45000, available: true }
+        ]
       }
     ],
 
@@ -411,6 +606,48 @@ export function createInitialStore() {
         clicks: 310,
         conversions: 85,
         roas: 4.5,
+        status: 'active'
+      },
+      {
+        id: 'CMP-703',
+        place_id: 'PLACE-408',
+        dish_id: 'DISH-111', // Mì Quảng Gà Ta (Safe, no major allergens)
+        title: 'Mì Quảng Gà Ta Đậm Đà Xứ Quảng',
+        badge_label: 'Tài trợ',
+        radius_m: 3000,
+        budget_monthly_vnd: 1000000,
+        impressions: 4200,
+        clicks: 290,
+        conversions: 78,
+        roas: 5.2,
+        status: 'active'
+      },
+      {
+        id: 'CMP-704',
+        place_id: 'PLACE-407',
+        dish_id: 'DISH-112', // Chả Giò Nấm Hạt Sen Chay
+        title: 'Mâm Chay Thanh Tịnh Ngày Rằm',
+        badge_label: 'Tài trợ',
+        radius_m: 3000,
+        budget_monthly_vnd: 800000,
+        impressions: 3100,
+        clicks: 215,
+        conversions: 62,
+        roas: 4.8,
+        status: 'active'
+      },
+      {
+        id: 'CMP-705',
+        place_id: 'PLACE-402',
+        dish_id: 'DISH-110', // Canh Chua Cá Lóc (chứa fish)
+        title: 'Canh Chua Cá Lóc Chuẩn Vị Miền Tây',
+        badge_label: 'Tài trợ',
+        radius_m: 3000,
+        budget_monthly_vnd: 900000,
+        impressions: 3800,
+        clicks: 240,
+        conversions: 55,
+        roas: 4.2,
         status: 'active'
       }
     ],
@@ -482,6 +719,42 @@ export function createInitialStore() {
       ad_impression: 18420,
       ad_click: 1252,
       report_issue: 84
-    }
+    },
+
+    polls: [
+      {
+        id: 'POLL-701',
+        title: 'Trưa thứ 6 phòng mình ăn gì?',
+        options: [
+          { id: 'pho', dish_id: 'DISH-101', votes: 4 },
+          { id: 'bunbo', dish_id: 'DISH-103', votes: 2 },
+          { id: 'comtam', dish_id: 'DISH-102', votes: 1 }
+        ],
+        expires_at: new Date(Date.now() + 86400000).toISOString()
+      }
+    ],
+
+    bookings: [
+      {
+        id: 'BK-1001',
+        place_id: 'PLACE-401',
+        party_size: 4,
+        time_slot: '19:00 Hôm nay',
+        has_baby_chair: true,
+        status: 'confirmed_instant'
+      }
+    ],
+
+    reviews: [
+      {
+        id: 'REV-01',
+        place_id: 'PLACE-401',
+        user_name: 'Anh Long',
+        rating: 5,
+        comment: 'Nước dùng phở ngọt thanh chuẩn vị Hà Nội!',
+        verified_gps: true,
+        created_at: new Date().toISOString()
+      }
+    ]
   };
 }

@@ -1,11 +1,21 @@
 # 🍲 Hôm Nay Ăn Gì? · Taste of Vietnam v0.1
 
 [![Render Status](https://img.shields.io/badge/Render-Deployed%20Live-22C55E?style=for-the-badge&logo=render)](https://taste-of-vietnam.onrender.com)
-[![QA Tests](https://img.shields.io/badge/QA%20Tests-16%2F16%20PASS-22C55E?style=for-the-badge&logo=node.js)](https://github.com/longcacrypto-afk/taste-of-vietnam)
-[![Flutter](https://img.shields.io/badge/Flutter-15%20Screens%20(5.2k%20LOC)-02569B?style=for-the-badge&logo=flutter)](mobile-flutter/)
+[![QA Tests](https://img.shields.io/badge/QA%20Tests-21%2F21%20PASS-22C55E?style=for-the-badge&logo=node.js)](https://github.com/longcacrypto-afk/taste-of-vietnam)
+[![Flutter](https://img.shields.io/badge/Flutter-16%20Screens%20(6.8k%20LOC)-02569B?style=for-the-badge&logo=flutter)](mobile-flutter/)
 [![PDPD](https://img.shields.io/badge/Tuân%20thủ-Nghị%20định%2013%2F2023%2FNĐ--CP-FBBF24?style=for-the-badge)](docs/PRODUCT_SPEC_v0.1.md)
 
 > **Hôm nay ăn gì · Taste of Vietnam** là nền tảng khám phá ẩm thực Việt Nam thông minh hỗ trợ bởi AI, cá nhân hóa dựa trên thời tiết địa phương, số lượng người, ngân sách, dị ứng thực phẩm và văn hóa ẩm thực 3 miền Bắc – Trung – Nam.
+
+---
+
+## 🚀 New in Latest Build (Phase F–J Production Hardening)
+
+- 🔒 **Security & Performance (Phase F):** In-memory Rate Limiting (60 req/min/IP), Strict CSP, Referrer-Policy, Permissions-Policy, ETag MD5 caching với 304 Not Modified, và Gzip compression tự động.
+- 📱 **PWA Offline-First (Phase G):** Service Worker `hnag-v3` Stale-While-Revalidate, Push Notification handlers, Background Sync queue khi vote poll offline, và Web Manifest v3 đầy đủ shortcuts + share_target.
+- 🌱 **Seed Expansion (Phase H):** Mở rộng lên 12 món ăn chuẩn 3 miền (thêm Bánh Xèo Miền Trung, Canh Chua Cá Lóc, Mì Quảng Gà Ta, Chả Giò Chay), 8 quán ăn PostGIS, 5 chiến dịch tài trợ và store polls/bookings/reviews.
+- 🌐 **Interactive Live Panels (Phase I):** Bổ sung Panel **Khám Phá Món Ăn (M2)** với bộ lọc vùng miền + categories, Panel **Chi Tiết Công Thức & Scale Khẩu Phần (M2-S04)** với bộ điều chỉnh khẩu phần 1–12 người, và nút **Chia sẻ Món (Web Share API)**.
+- ⚙️ **CI/CD Quality Gate (Phase J):** Tự động kiểm tra kích thước bundle (< 4MB) và xác thực tính toàn vẹn của API Gateway trên mọi commit.
 
 ---
 
@@ -19,7 +29,7 @@
 
 ---
 
-## 📱 Hệ Thống 15 Màn Hình Flutter Mobile (5.193 LOC)
+## 📱 Hệ Thống 16 Màn Hình Flutter Mobile (6.797 LOC)
 
 Ứng dụng di động Flutter được thiết kế theo chuẩn **AI Chef Benchmark Style** (`#18181B` Charcoal Hero, `#FBBF24` Golden Amber, `#22C55E` Emerald Badge):
 
@@ -28,6 +38,7 @@
 | **M1** | [`onboarding_taste_screen.dart`](mobile-flutter/lib/screens/onboarding_taste_screen.dart) | Người dùng | 6 bước onboarding: Vị giác, Mức cay, Vùng miền, Chế độ ăn & Bộ lọc Dị ứng nghiêm ngặt 100% |
 | **M2** | [`dish_detail_screen.dart`](mobile-flutter/lib/screens/dish_detail_screen.dart) | Người dùng | Chi tiết món ăn, Scale định lượng N khẩu phần, Lưới nguyên liệu 3x2, Chế độ nấu từng bước |
 | **M3** | [`today_home_screen.dart`](mobile-flutter/lib/screens/today_home_screen.dart) | Người dùng | Gợi ý theo thời tiết thời gian thực, Vòng quay món ăn, Cooldown 3 ngày không lặp món |
+| **M3** | [`spin_wheel_screen.dart`](mobile-flutter/lib/screens/spin_wheel_screen.dart) | Người dùng | Vòng quay 3D Luxury Casino, vật lý giảm tốc `Curves.easeOutCubic` 4.5s, âm thanh tick haptic |
 | **M3** | [`mam_ai_chef_screen.dart`](mobile-flutter/lib/screens/mam_ai_chef_screen.dart) | Người dùng | Chatbot AI Chef Măm, bóc tách ngôn ngữ tự nhiên: người, ngân sách, trẻ nhỏ, cay |
 | **M4, M5** | [`map_places_screen.dart`](mobile-flutter/lib/screens/map_places_screen.dart) | Người dùng | Bản đồ quán 3km PostGIS, Deep-link GrabFood/ShopeeFood, Tự động ẩn quán khi có 3 báo cáo |
 | **M6** | [`merchant_portal_screen.dart`](mobile-flutter/lib/screens/merchant_portal_screen.dart) | Chủ quán | Dashboard WebSocket realtime 5s, AI Menu OCR (chuẩn hóa giá 45k ➔ 45.000đ), Quản lý nạp VietQR |

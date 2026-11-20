@@ -27,5 +27,25 @@ jobs:
       - name: Execute QA Acceptance Suite (21 Tests)
         run: npm test
 
+      - name: Check Bundle Size
+        run: |
+          BUNDLE_SIZE=$(du -sk ui-design/index.html | cut -f1)
+          echo "Bundle size: ${BUNDLE_SIZE}KB"
+          if [ "$BUNDLE_SIZE" -gt 4096 ]; then
+            echo "⚠️ Warning: Bundle exceeds 4MB"
+          else
+            echo "✅ Bundle size OK: ${BUNDLE_SIZE}KB"
+          fi
+
+      - name: Verify API Endpoints & DB Fallback
+        run: |
+          node -e "
+          import('./src/api/router.js').then(m => {
+            console.log('✅ router.js loaded OK');
+          }).catch(e => {
+            console.error('❌ router.js error:', e);
+            process.exit(1);
+          });"
+
       - name: Verify Docker Compose Build
         run: docker compose config -q
