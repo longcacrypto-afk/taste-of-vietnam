@@ -6,6 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initDatabase, isPostgresConnected, closeDatabase } from '../src/db/connection.js';
+import { runMigrationAndSeed } from '../src/db/migrateAndSeed.js';
 import {
   findPlacesWithinRadius,
   searchDishesWithFilters,
@@ -57,4 +58,15 @@ test('DB-02: Repository methods safely fallback when PostgreSQL is offline', asy
 test('DB-03: Close database handles null pool gracefully', async () => {
   await closeDatabase();
   assert.equal(isPostgresConnected(), false);
+});
+
+test('DB-04: runMigrationAndSeed handles missing DATABASE_URL gracefully', async () => {
+  const originalUrl = process.env.DATABASE_URL;
+  delete process.env.DATABASE_URL;
+
+  const result = await runMigrationAndSeed();
+  assert.equal(result.success, false);
+  assert.equal(result.reason, 'NO_DATABASE_URL');
+
+  if (originalUrl) process.env.DATABASE_URL = originalUrl;
 });

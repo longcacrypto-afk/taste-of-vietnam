@@ -1,7 +1,7 @@
 # 🍲 Hôm Nay Ăn Gì? · Taste of Vietnam v0.1
 
 [![Render Status](https://img.shields.io/badge/Render-Deployed%20Live-22C55E?style=for-the-badge&logo=render)](https://taste-of-vietnam.onrender.com)
-[![QA Tests](https://img.shields.io/badge/QA%20Tests-23%2F23%20PASS-22C55E?style=for-the-badge&logo=node.js)](https://github.com/longcacrypto-afk/taste-of-vietnam)
+[![QA Tests](https://img.shields.io/badge/QA%20Tests-24%2F24%20PASS-22C55E?style=for-the-badge&logo=node.js)](https://github.com/longcacrypto-afk/taste-of-vietnam)
 [![Flutter](https://img.shields.io/badge/Flutter-16%20Screens%20(7.3k%20LOC)-02569B?style=for-the-badge&logo=flutter)](mobile-flutter/)
 [![PDPD](https://img.shields.io/badge/Tuân%20thủ-Nghị%20định%2013%2F2023%2FNĐ--CP-FBBF24?style=for-the-badge)](docs/PRODUCT_SPEC_v0.1.md)
 
