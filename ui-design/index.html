@@ -112,6 +112,49 @@
     .wheel-spinning {
       animation: wheelSpin 1.8s cubic-bezier(0.15, 0.85, 0.25, 1) forwards;
     }
+
+    /* Mini-Games Keyframes: Bamboo Lot Stick & Blind Box */
+    @keyframes bambooShake {
+      0%, 100% { transform: rotate(0deg) translateY(0); }
+      15% { transform: rotate(-12deg) translateY(-8px); }
+      30% { transform: rotate(12deg) translateY(6px); }
+      45% { transform: rotate(-10deg) translateY(-6px); }
+      60% { transform: rotate(10deg) translateY(6px); }
+      75% { transform: rotate(-5deg) translateY(-3px); }
+      90% { transform: rotate(5deg) translateY(2px); }
+    }
+    .bamboo-shaking {
+      animation: bambooShake 0.38s ease-in-out infinite;
+    }
+
+    @keyframes stickRise {
+      0% { transform: translateY(0); opacity: 0.3; }
+      40% { opacity: 1; }
+      100% { transform: translateY(-75px); opacity: 1; }
+    }
+    .stick-rising {
+      animation: stickRise 0.75s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+    }
+
+    @keyframes blindBoxShake {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      20% { transform: scale(1.08) rotate(-6deg); }
+      40% { transform: scale(1.08) rotate(6deg); }
+      60% { transform: scale(1.12) rotate(-6deg); }
+      80% { transform: scale(1.12) rotate(6deg); }
+    }
+    .blindbox-shaking {
+      animation: blindBoxShake 0.35s ease-in-out infinite;
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.7); opacity: 0; }
+      70% { transform: scale(1.05); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-pop-in {
+      animation: popIn 0.45s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -222,7 +265,7 @@
         <span>👨‍🍳</span> Trò Chuyện AI Chef Măm
       </button>
       <button onclick="setLiveAppTab('wheel')" id="ltab-wheel" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
-        <span>🎲</span> Vòng Quay Ẩm Thực 3D
+        <span>🎲</span> Vòng Quay &amp; Mini-Game
       </button>
       <button onclick="setLiveAppTab('places')" id="ltab-places" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
         <span>📍</span> Quán Gần Bán Kính 3km
@@ -311,84 +354,204 @@
       </div>
     </div>
 
-    <!-- TAB PANEL 3: VÒNG QUAY ẨM THỰC 3D -->
+    <!-- TAB PANEL 3: MINI-GAME QUYẾT ĐỊNH BỮA ĂN (M3-S03) -->
     <div id="lpanel-wheel" class="hidden genui-card p-6 flex flex-col items-center justify-center space-y-6 rounded-3xl">
-      <div class="text-center max-w-md">
-        <span class="px-3 py-1 rounded-full text-xs font-extrabold bg-[#FBBF24]/20 text-[#B45309]">M3-S03 · LUXURY 3D WHEEL</span>
-        <h2 class="text-2xl font-black mt-2">Vòng Quay Quyết Định Bữa Ăn</h2>
-        <p class="text-xs text-[var(--text-muted)] mt-1">Đắn đo mãi không biết ăn gì? Hãy để thần may mắn chọn giúp bạn món ngon trưa nay!</p>
+      <div class="text-center max-w-lg">
+        <span class="px-3 py-1 rounded-full text-xs font-extrabold bg-[#FBBF24]/20 text-[#B45309]">M3-S03 · LUXURY MINI-GAMES</span>
+        <h2 class="text-2xl font-black mt-2">Đấu Trường Quyết Định Bữa Ăn 🎲</h2>
+        <p class="text-xs text-[var(--text-muted)] mt-1">Đắn đo mãi không biết ăn gì? Hãy để thần may mắn chọn giúp bạn qua 3 trò chơi ẩm thực!</p>
       </div>
 
-      <!-- 3D Casino Wheel Display -->
-      <div class="relative w-80 h-80 flex items-center justify-center">
-        <!-- Top Ruby Gem Arrow Pointer -->
-        <div class="absolute -top-3 z-20 flex flex-col items-center pointer-events-none drop-shadow-md">
-          <div class="w-4 h-4 bg-gradient-to-br from-[#EF4444] to-[#B91C1C] rounded-full border-2 border-white shadow"></div>
-          <div class="w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[16px] border-t-[#B91C1C] -mt-1"></div>
+      <!-- Segmented Sub-game Switcher -->
+      <div class="flex items-center gap-1.5 p-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-2xl">
+        <button onclick="switchMiniGameSubMode('wheel')" id="btn-subgame-wheel" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-[#18181B] text-[#FBBF24] shadow transition flex items-center gap-1.5">
+          <span>🎡</span> Vòng Quay 3D
+        </button>
+        <button onclick="switchMiniGameSubMode('fortune')" id="btn-subgame-fortune" class="px-4 py-2 rounded-xl text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] transition flex items-center gap-1.5">
+          <span>🎋</span> Rút Quẻ Ẩm Thực
+        </button>
+        <button onclick="switchMiniGameSubMode('blindbox')" id="btn-subgame-blindbox" class="px-4 py-2 rounded-xl text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] transition flex items-center gap-1.5">
+          <span>🎁</span> Mở Túi Mù (Blind Box)
+        </button>
+      </div>
+
+      <!-- SUBGAME 1: 3D CASINO WHEEL -->
+      <div id="view-subgame-wheel" class="flex flex-col items-center justify-center space-y-6 w-full max-w-md">
+        <!-- 3D Casino Wheel Display -->
+        <div class="relative w-80 h-80 flex items-center justify-center">
+          <!-- Top Ruby Gem Arrow Pointer -->
+          <div class="absolute -top-3 z-20 flex flex-col items-center pointer-events-none drop-shadow-md">
+            <div class="w-4 h-4 bg-gradient-to-br from-[#EF4444] to-[#B91C1C] rounded-full border-2 border-white shadow"></div>
+            <div class="w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[16px] border-t-[#B91C1C] -mt-1"></div>
+          </div>
+
+          <svg id="live-wheel-svg" viewBox="0 0 300 300" class="w-full h-full drop-shadow-2xl transition-transform duration-[4000ms] cubic-bezier(0.12, 0.8, 0.2, 1)">
+            <defs>
+              <radialGradient id="liveWheelRim" cx="50%" cy="50%" r="50%">
+                <stop offset="85%" stop-color="#18181B" />
+                <stop offset="93%" stop-color="#FBBF24" />
+                <stop offset="97%" stop-color="#D97706" />
+                <stop offset="100%" stop-color="#78350F" />
+              </radialGradient>
+              <linearGradient id="liveHubGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FEF3C7" />
+                <stop offset="50%" stop-color="#FBBF24" />
+                <stop offset="100%" stop-color="#D97706" />
+              </linearGradient>
+            </defs>
+            <!-- Outer Bezel -->
+            <circle cx="150" cy="150" r="148" fill="url(#liveWheelRim)" stroke="#FBBF24" stroke-width="4" />
+            <!-- 16 Metallic Rivets -->
+            <g fill="#FEF3C7" stroke="#78350F" stroke-width="0.8">
+              <circle cx="150" cy="8" r="3" /><circle cx="205" cy="19" r="3" /><circle cx="250" cy="50" r="3" /><circle cx="281" cy="95" r="3" />
+              <circle cx="292" cy="150" r="3" /><circle cx="281" cy="205" r="3" /><circle cx="250" cy="250" r="3" /><circle cx="205" cy="281" r="3" />
+              <circle cx="150" cy="292" r="3" /><circle cx="95" cy="281" r="3" /><circle cx="50" cy="250" r="3" /><circle cx="19" cy="205" r="3" />
+              <circle cx="8" cy="150" r="3" /><circle cx="19" cy="95" r="3" /><circle cx="50" cy="50" r="3" /><circle cx="95" cy="19" r="3" />
+            </g>
+            <!-- Inner Rim -->
+            <circle cx="150" cy="150" r="136" fill="#18181B" stroke="#D97706" stroke-width="2" />
+            <!-- 8 Alternating Slices -->
+            <g transform="translate(150,150)">
+              <path d="M0,0 L0,-134 A134,134 0 0,1 94.7,-94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
+              <path d="M0,0 L94.7,-94.7 A134,134 0 0,1 134,0 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
+              <path d="M0,0 L134,0 A134,134 0 0,1 94.7,94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
+              <path d="M0,0 L94.7,94.7 A134,134 0 0,1 0,134 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
+              <path d="M0,0 L0,134 A134,134 0 0,1 -94.7,94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
+              <path d="M0,0 L-94.7,94.7 A134,134 0 0,1 -134,0 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
+              <path d="M0,0 L-134,0 A134,134 0 0,1 -94.7,-94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
+              <path d="M0,0 L-94.7,-94.7 A134,134 0 0,1 0,-134 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
+            </g>
+            <!-- Slice Labels & Emojis -->
+            <g font-family="Be Vietnam Pro, sans-serif" font-weight="700" text-anchor="middle" font-size="10" fill="#FFFFFF">
+              <text transform="translate(185, 60) rotate(22.5)"><tspan x="0" y="-8" font-size="16">🍜</tspan><tspan x="0" y="8" fill="#FBBF24">Phở Bò</tspan></text>
+              <text transform="translate(240, 115) rotate(67.5)"><tspan x="0" y="-8" font-size="16">🍚</tspan><tspan x="0" y="8">Cơm Tấm</tspan></text>
+              <text transform="translate(240, 185) rotate(112.5)"><tspan x="0" y="-8" font-size="16">🍲</tspan><tspan x="0" y="8" fill="#FBBF24">Bún Bò</tspan></text>
+              <text transform="translate(185, 240) rotate(157.5)"><tspan x="0" y="-8" font-size="16">🥖</tspan><tspan x="0" y="8">Bánh Mì</tspan></text>
+              <text transform="translate(115, 240) rotate(-157.5)"><tspan x="0" y="-8" font-size="16">🐟</tspan><tspan x="0" y="8" fill="#FBBF24">Cá Kho</tspan></text>
+              <text transform="translate(60, 185) rotate(-112.5)"><tspan x="0" y="-8" font-size="16">🥗</tspan><tspan x="0" y="8">Gỏi Cuốn</tspan></text>
+              <text transform="translate(60, 115) rotate(-67.5)"><tspan x="0" y="-8" font-size="16">🍤</tspan><tspan x="0" y="8" fill="#FBBF24">Bún Riêu</tspan></text>
+              <text transform="translate(115, 60) rotate(-22.5)"><tspan x="0" y="-8" font-size="16">🥓</tspan><tspan x="0" y="8">Bún Chả</tspan></text>
+            </g>
+            <!-- Center Gold Hub -->
+            <circle cx="150" cy="150" r="32" fill="url(#liveHubGold)" stroke="#FFFFFF" stroke-width="2" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.4))" />
+            <circle cx="150" cy="150" r="24" fill="#18181B" />
+            <text x="150" y="154" fill="#FBBF24" font-family="Be Vietnam Pro, sans-serif" font-weight="900" font-size="10" text-anchor="middle">QUAY</text>
+          </svg>
         </div>
 
-        <svg id="live-wheel-svg" viewBox="0 0 300 300" class="w-full h-full drop-shadow-2xl transition-transform duration-[4000ms] cubic-bezier(0.12, 0.8, 0.2, 1)">
-          <defs>
-            <radialGradient id="liveWheelRim" cx="50%" cy="50%" r="50%">
-              <stop offset="85%" stop-color="#18181B" />
-              <stop offset="93%" stop-color="#FBBF24" />
-              <stop offset="97%" stop-color="#D97706" />
-              <stop offset="100%" stop-color="#78350F" />
-            </radialGradient>
-            <linearGradient id="liveHubGold" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#FEF3C7" />
-              <stop offset="50%" stop-color="#FBBF24" />
-              <stop offset="100%" stop-color="#D97706" />
-            </linearGradient>
-          </defs>
-          <!-- Outer Bezel -->
-          <circle cx="150" cy="150" r="148" fill="url(#liveWheelRim)" stroke="#FBBF24" stroke-width="4" />
-          <!-- 16 Metallic Rivets -->
-          <g fill="#FEF3C7" stroke="#78350F" stroke-width="0.8">
-            <circle cx="150" cy="8" r="3" /><circle cx="205" cy="19" r="3" /><circle cx="250" cy="50" r="3" /><circle cx="281" cy="95" r="3" />
-            <circle cx="292" cy="150" r="3" /><circle cx="281" cy="205" r="3" /><circle cx="250" cy="250" r="3" /><circle cx="205" cy="281" r="3" />
-            <circle cx="150" cy="292" r="3" /><circle cx="95" cy="281" r="3" /><circle cx="50" cy="250" r="3" /><circle cx="19" cy="205" r="3" />
-            <circle cx="8" cy="150" r="3" /><circle cx="19" cy="95" r="3" /><circle cx="50" cy="50" r="3" /><circle cx="95" cy="19" r="3" />
-          </g>
-          <!-- Inner Rim -->
-          <circle cx="150" cy="150" r="136" fill="#18181B" stroke="#D97706" stroke-width="2" />
-          <!-- 8 Alternating Slices -->
-          <g transform="translate(150,150)">
-            <path d="M0,0 L0,-134 A134,134 0 0,1 94.7,-94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
-            <path d="M0,0 L94.7,-94.7 A134,134 0 0,1 134,0 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
-            <path d="M0,0 L134,0 A134,134 0 0,1 94.7,94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
-            <path d="M0,0 L94.7,94.7 A134,134 0 0,1 0,134 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
-            <path d="M0,0 L0,134 A134,134 0 0,1 -94.7,94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
-            <path d="M0,0 L-94.7,94.7 A134,134 0 0,1 -134,0 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
-            <path d="M0,0 L-134,0 A134,134 0 0,1 -94.7,-94.7 Z" fill="#27272A" stroke="#FBBF24" stroke-width="1.5" />
-            <path d="M0,0 L-94.7,-94.7 A134,134 0 0,1 0,-134 Z" fill="#18181B" stroke="#FBBF24" stroke-width="1.5" />
-          </g>
-          <!-- Slice Labels & Emojis -->
-          <g font-family="Be Vietnam Pro, sans-serif" font-weight="700" text-anchor="middle" font-size="10" fill="#FFFFFF">
-            <text transform="translate(185, 60) rotate(22.5)"><tspan x="0" y="-8" font-size="16">🍜</tspan><tspan x="0" y="8" fill="#FBBF24">Phở Bò</tspan></text>
-            <text transform="translate(240, 115) rotate(67.5)"><tspan x="0" y="-8" font-size="16">🍚</tspan><tspan x="0" y="8">Cơm Tấm</tspan></text>
-            <text transform="translate(240, 185) rotate(112.5)"><tspan x="0" y="-8" font-size="16">🍲</tspan><tspan x="0" y="8" fill="#FBBF24">Bún Bò</tspan></text>
-            <text transform="translate(185, 240) rotate(157.5)"><tspan x="0" y="-8" font-size="16">🥖</tspan><tspan x="0" y="8">Bánh Mì</tspan></text>
-            <text transform="translate(115, 240) rotate(-157.5)"><tspan x="0" y="-8" font-size="16">🐟</tspan><tspan x="0" y="8" fill="#FBBF24">Cá Kho</tspan></text>
-            <text transform="translate(60, 185) rotate(-112.5)"><tspan x="0" y="-8" font-size="16">🥗</tspan><tspan x="0" y="8">Gỏi Cuốn</tspan></text>
-            <text transform="translate(60, 115) rotate(-67.5)"><tspan x="0" y="-8" font-size="16">🍤</tspan><tspan x="0" y="8" fill="#FBBF24">Bún Riêu</tspan></text>
-            <text transform="translate(115, 60) rotate(-22.5)"><tspan x="0" y="-8" font-size="16">🥓</tspan><tspan x="0" y="8">Bún Chả</tspan></text>
-          </g>
-          <!-- Center Gold Hub -->
-          <circle cx="150" cy="150" r="32" fill="url(#liveHubGold)" stroke="#FFFFFF" stroke-width="2" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.4))" />
-          <circle cx="150" cy="150" r="24" fill="#18181B" />
-          <text x="150" y="154" fill="#FBBF24" font-family="Be Vietnam Pro, sans-serif" font-weight="900" font-size="10" text-anchor="middle">QUAY</text>
-        </svg>
+        <div id="live-spin-result" class="text-center min-h-[60px] w-full">
+          <div class="text-xs text-[var(--text-muted)]">Bấm nút để quay món</div>
+          <div id="live-spin-title" class="text-xl font-black text-[#FBBF24] mt-1">Sẵn sàng quay</div>
+        </div>
+
+        <button onclick="startLiveSpin()" id="btn-spin-live" class="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#FBBF24] to-[#F59E0B] text-[#0F172A] font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition flex items-center gap-2">
+          <span>🎯</span> QUAY NGAY (4.2 GIÂY)
+        </button>
       </div>
 
-      <div id="live-spin-result" class="text-center min-h-[50px]">
-        <div class="text-xs text-[var(--text-muted)]">Bấm nút để quay món</div>
-        <div id="live-spin-title" class="text-xl font-black text-[#FBBF24] mt-1">Sẵn sàng quay</div>
+      <!-- SUBGAME 2: RÚT QUẺ ẨM THỰC (BAMBOO LOT STICK DRAW) -->
+      <div id="view-subgame-fortune" class="hidden flex flex-col items-center justify-center space-y-6 w-full max-w-md">
+        <div class="relative w-72 h-80 flex flex-col items-center justify-end pb-4">
+          <!-- Floating Emerging Lot Stick -->
+          <div id="fortune-emerging-stick" class="hidden absolute top-2 w-12 h-36 bg-gradient-to-b from-[#FEF3C7] to-[#FDE68A] border-2 border-[#D97706] rounded-t-lg shadow-2xl flex flex-col items-center justify-start pt-2 text-[#78350F] font-black text-xs z-10 transition">
+            <span class="text-sm">🎋</span>
+            <span id="fortune-stick-num">08</span>
+          </div>
+
+          <!-- Bamboo Cylinder SVG -->
+          <div id="fortune-bamboo-cylinder" class="relative z-20 transition-transform">
+            <svg width="180" height="220" viewBox="0 0 180 220">
+              <defs>
+                <linearGradient id="bambooGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#78350F" />
+                  <stop offset="25%" stop-color="#B45309" />
+                  <stop offset="50%" stop-color="#D97706" />
+                  <stop offset="85%" stop-color="#92400E" />
+                  <stop offset="100%" stop-color="#451A03" />
+                </linearGradient>
+                <linearGradient id="rimGold" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#FDE68A" />
+                  <stop offset="50%" stop-color="#FBBF24" />
+                  <stop offset="100%" stop-color="#B45309" />
+                </linearGradient>
+              </defs>
+              <!-- Bamboo Lot Sticks in Jar -->
+              <g stroke="#92400E" stroke-width="1.5">
+                <rect x="55" y="25" width="10" height="75" rx="3" fill="#FEF3C7" transform="rotate(-8 60 100)" />
+                <rect x="70" y="18" width="10" height="80" rx="3" fill="#FDE68A" transform="rotate(-4 75 100)" />
+                <rect x="85" y="15" width="10" height="85" rx="3" fill="#FEF3C7" transform="rotate(2 90 100)" />
+                <rect x="100" y="20" width="10" height="80" rx="3" fill="#FDE68A" transform="rotate(7 105 100)" />
+                <rect x="115" y="28" width="10" height="75" rx="3" fill="#FEF3C7" transform="rotate(12 120 100)" />
+              </g>
+              <!-- Cylinder Body -->
+              <path d="M 35 70 L 145 70 L 138 200 L 42 200 Z" fill="url(#bambooGrad)" stroke="#451A03" stroke-width="3" />
+              <!-- Upper Gold Ring -->
+              <rect x="33" y="70" width="114" height="12" rx="4" fill="url(#rimGold)" stroke="#78350F" stroke-width="1.5" />
+              <!-- Middle Ornamental Plate -->
+              <rect x="36" y="125" width="108" height="18" fill="#991B1B" stroke="#FBBF24" stroke-width="1.5" />
+              <text x="90" y="138" fill="#FDE68A" font-family="'Be Vietnam Pro', sans-serif" font-weight="900" font-size="10" text-anchor="middle" letter-spacing="3">ẨM THỰC</text>
+              <!-- Lower Gold Ring -->
+              <rect x="40" y="185" width="100" height="10" rx="3" fill="url(#rimGold)" stroke="#78350F" stroke-width="1.5" />
+            </svg>
+          </div>
+        </div>
+
+        <!-- Fortune Card Result Box -->
+        <div id="fortune-card-result" class="w-full min-h-[60px] text-center">
+          <div class="text-xs text-[var(--text-muted)]">Bấm nút để lắc ống xăm xin quẻ ẩm thực hôm nay</div>
+        </div>
+
+        <button onclick="drawFoodFortune()" id="btn-draw-fortune" class="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#DC2626] to-[#B91C1C] text-white font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition flex items-center gap-2">
+          <span>🎋</span> LẮC ỐNG XĂM (XIN QUẺ)
+        </button>
       </div>
 
-      <button onclick="startLiveSpin()" id="btn-spin-live" class="px-8 py-3 rounded-2xl bg-gradient-to-r from-[#FBBF24] to-[#F59E0B] text-[#0F172A] font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition">
-        🎯 QUAY NGAY (4.5 GIÂY)
-      </button>
+      <!-- SUBGAME 3: MỞ TÚI MÙ / HỘP BÍ MẬT (BLIND BOX) -->
+      <div id="view-subgame-blindbox" class="hidden flex flex-col items-center justify-center space-y-6 w-full max-w-xl">
+        <div class="text-center">
+          <div class="text-xs font-bold text-[#FBBF24]">🔥 TRENDING: XÉ TÚI MÙ ẨM THỰC</div>
+          <div class="text-sm font-medium text-[var(--text-muted)] mt-0.5">Chọn 1 trong 3 túi may mắn để mở món ngon + voucher bí mật!</div>
+        </div>
+
+        <!-- 3 Mystery Foil Bags Grid -->
+        <div id="blindbox-grid" class="grid grid-cols-3 gap-3 md:gap-5 w-full">
+          <!-- Box 1: Red Lucky -->
+          <div onclick="openBlindBox(0)" id="blindbox-0" class="group relative cursor-pointer flex flex-col items-center p-4 rounded-2xl bg-gradient-to-b from-[#EF4444]/15 to-[#B91C1C]/30 border-2 border-[#EF4444] hover:scale-105 hover:shadow-2xl transition duration-300">
+            <div class="w-16 h-20 md:w-20 md:h-24 rounded-2xl bg-gradient-to-br from-[#EF4444] to-[#991B1B] shadow-lg flex flex-col items-center justify-center text-white border border-white/30 relative overflow-hidden group-hover:rotate-2 transition">
+              <span class="text-3xl">🧧</span>
+              <span class="text-[10px] font-black uppercase mt-1 tracking-wider">Tài Lộc</span>
+              <div class="absolute -top-6 -right-6 w-12 h-12 bg-white/20 rounded-full blur-sm"></div>
+            </div>
+            <span class="mt-2 text-xs font-black text-[#EF4444]">Túi Đỏ #01</span>
+            <span class="text-[10px] text-[var(--text-muted)] group-hover:text-[#EF4444] transition font-bold">Bấm để xé ✂️</span>
+          </div>
+
+          <!-- Box 2: Gold Prosperity -->
+          <div onclick="openBlindBox(1)" id="blindbox-1" class="group relative cursor-pointer flex flex-col items-center p-4 rounded-2xl bg-gradient-to-b from-[#FBBF24]/15 to-[#D97706]/30 border-2 border-[#FBBF24] hover:scale-105 hover:shadow-2xl transition duration-300">
+            <div class="w-16 h-20 md:w-20 md:h-24 rounded-2xl bg-gradient-to-br from-[#FBBF24] to-[#B45309] shadow-lg flex flex-col items-center justify-center text-[#18181B] border border-white/30 relative overflow-hidden group-hover:-rotate-2 transition">
+              <span class="text-3xl">✨</span>
+              <span class="text-[10px] font-black uppercase mt-1 tracking-wider">Hoàng Kim</span>
+              <div class="absolute -top-6 -right-6 w-12 h-12 bg-white/30 rounded-full blur-sm"></div>
+            </div>
+            <span class="mt-2 text-xs font-black text-[#FBBF24]">Túi Vàng #02</span>
+            <span class="text-[10px] text-[var(--text-muted)] group-hover:text-[#FBBF24] transition font-bold">Bấm để xé ✂️</span>
+          </div>
+
+          <!-- Box 3: Emerald Peace -->
+          <div onclick="openBlindBox(2)" id="blindbox-2" class="group relative cursor-pointer flex flex-col items-center p-4 rounded-2xl bg-gradient-to-b from-[#22C55E]/15 to-[#15803D]/30 border-2 border-[#22C55E] hover:scale-105 hover:shadow-2xl transition duration-300">
+            <div class="w-16 h-20 md:w-20 md:h-24 rounded-2xl bg-gradient-to-br from-[#22C55E] to-[#14532D] shadow-lg flex flex-col items-center justify-center text-white border border-white/30 relative overflow-hidden group-hover:rotate-2 transition">
+              <span class="text-3xl">🍀</span>
+              <span class="text-[10px] font-black uppercase mt-1 tracking-wider">Ngọc Bích</span>
+              <div class="absolute -top-6 -right-6 w-12 h-12 bg-white/20 rounded-full blur-sm"></div>
+            </div>
+            <span class="mt-2 text-xs font-black text-[#22C55E]">Túi Xanh #03</span>
+            <span class="text-[10px] text-[var(--text-muted)] group-hover:text-[#22C55E] transition font-bold">Bấm để xé ✂️</span>
+          </div>
+        </div>
+
+        <!-- Blind Box Reveal Container -->
+        <div id="blindbox-reveal" class="hidden w-full transition"></div>
+      </div>
     </div>
 
     <!-- TAB PANEL 4: QUÁN ĂN BÁN KÍNH 3KM (POSTGIS) -->
@@ -5463,6 +5626,115 @@ export async function load${activeScr.id.replace('-','')}() {
       }
     }
 
+    // =========================================================================
+    // MINI-GAMES HUB: VÒNG QUAY 3D / RÚT QUẺ ẨM THỰC / MỞ TÚI MÙ (BLIND BOX)
+    // =========================================================================
+
+    function switchMiniGameSubMode(mode) {
+      const modes = ['wheel', 'fortune', 'blindbox'];
+      modes.forEach(m => {
+        const view = document.getElementById(`view-subgame-${m}`);
+        const btn = document.getElementById(`btn-subgame-${m}`);
+        if (view) view.classList.toggle('hidden', m !== mode);
+        if (btn) {
+          if (m === mode) {
+            btn.className = 'px-4 py-2 rounded-xl text-xs font-extrabold bg-[#18181B] text-[#FBBF24] shadow transition flex items-center gap-1.5';
+          } else {
+            btn.className = 'px-4 py-2 rounded-xl text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-main)] transition flex items-center gap-1.5';
+          }
+        }
+      });
+    }
+
+    function playWebAudioSound(type) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        if (type === 'spin') {
+          for (let i = 0; i < 8; i++) {
+            setTimeout(() => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(450 + i * 35, ctx.currentTime);
+              gain.gain.setValueAtTime(0.06, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start();
+              osc.stop(ctx.currentTime + 0.04);
+            }, i * 220);
+          }
+        } else if (type === 'rattle') {
+          for (let i = 0; i < 7; i++) {
+            setTimeout(() => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'sawtooth';
+              osc.frequency.setValueAtTime(220 + Math.random() * 260, ctx.currentTime);
+              gain.gain.setValueAtTime(0.08, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start();
+              osc.stop(ctx.currentTime + 0.05);
+            }, i * 140);
+          }
+        } else if (type === 'win' || type === 'pop') {
+          const freqs = [523.25, 659.25, 783.99, 1046.50];
+          freqs.forEach((f, idx) => {
+            setTimeout(() => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(f, ctx.currentTime);
+              gain.gain.setValueAtTime(0.12, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start();
+              osc.stop(ctx.currentTime + 0.3);
+            }, idx * 110);
+          });
+        }
+      } catch (err) {
+        // AudioContext error safe ignore
+      }
+    }
+
+    function launchMiniConfetti() {
+      const colors = ['#FBBF24', '#EF4444', '#22C55E', '#3B82F6', '#EC4899', '#A855F7'];
+      for (let i = 0; i < 36; i++) {
+        const el = document.createElement('div');
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const size = Math.random() * 8 + 6;
+        el.className = 'pointer-events-none fixed z-50 rounded-sm';
+        el.style.width = `${size}px`;
+        el.style.height = `${size * 0.65}px`;
+        el.style.backgroundColor = color;
+        el.style.left = `${45 + (Math.random() - 0.5) * 35}%`;
+        el.style.top = `${35 + (Math.random() - 0.5) * 20}%`;
+        el.style.transform = `rotate(${Math.random() * 360}deg)`;
+        el.style.transition = 'all 1.3s cubic-bezier(0.22, 1, 0.36, 1)';
+        el.style.opacity = '1';
+        document.body.appendChild(el);
+
+        const targetX = (Math.random() - 0.5) * 380;
+        const targetY = Math.random() * 320 + 80;
+        const targetRot = Math.random() * 720 - 360;
+
+        requestAnimationFrame(() => {
+          el.style.transform = `translate(${targetX}px, ${targetY}px) rotate(${targetRot}deg)`;
+          el.style.opacity = '0';
+        });
+
+        setTimeout(() => el.remove(), 1400);
+      }
+    }
+
     function startLiveSpin() {
       const wheel = document.getElementById('live-wheel-svg');
       const btn = document.getElementById('btn-spin-live');
@@ -5470,32 +5742,333 @@ export async function load${activeScr.id.replace('-','')}() {
       if (!wheel || btn.disabled) return;
 
       btn.disabled = true;
-      btn.textContent = '⏳ Đang quay...';
-      title.textContent = 'Đang chọn món...';
+      btn.textContent = '⏳ Đang quay định mệnh...';
+      title.innerHTML = '<span class="text-xs text-[var(--text-muted)] animate-pulse">Vòng quay phong thủy đang chọn món trưa cho bạn...</span>';
+      playWebAudioSound('spin');
 
       const slices = [
-        'Phở Bò Tái Nạm Hà Nội (45k)',
-        'Cơm Tấm Sườn Bì Chả (40k)',
-        'Bún Bò Huế O Xuân (50k)',
-        'Bánh Mì Thịt Nướng (25k)',
-        'Cá Lóc Kho Tộ (45k)',
-        'Gỏi Cuốn Chay Đậu Hũ (35k)',
-        'Bún Riêu Cua Đồng (40k)',
-        'Bún Chả Nem Cua Bể (55k)'
+        { name: 'Phở Bò Tái Nạm Hà Nội', price: '45k', emoji: '🍜', desc: 'Nước dùng trong ngọt thanh thảo quả quế hồi, bánh phở mềm mướt.' },
+        { name: 'Cơm Tấm Sườn Bì Chả', price: '40k', emoji: '🍚', desc: 'Sườn nướng than hoa đẫm mỡ hành, chả trứng bùi thơm đậm đà Sài Gòn.' },
+        { name: 'Bún Bò Huế O Xuân', price: '50k', emoji: '🍲', desc: 'Nước lèo cay nồng sả ớt, chả cua giòn ngọt bừng tỉnh ngày mới.' },
+        { name: 'Bánh Mì Thịt Nướng', price: '25k', emoji: '🥖', desc: 'Vỏ giòn rụm rã, nhân thịt xiên nướng than cùng pate và bơ trứng béo ngậy.' },
+        { name: 'Cá Lóc Kho Tộ', price: '45k', emoji: '🐟', desc: 'Thịt cá săn chắc ngấm tiêu ớt cay the sánh quyện sốt caramel nước hàng.' },
+        { name: 'Gỏi Cuốn Chay Đậu Hũ', price: '35k', emoji: '🥗', desc: 'Rau thơm thanh mát, bánh tráng dẻo dai chấm sốt tương đen bùi ngậy.' },
+        { name: 'Bún Riêu Cua Đồng', price: '40k', emoji: '🍤', desc: 'Gạch cua đồng béo bùi, cà chua đỏ mọng chua dịu cùng đậu mơ giòn vàng.' },
+        { name: 'Bún Chả Nem Cua Bể', price: '55k', emoji: '🥓', desc: 'Chả quạt thơm lừng than hoa, nem cua giòn tan chấm mắm chua ngọt.' }
       ];
 
-      // Rotate between 5 and 8 full spins + random target angle
+      // CRITICAL FIX: Needle points squarely at center of target slice
       const targetIndex = Math.floor(Math.random() * slices.length);
-      const anglePerSlice = 360 / slices.length;
-      const extraRotations = 360 * 5;
-      liveWheelRotation += extraRotations + (360 - (targetIndex * anglePerSlice));
+      const anglePerSlice = 360 / slices.length; // 45 degrees
+      const centerOffset = anglePerSlice / 2; // 22.5 degrees (SLOT CENTER)
+      
+      // Calculate angle that places slot `targetIndex` center exactly at 12 o'clock (0°)
+      const targetAngle = (360 - (targetIndex * anglePerSlice + centerOffset)) % 360;
+      const currentNormalized = ((liveWheelRotation % 360) + 360) % 360;
+      let forwardDiff = (targetAngle - currentNormalized + 360) % 360;
+      if (forwardDiff < 180) forwardDiff += 360; // guarantee satisfying momentum
+      const extraRotations = 360 * 6; // 6 full spins
+      
+      liveWheelRotation += extraRotations + forwardDiff;
       wheel.style.transform = `rotate(${liveWheelRotation}deg)`;
 
       setTimeout(() => {
         btn.disabled = false;
         btn.textContent = '🎯 QUAY LẠI';
-        title.textContent = `🎉 Chúc mừng! Món trưa nay: ${slices[targetIndex]}`;
+        const won = slices[targetIndex];
+        title.innerHTML = `
+          <div class="space-y-1.5 animate-pop-in">
+            <div class="text-xl font-black text-[#FBBF24]">🎉 Món trưa nay: ${won.name} (${won.price})</div>
+            <div class="text-xs text-[var(--text-muted)] font-normal max-w-sm mx-auto">${won.desc}</div>
+            <div class="pt-2 flex items-center justify-center gap-2">
+              <button onclick="setLiveAppTab('places')" class="px-3.5 py-1.5 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs hover:bg-[#16A34A] transition shadow">📍 Xem quán gần (3km)</button>
+              <button onclick="setLiveAppTab('recipe')" class="px-3.5 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs font-bold hover:border-[#FBBF24] transition">📖 Xem công thức</button>
+            </div>
+          </div>
+        `;
+        playWebAudioSound('win');
+        launchMiniConfetti();
       }, 4200);
+    }
+
+    // GAME 2: RÚT QUẺ ẨM THỰC (BAMBOO LOT STICK DRAW)
+    const foodFortunes = [
+      {
+        num: '01',
+        rank: 'Thượng Thượng Cát',
+        dish: 'Phở Bò Tái Nạm Hà Nội',
+        price: '45.000đ',
+        poem: 'Sương mai bảng lảng gió heo may,\nPhở nóng trao tay ấm cả ngày.\nNước dùng trong ngọt hồi quế thảo,\nQuẻ lành mang đến phúc tràn đầy!',
+        divination: 'Khí vận hanh thông, công việc suôn sẻ như dòng nước phở ngọt thanh khiết.',
+        cal: '520 kcal'
+      },
+      {
+        num: '02',
+        rank: 'Đại Cát Đại Lợi',
+        dish: 'Cơm Tấm Sườn Bì Chả Sài Gòn',
+        price: '40.000đ',
+        poem: 'Sườn nướng than hoa đượm sắc vàng,\nHương thơm nức mũi khắp xóm làng.\nChả trứng bì bùi chan mắm ớt,\nĂn xong đón lộc bước thênh thang!',
+        divination: 'Chắc bụng ấm dạ, quý nhân nâng bước, làm việc gì cũng vững vàng như đĩa cơm sườn.',
+        cal: '650 kcal'
+      },
+      {
+        num: '03',
+        rank: 'Thượng Cát',
+        dish: 'Bún Bò Cố Đô Huế O Xuân',
+        price: '50.000đ',
+        poem: 'Hương sả nồng nàn cay dịu êm,\nNước dùng đậm vị ấm môi mềm.\nChả cua huyết mịn hòa phong sắc,\nXua tan mưa lạnh bước êm đềm!',
+        divination: 'Xua tan u ám, khai thông tài lộc, nhiệt huyết bừng sáng cả ngày dài.',
+        cal: '580 kcal'
+      },
+      {
+        num: '04',
+        rank: 'Cát Lợi',
+        dish: 'Bánh Mì Thịt Nướng Pate Giòn Rụm',
+        price: '25.000đ',
+        poem: 'Bánh giòn rụm rã giữa đôi tay,\nPate thơm béo ngập tràn say.\nNhanh gọn tiện vui tràn năng lượng,\nVượt mọi chông gai thẳng cánh bay!',
+        divination: 'Linh hoạt thần tốc, giải quyết bế tắc chỉ trong tích tắc.',
+        cal: '430 kcal'
+      },
+      {
+        num: '05',
+        rank: 'Thượng Cát',
+        dish: 'Bún Chả Nem Cua Bể Hà Thành',
+        price: '55.000đ',
+        poem: 'Than hồng quạt khói chả vàng mơ,\nNước chấm thanh tao vị ngẩn ngơ.\nNem cua giòn rụm thêm duyên thắm,\nTri kỷ tương phùng đẹp ý thơ!',
+        divination: 'Duyên lành hội ngộ, đối tác hài lòng, các mối quan hệ tiến triển rực rỡ.',
+        cal: '610 kcal'
+      },
+      {
+        num: '06',
+        rank: 'An Lành Tự Tại',
+        dish: 'Bún Riêu Cua Đồng Mộc Mạc',
+        price: '40.000đ',
+        poem: 'Gạch cua béo ngậy sắc cà chua,\nChua dịu thanh tao mát bốn mùa.\nĐậu mơ rán giòn rau ghém mướt,\nBình an no ấm vượt nghìn xưa!',
+        divination: 'Tâm hồn an nhiên, thanh lọc cơ thể, tài lộc tích lũy vững bền.',
+        cal: '490 kcal'
+      },
+      {
+        num: '07',
+        rank: 'Viên Mãn',
+        dish: 'Cá Lóc Đồng Kho Tộ Cơm Niêu',
+        price: '45.000đ',
+        poem: 'Tộ đất sôi reo quyện nước hàng,\nHồ tiêu thơm nức quyện cay nồng.\nCơm niêu đáy giòn cào vét sạch,\nSum vầy đầm ấm thỏa ước mong!',
+        divination: 'Gia đạo êm ấm, hậu phương vững chắc, vạn sự thuận buồm xuôi gió.',
+        cal: '540 kcal'
+      },
+      {
+        num: '08',
+        rank: 'Thanh Tịnh Cát',
+        dish: 'Gỏi Cuốn Tôm Thịt & Đậu Hũ Chay',
+        price: '35.000đ',
+        poem: 'Bánh tráng phơi sương bọc sắc xanh,\nTôm tươi rau ngọt mát an lành.\nTương nâu đậu phộng bùi chan chứa,\nKhỏe dáng thanh xuân vạn phước sinh!',
+        divination: 'Thân tâm nhẹ nhõm, trí tuệ minh mẫn, năng lượng tái sinh dồi dào.',
+        cal: '360 kcal'
+      }
+    ];
+
+    function drawFoodFortune() {
+      const btn = document.getElementById('btn-draw-fortune');
+      const cylinder = document.getElementById('fortune-bamboo-cylinder');
+      const stick = document.getElementById('fortune-emerging-stick');
+      const result = document.getElementById('fortune-card-result');
+      if (!btn || btn.disabled) return;
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Đang lắc ống xăm...';
+      cylinder.classList.add('bamboo-shaking');
+      stick.classList.add('hidden');
+      result.innerHTML = '<span class="text-xs text-[var(--text-muted)] animate-pulse">Lắc đều tay... Thần quẻ đang chọn thẻ cho bạn...</span>';
+      playWebAudioSound('rattle');
+
+      setTimeout(() => {
+        cylinder.classList.remove('bamboo-shaking');
+        const fortune = foodFortunes[Math.floor(Math.random() * foodFortunes.length)];
+        const stickNum = document.getElementById('fortune-stick-num');
+        if (stickNum) stickNum.textContent = fortune.num;
+
+        stick.classList.remove('hidden');
+        stick.classList.add('stick-rising');
+        playWebAudioSound('win');
+
+        setTimeout(() => {
+          stick.classList.remove('stick-rising');
+          btn.disabled = false;
+          btn.textContent = '🎋 LẮC QUẺ KHÁC';
+          result.innerHTML = `
+            <div class="genui-card p-5 rounded-2xl border-2 border-[#D97706] bg-gradient-to-b from-[#FEF3C7]/40 to-[var(--bg-card)] space-y-3.5 text-left animate-pop-in">
+              <div class="flex items-center justify-between border-b border-[#D97706]/30 pb-2.5">
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#991B1B] text-[#FEF3C7]">🎋 QUẺ SỐ ${fortune.num} · ${fortune.rank}</span>
+                <span class="text-xs font-bold text-[#D97706]">🔥 ${fortune.cal}</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-[#FEF3C7] border border-[#FBBF24] flex items-center justify-center text-2xl shrink-0">
+                  🥢
+                </div>
+                <div>
+                  <h3 class="font-black text-base text-[#991B1B]">${fortune.dish}</h3>
+                  <div class="text-xs text-[var(--text-muted)] font-bold">Giá tham khảo: <span class="text-[#15803D]">${fortune.price}</span></div>
+                </div>
+              </div>
+              <div class="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] font-serif italic text-xs leading-relaxed text-[#78350F] whitespace-pre-line">
+"${fortune.poem}"
+              </div>
+              <div class="text-[11px] text-[var(--text-muted)]">
+                <span class="font-bold text-[#B45309]">Lời luận quẻ:</span> ${fortune.divination}
+              </div>
+              <div class="pt-1 flex items-center gap-2">
+                <button onclick="setLiveAppTab('places')" class="flex-1 py-2 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs hover:bg-[#16A34A] transition text-center shadow">📍 Tìm Quán Bán Món Này</button>
+                <button onclick="drawFoodFortune()" class="px-4 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] font-bold text-xs hover:border-[#FBBF24] transition">Xóc Lại</button>
+              </div>
+            </div>
+          `;
+          launchMiniConfetti();
+        }, 800);
+      }, 1600);
+    }
+
+    // GAME 3: MỞ TÚI MÙ / HỘP BÍ MẬT (BLIND BOX MYSTERY UNBOXING)
+    const blindBoxLoots = [
+      {
+        rarity: 'SSR SIÊU PHẨM',
+        rarityColor: 'bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white',
+        dish: 'Cơm Tấm Sườn Cây Khổng Lồ Ốp La',
+        price: '65.000đ',
+        emoji: '🍱',
+        voucher: 'TUIMU-MAM-25K',
+        discount: 'Giảm 25.000đ',
+        desc: 'Sườn cây nướng ngũ vị vàng ươm thơm phức, trứng ốp la lòng đào béo ngậy kèm mỡ hành tóp mỡ giòn rụm!'
+      },
+      {
+        rarity: 'SSR SIÊU PHẨM',
+        rarityColor: 'bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white',
+        dish: 'Lẩu Bò Nhúng Dấm Ba Toa Đặc Biệt',
+        price: '180.000đ (2 người)',
+        emoji: '🍲',
+        voucher: 'TUIMU-MAM-30K',
+        discount: 'Giảm 30.000đ',
+        desc: 'Bắp bò giòn sần sật nhúng nước lẩu dấm dừa chua thanh bốc khói, chấm mắm nêm đậm đà chuẩn vị Đà Lạt.'
+      },
+      {
+        rarity: 'SR HOÀNG GIA',
+        rarityColor: 'bg-[#8B5CF6] text-white',
+        dish: 'Bún Riêu Cua Bắp Bò Giò Heo',
+        price: '55.000đ',
+        emoji: '🍜',
+        voucher: 'TUIMU-MAM-15K',
+        discount: 'Giảm 15.000đ',
+        desc: 'Tô đầy ú ụ thịt bắp bò tươi, giò heo giòn gân và riêu cua đồng thơm béo ngập tràn cà chua thanh mát.'
+      },
+      {
+        rarity: 'SR HOÀNG GIA',
+        rarityColor: 'bg-[#8B5CF6] text-white',
+        dish: 'Bún Chả Hà Nội Nem Hải Sản',
+        price: '50.000đ',
+        emoji: '🥓',
+        voucher: 'TUIMU-MAM-15K',
+        discount: 'Giảm 15.000đ',
+        desc: 'Chả viên nướng mềm ngọt, nem hải sản giòn rụm chấm nước mắm đu đủ chua ngọt thanh tao.'
+      },
+      {
+        rarity: 'RARE MAY MẮN',
+        rarityColor: 'bg-[#22C55E] text-white',
+        dish: 'Bánh Mì Chảo Xíu Mại Trứng Muối',
+        price: '38.000đ',
+        emoji: '🍳',
+        voucher: 'TUIMU-MAM-10K',
+        discount: 'Giảm 10.000đ',
+        desc: 'Chảo gang xèo xèo sốt cà sánh sệt, viên xíu mại trứng muối bùi béo quết bánh mì giòn nóng hổi.'
+      }
+    ];
+
+    function openBlindBox(boxIndex) {
+      const box = document.getElementById(`blindbox-${boxIndex}`);
+      const reveal = document.getElementById('blindbox-reveal');
+      if (!box || !reveal) return;
+
+      box.classList.add('blindbox-shaking');
+      playWebAudioSound('rattle');
+
+      setTimeout(() => {
+        box.classList.remove('blindbox-shaking');
+        playWebAudioSound('win');
+        launchMiniConfetti();
+
+        const loot = blindBoxLoots[Math.floor(Math.random() * blindBoxLoots.length)];
+
+        reveal.classList.remove('hidden');
+        reveal.innerHTML = `
+          <div class="genui-card p-6 rounded-3xl border-2 border-[#FBBF24] bg-gradient-to-b from-[#FEF3C7]/30 to-[var(--bg-card)] shadow-2xl space-y-4 animate-pop-in">
+            <div class="flex items-center justify-between">
+              <span class="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${loot.rarityColor}">
+                ✨ ${loot.rarity}
+              </span>
+              <span class="text-xs font-bold text-[#15803D] bg-[#DCFCE7] px-2.5 py-0.5 rounded-full">
+                🎁 ${loot.discount}
+              </span>
+            </div>
+
+            <div class="flex items-center gap-4">
+              <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A] border-2 border-[#FBBF24] flex items-center justify-center text-3xl shrink-0 shadow-md">
+                ${loot.emoji}
+              </div>
+              <div class="space-y-1">
+                <h3 class="font-black text-lg text-[var(--text-main)]">${loot.dish}</h3>
+                <div class="text-xs font-bold text-[#D97706]">Giá ước tính: ${loot.price}</div>
+              </div>
+            </div>
+
+            <p class="text-xs text-[var(--text-muted)] leading-relaxed bg-[var(--bg-elevated)] p-3 rounded-2xl border border-[var(--border-subtle)]">
+              ${loot.desc}
+            </p>
+
+            <!-- Voucher Code Box -->
+            <div class="p-3.5 rounded-2xl bg-[#0F172A] text-white flex items-center justify-between shadow">
+              <div class="space-y-0.5">
+                <div class="text-[10px] text-[#FBBF24] uppercase font-bold tracking-wider">Mã Giảm Giá Bí Mật Cho Bạn</div>
+                <div id="voucher-code-val" class="font-mono font-black text-sm tracking-widest text-white">${loot.voucher}</div>
+              </div>
+              <button onclick="copyVoucherCode('${loot.voucher}')" id="btn-copy-code" class="px-3 py-1.5 rounded-xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-xs hover:bg-[#F59E0B] transition">
+                📋 Sao chép
+              </button>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex items-center gap-2 pt-1">
+              <a href="https://food.grab.com" target="_blank" class="flex-1 py-2.5 rounded-xl bg-[#00B14F] text-white font-black text-xs text-center hover:opacity-90 transition shadow">
+                🛵 Đặt GrabFood Áp Mã
+              </a>
+              <button onclick="resetBlindBoxes()" class="px-4 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] font-bold text-xs hover:border-[#FBBF24] transition">
+                🎁 Xé Túi Khác
+              </button>
+            </div>
+          </div>
+        `;
+      }, 900);
+    }
+
+    function resetBlindBoxes() {
+      const reveal = document.getElementById('blindbox-reveal');
+      if (reveal) {
+        reveal.classList.add('hidden');
+        reveal.innerHTML = '';
+      }
+    }
+
+    function copyVoucherCode(code) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(code).then(() => {
+          const btn = document.getElementById('btn-copy-code');
+          if (btn) {
+            btn.textContent = '✅ Đã chép!';
+            btn.className = 'px-3 py-1.5 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs transition';
+            setTimeout(() => {
+              btn.textContent = '📋 Sao chép';
+              btn.className = 'px-3 py-1.5 rounded-xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-xs hover:bg-[#F59E0B] transition';
+            }, 2000);
+          }
+        }).catch(() => {});
+      }
     }
 
     async function loadLivePlaces() {
