@@ -501,6 +501,22 @@ class _TodayHomeScreenState extends State<TodayHomeScreen> {
                           ),
                           child: const Text('Tài trợ', style: TextStyle(color: AppTheme.goldenAmber, fontSize: 9, fontWeight: FontWeight.bold)),
                         ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.favorite_border_rounded, size: 16, color: Colors.white54),
+                        onPressed: () => _handleFeedback(dish['id'] ?? 'DISH-101', dish['name'], 'liked'),
+                        tooltip: 'Yêu thích',
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.close_rounded, size: 16, color: Colors.white38),
+                        onPressed: () => _handleFeedback(dish['id'] ?? 'DISH-101', dish['name'], 'skipped'),
+                        tooltip: 'Đổi món khác',
+                      ),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -515,6 +531,25 @@ class _TodayHomeScreenState extends State<TodayHomeScreen> {
                       Text(
                         '${_fmt(dish['price'])}đ',
                         style: const TextStyle(color: AppTheme.goldenAmber, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.emeraldBadge,
+                          side: const BorderSide(color: AppTheme.emeraldBadge),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => _handleFeedback(dish['id'] ?? 'DISH-101', dish['name'], 'eaten'),
+                        icon: const Icon(Icons.check_rounded, size: 13),
+                        label: const Text('Đã ăn (Cooldown 3 ngày)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
@@ -563,6 +598,45 @@ class _TodayHomeScreenState extends State<TodayHomeScreen> {
           ],
         ),
       );
+
+  Future<void> _handleFeedback(String dishId, String dishName, String action) async {
+    String message = '';
+    Color snackbarColor = AppTheme.goldenAmber;
+
+    if (action == 'liked') {
+      message = '❤️ Đã lưu "$dishName" vào danh sách yêu thích!';
+      snackbarColor = Colors.pinkAccent;
+    } else if (action == 'skipped') {
+      message = '🔄 Đã đổi món khác! Hệ thống đang cập nhật.';
+      snackbarColor = Colors.orangeAccent;
+      setState(() {
+        _suggestions.removeWhere((d) => d['id'] == dishId);
+      });
+    } else if (action == 'eaten') {
+      message = '✓ Đã ghi nhận ăn "$dishName"! Kích hoạt cooldown 3 ngày.';
+      snackbarColor = AppTheme.emeraldBadge;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          backgroundColor: AppTheme.charcoalHero,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: snackbarColor.withOpacity(0.5)),
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
+    await ApiService.sendSuggestionFeedback(dishId: dishId, action: action);
+    if (action == 'skipped' && _suggestions.isEmpty) {
+      _loadTodaySuggestions();
+    }
+  }
 
   String _fmt(int n) {
     final s = n.toString();

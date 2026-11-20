@@ -1,15 +1,34 @@
 // =============================================================================
-// SERVICE WORKER: Hôm nay ăn gì · Taste of Vietnam v0.1 — hnag-v6
-// Strategy: Network First with graceful offline fallback (Never crashes)
+// SERVICE WORKER: Hôm nay ăn gì · Taste of Vietnam v0.1 — hnag-v7
+// Strategy: Network First with graceful offline fallback & precache (Never crashes)
 // =============================================================================
 
-const CACHE_NAME = 'hnag-v6';
+const CACHE_NAME = 'hnag-v7';
+const PRECACHE_ASSETS = [
+  '/',
+  '/manifest.json',
+  '/assets/tailwindcss.min.js',
+  '/assets/avatar_mam_ai.jpg',
+  '/assets/hero_pho.jpg',
+  '/assets/dish_banhmi.jpg',
+  '/assets/mascot_bep.jpg',
+  '/assets/mascot_la.jpg',
+  '/assets/mascot_mam.jpg',
+  '/assets/mascot_miu.jpg',
+  '/assets/place_restaurant.jpg'
+];
 
 // ---------------------------------------------------------------------------
-// INSTALL: Skip waiting immediately
+// INSTALL: Precache critical static shell & skip waiting immediately
 // ---------------------------------------------------------------------------
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
+        console.warn('[SW] Pre-caching partial error (offline safe):', err);
+      });
+    }).then(() => self.skipWaiting())
+  );
 });
 
 // ---------------------------------------------------------------------------

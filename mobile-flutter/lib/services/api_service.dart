@@ -43,6 +43,29 @@ class ApiService {
     return null;
   }
 
+  static Future<Map<String, dynamic>?> sendSuggestionFeedback({
+    required String dishId,
+    required String action,
+    String? skipReason,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/suggestions/feedback'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'dish_id': dishId,
+          'action': action,
+          if (skipReason != null) 'skip_reason': skipReason,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
   // ─── 2. M3: CHAT VỚI AI CHEF MĂM (GEMINI 2.0 FLASH / NLU) ────────────────
   static Future<Map<String, dynamic>?> sendAiChefChat(String message) async {
     try {
@@ -77,12 +100,24 @@ class ApiService {
       final res = await http.get(uri).timeout(const Duration(seconds: 5));
       if (res.statusCode == 200) {
         final data = jsonDecode(utf8.decode(res.bodyBytes));
-        return data['places'] as List<dynamic>?;
+        return (data['items'] ?? data['places']) as List<dynamic>?;
       }
     } catch (e) {
       // Fallback
     }
     return null;
+  }
+
+  static Future<bool> reportPlaceClosed(String placeId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/places/$placeId/reports'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+      return res.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
   }
 
   // ─── 4. M11: THỰC ĐƠN 7 NGÀY & GIỎ ĐI CHỢ ───────────────────────────────
