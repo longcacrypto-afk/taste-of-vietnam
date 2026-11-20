@@ -205,7 +205,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
           ListTile(
             leading: const Icon(Icons.language, color: Colors.blueAccent),
             title: const Text('🌐 Menu Translator AI (M16)', style: TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: const Text('EN / KO / JA — Giữ tên tiếng Việt', style: TextStyle(fontSize: 11)),
+            subtitle: const Text('EN / KO / JA / ZH — Giữ tên tiếng Việt', style: TextStyle(fontSize: 11)),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuTranslatorScreen()));

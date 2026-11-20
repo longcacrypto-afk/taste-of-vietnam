@@ -107,6 +107,36 @@ class _MenuTranslatorScreenState extends State<MenuTranslatorScreen> {
         'diet': '完全ヴィーガン。ピーナッツ（タレ）使用。',
       },
     ],
+    'ZH': [
+      {
+        'vn': 'Phở Bò Tái Nạm Hà Nội',
+        'trans': '河内半熟牛腩牛肉粉',
+        'pronounce': 'fěn bō dài nán',
+        'desc': '12小时牛骨高汤慢火熬制，散发八角与烤姜清香，配鲜嫩半熟牛腩。',
+        'diet': '含牛肉。天然无麸质。',
+      },
+      {
+        'vn': 'Cơm Tấm Sườn Bì Chả',
+        'trans': '西贡蜜汁炭烤猪排碎米饭',
+        'pronounce': 'gēnbǎ suǒn bǐ zhǎ',
+        'desc': '西贡招牌美食，搭配炭烤猪排、蒸蛋肉饼与酸甜爽脆泡菜。',
+        'diet': '含猪肉、鸡蛋、鱼露。',
+      },
+      {
+        'vn': 'Bún Bò Huế O Xuân',
+        'trans': '顺化香茅微辣牛肉米粉',
+        'pronounce': 'būn bō huì',
+        'desc': '源自越南古都顺化，以香茅、辣椒油及发酵虾酱熬制的浓郁香辣汤底。',
+        'diet': '含牛肉、猪肉、虾酱。微辣（2级）。',
+      },
+      {
+        'vn': 'Gỏi Cuốn Chay Đậu Hũ',
+        'trans': '鲜素豆腐生春卷',
+        'pronounce': 'gēnlǎng sù dòufǔ',
+        'desc': '薄稻米纸卷入香炸豆腐、新鲜生菜与薄荷叶，配浓香花生蘸酱。',
+        'diet': '100% 纯素。蘸酱含花生过敏原。',
+      },
+    ],
   };
 
   void _speakPronunciation(String vn, String pronounce) {
@@ -187,9 +217,10 @@ class _MenuTranslatorScreenState extends State<MenuTranslatorScreen> {
         ),
         child: Row(
           children: [
-            _langBtn('EN', '🇬🇧 English'),
-            _langBtn('KO', '🇰🇷 한국어'),
-            _langBtn('JA', '🇯🇵 日本語'),
+            _langBtn('EN', '🇬🇧 EN'),
+            _langBtn('KO', '🇰🇷 KO'),
+            _langBtn('JA', '🇯🇵 JA'),
+            _langBtn('ZH', '🇨🇳 ZH'),
           ],
         ),
       );
