@@ -6,8 +6,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
-import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createInitialStore } from './src/data/seed.js';
 import { handleApiRequest } from './src/api/router.js';
@@ -16,72 +14,6 @@ import { initDatabase } from './src/db/connection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const store = createInitialStore();
-
-// ---------------------------------------------------------------------------
-// In-memory Rate Limiter: 60 requests / minute / IP for /api/v1/* routes
-// ---------------------------------------------------------------------------
-const rateLimitMap = new Map(); // ip -> { count, resetAt }
-const RATE_LIMIT_MAX = 60;
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-
-function checkRateLimit(ip) {
-  const now = Date.now();
-  let entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    entry = { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS };
-    rateLimitMap.set(ip, entry);
-    return true; // allowed
-  }
-  entry.count += 1;
-  return entry.count <= RATE_LIMIT_MAX;
-}
-
-// Clean up stale rate-limit entries every 2 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of rateLimitMap) {
-    if (now > entry.resetAt) rateLimitMap.delete(ip);
-  }
-}, 2 * 60 * 1000);
-
-// ---------------------------------------------------------------------------
-// ETag helper: MD5 of content
-// ---------------------------------------------------------------------------
-function computeETag(content) {
-  return '"' + crypto.createHash('md5').update(content).digest('hex') + '"';
-}
-
-// ---------------------------------------------------------------------------
-// Gzip helper: compress buffer if client supports it
-// ---------------------------------------------------------------------------
-function sendCompressed(req, res, contentType, content, extraHeaders = {}) {
-  const buf = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
-  const acceptEncoding = req.headers['accept-encoding'] || '';
-  const shouldCompress =
-    acceptEncoding.includes('gzip') &&
-    (contentType.includes('text/html') || contentType.includes('application/json'));
-
-  const headers = {
-    'Content-Type': contentType,
-    ...extraHeaders,
-  };
-
-  if (shouldCompress) {
-    zlib.gzip(buf, (err, compressed) => {
-      if (err) {
-        res.writeHead(200, headers);
-        return res.end(buf);
-      }
-      headers['Content-Encoding'] = 'gzip';
-      headers['Vary'] = 'Accept-Encoding';
-      res.writeHead(200, headers);
-      res.end(compressed);
-    });
-  } else {
-    res.writeHead(200, headers);
-    res.end(buf);
-  }
-}
 
 export function createAppServer() {
   const server = http.createServer(async (req, res) => {
@@ -97,38 +29,15 @@ export function createAppServer() {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 
-    // Phase F: Additional Security Headers
-    res.setHeader(
-      'Content-Security-Policy',
-      "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.tailwindcss.com fonts.googleapis.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://generativelanguage.googleapis.com https://api.render.com; font-src 'self' fonts.gstatic.com; frame-ancestors 'none'"
-    );
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'geolocation=(self), camera=(none), microphone=(none)');
-
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       return res.end();
     }
 
-    // Phase F: Rate Limiting for /api/v1/* routes
-    if (pathname.startsWith('/api/v1/')) {
-      const ip =
-        req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-        req.socket?.remoteAddress ||
-        'unknown';
-      if (!checkRateLimit(ip)) {
-        res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
-        return res.end(
-          JSON.stringify({ error: 'Too Many Requests', retryAfter: 60 })
-        );
-      }
-    }
-
     // 1. WebSocket test payload (REST endpoint)
     if (pathname === '/api/v1/ws/test-payload' && req.method === 'GET') {
-      const payload = JSON.stringify(getWsTestPayload(store), null, 2);
-      res.setHeader('Cache-Control', 'no-store');
-      return sendCompressed(req, res, 'application/json; charset=utf-8', payload);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify(getWsTestPayload(store), null, 2));
     }
 
     // 2. REST API Gateway (/api/v1/*)
@@ -143,56 +52,34 @@ export function createAppServer() {
         }
       }
       const result = await handleApiRequest(store, req.method, pathname, urlObj.searchParams, body);
-      const payload = JSON.stringify(result.data, null, 2);
-      res.setHeader('Cache-Control', 'no-store');
-      res.writeHead(result.status, { 'Content-Type': 'application/json; charset=utf-8' });
-      return res.end(payload);
+      res.writeHead(result.status, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store'
+      });
+      return res.end(JSON.stringify(result.data, null, 2));
     }
 
-    // 3. Serve PWA Web Manifest & Service Worker (ETag + Cache-Control)
+    // 3. Serve PWA Web Manifest & Service Worker
     if (pathname === '/manifest.json') {
       const manifestFile = path.join(__dirname, 'ui-design', 'manifest.json');
       if (fs.existsSync(manifestFile)) {
-        const content = fs.readFileSync(manifestFile);
-        const etag = computeETag(content);
-        if (req.headers['if-none-match'] === etag) {
-          res.writeHead(304);
-          return res.end();
-        }
-        res.setHeader('ETag', etag);
-        res.setHeader('Cache-Control', 'no-cache');
-        res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8' });
-        return res.end(content);
+        res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-cache' });
+        return fs.createReadStream(manifestFile).pipe(res);
       }
     }
     if (pathname === '/sw.js') {
       const swFile = path.join(__dirname, 'ui-design', 'sw.js');
       if (fs.existsSync(swFile)) {
-        const content = fs.readFileSync(swFile);
-        const etag = computeETag(content);
-        if (req.headers['if-none-match'] === etag) {
-          res.writeHead(304);
-          return res.end();
-        }
-        res.setHeader('ETag', etag);
-        res.setHeader('Cache-Control', 'no-cache');
-        res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
-        return res.end(content);
+        res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
+        return fs.createReadStream(swFile).pipe(res);
       }
     }
 
-    // 4. Serve 93-Screen UI/UX Studio at / and /studio (ETag + gzip + Cache-Control)
+    // 4. Serve 93-Screen UI/UX Studio at / and /studio (Streaming with no memory overhead)
     const studioFile = path.join(__dirname, 'ui-design', 'index.html');
     if ((pathname === '/' || pathname === '/studio') && fs.existsSync(studioFile)) {
-      const content = fs.readFileSync(studioFile);
-      const etag = computeETag(content);
-      if (req.headers['if-none-match'] === etag) {
-        res.writeHead(304);
-        return res.end();
-      }
-      res.setHeader('ETag', etag);
-      res.setHeader('Cache-Control', 'no-cache');
-      return sendCompressed(req, res, 'text/html; charset=utf-8', content);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      return fs.createReadStream(studioFile).pipe(res);
     }
 
     res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });

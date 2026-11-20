@@ -1,77 +1,67 @@
 // =============================================================================
-// SERVICE WORKER: Hôm nay ăn gì · Taste of Vietnam v0.1 — hnag-v3
-// Strategy: Cache First (HTML/CSS/JS) + Network First with fallback (API)
-// Features: Stale-While-Revalidate, Push Notifications, Background Sync
+// SERVICE WORKER: Hôm nay ăn gì · Taste of Vietnam v0.1 — hnag-v5
+// Strategy: Network First with graceful offline fallback (Never crashes)
 // =============================================================================
 
-const CACHE_NAME = 'hnag-v3';
-const STATIC_SHELL = ['/', '/manifest.json', '/api/v1/suggestions/today'];
+const CACHE_NAME = 'hnag-v5';
 
 // ---------------------------------------------------------------------------
-// INSTALL: Pre-cache static shell
+// INSTALL: Skip waiting immediately
 // ---------------------------------------------------------------------------
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_SHELL).catch(() => {});
-    })
-  );
   self.skipWaiting();
 });
 
 // ---------------------------------------------------------------------------
-// ACTIVATE: Delete old caches
+// ACTIVATE: Purge all old caches and take control
 // ---------------------------------------------------------------------------
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // ---------------------------------------------------------------------------
-// FETCH: Cache First for HTML/CSS/JS; Network First for /api/v1/*
+// FETCH: Network First (Always fresh, safe offline fallback)
 // ---------------------------------------------------------------------------
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-  const isApi = url.pathname.startsWith('/api/v1/');
 
-  if (isApi) {
-    // Network First with cache fallback
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-  } else {
-    // Cache First (Stale-While-Revalidate)
-    event.respondWith(
-      caches.open(CACHE_NAME).then((cache) => {
-        return cache.match(event.request).then((cached) => {
-          const networkFetch = fetch(event.request).then((response) => {
-            if (response && response.status === 200) {
-              cache.put(event.request, response.clone());
-            }
-            return response;
-          }).catch(() => null);
+  // Skip chrome-extension or non-http
+  if (!url.protocol.startsWith('http')) return;
 
-          return cached || networkFetch;
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, clone).catch(() => {});
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          return new Response('Offline — Không có kết nối mạng', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+          });
         });
       })
-    );
-  }
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -90,24 +80,17 @@ self.addEventListener('push', (event) => {
     body: data.body || 'Khám phá món ngon hôm nay dành riêng cho bạn!',
     icon: '/assets/icon-192.png',
     badge: '/assets/icon-192.png',
-    data: { url: data.url || 'https://taste-of-vietnam.onrender.com/' },
-    actions: [
-      { action: 'open', title: 'Xem ngay' },
-      { action: 'dismiss', title: 'Để sau' }
-    ]
+    data: { url: data.url || 'https://taste-of-vietnam.onrender.com/' }
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 // ---------------------------------------------------------------------------
-// NOTIFICATION CLICK: Open app URL
+// NOTIFICATION CLICK: Focus or open window
 // ---------------------------------------------------------------------------
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-
-  if (event.action === 'dismiss') return;
-
   const targetUrl = (event.notification.data && event.notification.data.url)
     ? event.notification.data.url
     : 'https://taste-of-vietnam.onrender.com/';
@@ -125,35 +108,3 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
-
-// ---------------------------------------------------------------------------
-// BACKGROUND SYNC: Queue offline poll votes, replay when online
-// ---------------------------------------------------------------------------
-const SYNC_TAG_POLL = 'sync-poll-votes';
-
-self.addEventListener('sync', (event) => {
-  if (event.tag === SYNC_TAG_POLL) {
-    event.waitUntil(replayPollVotes());
-  }
-});
-
-async function replayPollVotes() {
-  // Read queued votes from Cache Storage (used as offline queue)
-  const cache = await caches.open('hnag-sync-queue');
-  const keys = await cache.keys();
-
-  for (const request of keys) {
-    try {
-      const queued = await cache.match(request);
-      const body = await queued.json();
-      await fetch('/api/v1/polls/vote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      await cache.delete(request);
-    } catch {
-      // Will retry on next sync
-    }
-  }
-}
