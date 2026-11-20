@@ -21,6 +21,7 @@ import 'screens/b2g_insights_screen.dart';
 import 'screens/merchant_portal_screen.dart';
 import 'screens/admin_cms_screen.dart';
 import 'screens/profile_expansion_screen.dart';
+import 'screens/notifications_screen.dart';
 
 void main() {
   runApp(const TasteOfVietnamApp());
@@ -154,6 +155,15 @@ class _MainShellScreenState extends State<MainShellScreen> {
             onTap: () {
               Navigator.pop(context);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const SpinWheelScreen()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.notifications_active_rounded, color: Colors.orangeAccent),
+            title: const Text('🔔 Nhắc Bữa Ăn & Thời Tiết (M8)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('Anti-fatigue ≤ 2 push/ngày · Simulator', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
             },
           ),
           ListTile(

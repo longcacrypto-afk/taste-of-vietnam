@@ -212,7 +212,7 @@ Recommendation Engine (Search Dishes + Search Places + Weather + User Taste Prof
 
 ### 8.1. Tech Stack Hoàn Chỉnh
 - **Mobile Client:** Flutter 3.x (Dart) — Kiến trúc Clean Architecture với Riverpod / Provider.
-- **Web Runtime:** HTML5, Tailwind CSS v3 tự lưu trữ tại chỗ (`/assets/tailwindcss.min.js`), Service Worker PWA `hnag-v6`.
+- **Web Runtime:** HTML5, Tailwind CSS v3 tự lưu trữ tại chỗ (`/assets/tailwindcss.min.js`), Service Worker PWA `hnag-v7` (Pre-caching offline toàn diện cho App Shell, Icons, Mascots và Dishes).
 - **Backend Gateway:** Node.js HTTP/2 REST Gateway (Modular Services Architecture), hỗ trợ High-Speed In-Memory Store & PostgreSQL fallback.
 - **Database:** PostgreSQL + PostGIS (tìm kiếm không gian bán kính 3km) + pgvector (tìm kiếm tương đồng ngữ nghĩa món ăn).
 - **AI Core:** Gemini 2.0 Flash (Chat ẩm thực thông minh, giải thích lý do gợi ý) + Regex Intent Parser tốc độ cao.
@@ -230,12 +230,9 @@ Recommendation Engine (Search Dishes + Search Places + Weather + User Taste Prof
 
 ---
 
-## 7. Kiến trúc Kỹ thuật đề xuất
-
-- **Mobile:** Flutter (iOS / Android)
-- **Web / Merchant / Admin:** Next.js + Tailwind CSS
-- **Backend:** NestJS hoặc FastAPI (Modular Monolith trước, tách microservice khi > 100k MAU)
-- **Database:** PostgreSQL + PostGIS (Geo search) + pgvector (Vector similarity search)
-- **Cache & Queue:** Redis + BullMQ
-- **AI Gateway:** LiteLLM (trừu tượng hóa LLM provider)
-- **Storage / Analytics / Monitoring:** S3-compatible, PostHog, Sentry, GitHub Actions
+### 8.3. Lộ trình Mở rộng Microservices & Mở Rộng Hạ Tầng (>100k MAU)
+- **Modular Monolith hiện tại:** Đạt hiệu năng cực cao, đáp ứng từ 0 đến 100k người dùng hoạt động hằng tháng (MAU) với chi phí vận hành tối ưu trên cụm Render Singapore.
+- **Microservices Tương lai (> 100k MAU):**
+  - Tách `Recommender & Vector Search Service` (FastAPI / pgvector / Redis).
+  - Tách `Notification & Meal Scheduler Queue` (BullMQ / Redis Cluster).
+  - Multi-region DB Replication (Hà Nội, Đà Nẵng, TP.HCM & Singapore) cho độ trễ < 50ms khắp cả nước.

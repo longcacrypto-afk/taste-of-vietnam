@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import 'notifications_screen.dart';
 
 class ProfileExpansionScreen extends StatefulWidget {
   const ProfileExpansionScreen({super.key});
@@ -355,6 +356,7 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
                       DropdownMenuItem(value: 'EN', child: Text('English (EN)')),
                       DropdownMenuItem(value: 'KO', child: Text('한국어 (KO)')),
                       DropdownMenuItem(value: 'JA', child: Text('日本語 (JA)')),
+                      DropdownMenuItem(value: 'ZH', child: Text('中文 (ZH)')),
                     ],
                     onChanged: (v) => setState(() => _selectedMenuLang = v ?? 'EN'),
                   ),
@@ -369,8 +371,49 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
                     ? '하노이 소고기 양지 쌀국수 — 12시간 우린 깊은 사골 육수'
                     : _selectedMenuLang == 'JA'
                         ? 'ハノイ風牛肉フォー（レア＆ブリスケット）'
-                        : 'Hanoi Sliced & Flank Beef Noodle Soup (12-hr marrow broth)',
+                        : _selectedMenuLang == 'ZH'
+                            ? '河内半熟牛腩牛肉粉 — 12小时牛骨浓郁高汤'
+                            : 'Hanoi Sliced & Flank Beef Noodle Soup (12-hr marrow broth)',
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 5b. Smart Meal Reminders & Weather Notification Shortcut (M8)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              const Text('🔔', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Nhắc Bữa Ăn & Thông Báo Thời Tiết (M8)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                    SizedBox(height: 2),
+                    Text('SLA ≤ 2 push/ngày · Giờ nhắc 10:30 & 17:00 · Simulator', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+                  ],
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.charcoalHero,
+                  foregroundColor: AppTheme.goldenAmber,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+                },
+                child: const Text('Cài đặt', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
