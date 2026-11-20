@@ -195,16 +195,140 @@ Recommendation Engine (Search Dishes + Search Places + Weather + User Taste Prof
 
 ---
 
-## 7. Ma trận 93 Màn hình Toàn Ứng Dụng (M1 → M17)
+## 7. Ma trận 93 Màn hình Toàn Ứng Dụng (M1 → M17 & Web Core)
 
 | Nhóm Nền Tảng | Mã Module | Số lượng Màn hình | Ghi chú & Phạm vi |
 | :--- | :--- | :---: | :--- |
 | **Consumer Mobile MVP** | M1 → M5 | **40 Màn hình** | Onboarding, Gợi ý 3 món AI hằng ngày, Vòng quay 3D & Mini-game, Chat AI Măm, Bản đồ quán 3km, Chi tiết quán & Đặt món. |
-| **Consumer Web & PWA** | Web Core | **5 Màn hình** | Trang chủ Responsive, Khám phá món & quán, Chi tiết công thức nấu ăn, Thư viện ẩm thực SEO. |
+| **Consumer Web & PWA** | Web Core | **5 Màn hình** | Trang chủ Responsive, Khám phá món & quán, Chi tiết công thức nấu ăn, Thư viện ẩm thực SEO, Trung tâm Studio. |
 | **Merchant & Quảng Cáo** | M6 → M7 | **17 Màn hình** | Đăng ký quán, Quản lý thực đơn thủ công & AI Menu OCR, Tạo chiến dịch quảng cáo, Cổng thanh toán VietQR Napas247. |
 | **Quản Trị & Phân Tích** | M9 → M10 | **15 Màn hình** | Admin CMS, Hàng đợi duyệt ghép món OCR, Xử lý quán tự động tạm dừng, Phân quyền RBAC 6 roles, Phễu PostHog & AI Benchmark. |
 | **Tăng Trưởng & Mở Rộng**| M11 → M17 | **16 Màn hình** | Thực đơn tuần & Giỏ đi chợ, Bình chọn nhóm & Đánh giá GPS, Đặt bàn & Voucher, Chuyện văn hóa, Food Trail, Dịch menu AI, B2G Insights. |
 | **TỔNG CỘNG** | **M1 → M17** | **93 Màn hình** | **Hoàn chỉnh 100% trên cả Web Runtime (Live) và Flutter Mobile Screens.** |
+
+### 7.1. Danh mục Chi tiết Mã 93 Màn hình (The 93-Screen Catalog & Route Dictionary)
+
+#### Nhóm Consumer Mobile Core (M1 → M5: 40 Màn hình)
+- **M1 (Tài khoản & Hồ sơ khẩu vị — 10 screens):**
+  - `M1-S01`: Splash & Khởi động ứng dụng (Mascot Măm chào đón).
+  - `M1-S02`: Đăng nhập OTP / Social (Google, Apple, Zalo) & Chế độ Khách (Guest Mode).
+  - `M1-S03`: Onboarding Bước 1 — Chọn vùng miền ẩm thực (Bắc / Trung / Nam).
+  - `M1-S04`: Onboarding Bước 2 — Mức độ ăn cay (Thanh trượt 0 → 3).
+  - `M1-S05`: Onboarding Bước 3 — Dị ứng thực phẩm (Hard Allergy Guard).
+  - `M1-S06`: Onboarding Bước 4 — Chế độ ăn (Cân bằng, Ăn chay, Eat Clean, Gym).
+  - `M1-S07`: Onboarding Bước 5 — Ngân sách bữa ăn trung bình (35k – 120k+).
+  - `M1-S08`: Quản lý Hồ sơ cá nhân & Khẩu vị gia đình.
+  - `M1-S09`: Xuất dữ liệu cá nhân JSON tuân thủ Nghị định 13/2023/NĐ-CP (PDPD Data Export).
+  - `M1-S10`: Xóa tài khoản vĩnh viễn (*Right to be Forgotten* - PDPD Account Wipe).
+- **M2 (Thư viện món & Công thức nấu — 8 screens):**
+  - `M2-S01`: Khám phá Món ăn theo Danh mục & 3 Miền.
+  - `M2-S02`: Tìm kiếm thông minh tiếng Việt (Có dấu / Không dấu / Viết tắt).
+  - `M2-S03`: Chi tiết Món ăn (Nguồn gốc, calo, hương vị, độ khó).
+  - `M2-S04`: Tab Đi ăn / Đặt ngoài (Danh sách quán gần bán món).
+  - `M2-S05`: Tab Tự nấu tại nhà (Dynamic Portion Scaler nhân chia định lượng 1–10 người).
+  - `M2-S06`: Chế độ Nấu ăn từng bước kèm Đồng hồ bấm giờ (Step-by-step Cooking Mode).
+  - `M2-S07`: Bộ sưu tập Món yêu thích (Favorite Collections).
+  - `M2-S08`: Lịch sử món đã xem & tìm kiếm gần đây.
+- **M3 (Gợi ý AI hằng ngày & Ra quyết định — 7 screens):**
+  - `M3-S01`: Today Home (3 món gợi ý theo thời tiết & khẩu vị, tối đa 1/3 Sponsored).
+  - `M3-S02`: Chi tiết Lý do AI gợi ý (AI Recommendation Insight).
+  - `M3-S03`: Mini-game 3-in-1 Decision Hub (Vòng quay 3D, Rút quẻ cổ truyền, Túi mù Blind Box).
+  - `M3-S04`: Trò chuyện tự nhiên với Trợ lý AI Chef Măm (NLU Intent Extraction).
+  - `M3-S05`: Kết quả 3 phương án gợi ý thực tế kèm tổng ngân sách nhóm.
+  - `M3-S06`: Phản hồi gợi ý (Yêu thích, Đổi món nhanh, Đã ăn kích hoạt Cooldown 3 ngày).
+  - `M3-S07`: Lịch sử các món gợi ý & tần suất ăn uống tuần.
+- **M4 (Quán & Bản đồ 3km — 6 screens):**
+  - `M4-S01`: Bản đồ Quán ngon bán kính 3km (PostGIS Spatial Map).
+  - `M4-S02`: Danh sách Quán đang mở cửa & Bộ lọc (Máy lạnh, Ghế trẻ em, Đánh giá cao).
+  - `M4-S03`: Chi tiết Quán ăn (Giờ mở/đóng, hotline, hình ảnh, chứng nhận đối tác).
+  - `M4-S04`: Thực đơn có cấu trúc & Bảng giá tại quán.
+  - `M4-S05`: Trạng thái món còn/hết hàng thời gian thực.
+  - `M4-S06`: Báo cáo quán đóng cửa / sai dữ liệu (Cơ chế Auto-Pause khi nhận đủ 3 báo cáo).
+- **M5 (Đặt món & Chỉ đường — 5 screens):**
+  - `M5-S01`: Hub chuyển tiếp Đặt món (Deep-link GrabFood, ShopeeFood, beFood, Xanh SM Ngon).
+  - `M5-S02`: Chỉ đường thực tế qua Google Maps / Apple Maps.
+  - `M5-S03`: Gọi điện trực tiếp hotline quán ăn (tel: deep-link).
+  - `M5-S04`: Ghi nhận chuyển đổi Loopback & UTM Click Tracking.
+  - `M5-S05`: Xác nhận hoàn tất đơn hàng và tự động cập nhật Cooldown 3 ngày.
+
+#### Nhóm Merchant & Quảng Cáo (M6 → M7: 17 Màn hình)
+- **M6 (Cổng Quán — Merchant Portal — 9 screens):**
+  - `M6-S01`: Đăng ký & Xác minh Quán ăn đối tác (Merchant Onboarding).
+  - `M6-S02`: Bảng tổng quan Merchant KPI (Lượt xem, gọi điện, chỉ đường, click đặt món).
+  - `M6-S03`: Quản lý Chi nhánh & Giờ mở cửa từng ngày.
+  - `M6-S04`: Quản lý Thực đơn thủ công (Thêm/Sửa/Ẩn món).
+  - `M6-S05`: Tải ảnh thực đơn bóc tách bằng AI Menu OCR.
+  - `M6-S06`: Xem trước & Ghép nối AI OCR với Thư viện món M2 (Menu Matching Review).
+  - `M6-S07`: Quản lý Món đặc biệt hôm nay (Daily Special Tagging).
+  - `M6-S08`: Thiết lập Chương trình khuyến mãi & Giảm giá tại quán.
+  - `M6-S09`: Báo cáo Doanh thu & Lượng khách ước tính từ nền tảng.
+- **M7 (Quảng bá & Chiến dịch VietQR — 8 screens):**
+  - `M7-S01`: Danh sách Chiến dịch Tài trợ Vị trí (Sponsored Campaigns).
+  - `M7-S02`: Tạo Chiến dịch mới (Chọn món, bán kính GPS, thời tiết, khung giờ trưa/tối).
+  - `M7-S03`: Thiết lập Ngân sách ngày & Giới hạn giá thầu CPC / CPA.
+  - `M7-S04`: Nạp ngân sách quảng cáo bằng VietQR chuẩn EMVCo (NAPAS 24/7).
+  - `M7-S05`: Màn hình Quét mã QR thanh toán ngân hàng & Webhook tự động cộng tiền.
+  - `M7-S06`: Lịch sử Giao dịch Nạp tiền & Hóa đơn điện tử.
+  - `M7-S07`: Giám sát Chống Click Tặc (Anti-Fraud Click Guard 60 giây).
+  - `M7-S08`: Báo cáo Hiệu quả Chiến dịch (Lượt hiển thị Impression, Click CTR, Chuyển đổi CPA).
+
+#### Nhóm Quản Trị, Vận Hành & Phân Tích (M8 → M10: 19 Màn hình)
+- **M8 (Thông báo & Tái kích hoạt — 4 screens):**
+  - `M8-S01`: Cài đặt Khung giờ Nhắc Bữa Ăn (Trưa 10:30 & Tối 17:00, SLA ≤2 push/ngày).
+  - `M8-S02`: Bật/Tắt Gợi ý Thích ứng Thời tiết thực tế (Weather-Adaptive Notifications).
+  - `M8-S03`: Bộ Giả Lập Push Notification & Floating Toast Simulator.
+  - `M8-S04`: Trung tâm Lưu trữ & Lịch sử Thông báo cá nhân.
+- **M9 (Admin CMS & Kiểm duyệt tự động — 9 screens):**
+  - `M9-S01`: Bảng điều khiển Quản trị Trung tâm (Admin Executive Dashboard).
+  - `M9-S02`: Quản lý Thư viện Món ăn Toàn quốc & Gán nhãn Dị ứng chuẩn.
+  - `M9-S03`: Hàng đợi Duyệt ghép món AI Menu OCR (Độ tin cậy <95%).
+  - `M9-S04`: Xử lý Từ chối ghép món OCR kèm Lý do phản hồi cho chủ quán.
+  - `M9-S05`: Quản lý Danh sách Báo cáo sai dữ liệu & Quán tự động tạm dừng (Auto-Pause Guard).
+  - `M9-S06`: Thao tác Mở lại Quán ăn sau khi xác minh (Un-pause & Clear Reports).
+  - `M9-S07`: Kiểm duyệt Chiến dịch Quảng cáo trước khi phân phối.
+  - `M9-S08`: Phân quyền Tài khoản & Phân cấp Vai trò (RBAC 6 Roles).
+  - `M9-S09`: Nhật ký Kiểm toán Hệ thống không thể chỉnh sửa (Audit Logs).
+- **M10 (Phễu chuyển đổi & NLU Benchmark — 6 screens):**
+  - `M10-S01`: Bảng theo dõi Chỉ số North Star WAMD (Weekly Active Meal Decisions).
+  - `M10-S02`: Phễu chuyển đổi 4 bước (App Open → Suggestion Shown → Place View → Order Click).
+  - `M10-S03`: Báo cáo Tỷ lệ Thoát & Thời gian ra quyết định trung bình (<60s).
+  - `M10-S04`: Bộ Kiểm thử Tự động NLU Tiếng Việt 200 câu phức tạp (Benchmark SLA ≥90%).
+  - `M10-S05`: Bản đồ nhiệt Tương tác Người dùng (Heatmap & Event Tracking).
+  - `M10-S06`: Báo cáo Thử nghiệm A/B Testing Thuật toán gợi ý.
+
+#### Nhóm Tăng Trưởng & Mở Rộng Hệ Sinh Thái (M11 → M17: 16 Màn hình)
+- **M11 (Thực đơn tuần & Giỏ đi chợ — 3 screens):**
+  - `M11-S01`: Lập Kế hoạch Bữa ăn 7 Ngày (Trưa & Tối, 2200–2400 kcal/ngày).
+  - `M11-S02`: Giỏ đi chợ Gộp thông minh (Tự động cộng dồn & khấu trừ nguyên liệu trong tủ lạnh).
+  - `M11-S03`: Quản lý Kho nguyên liệu Tủ lạnh Gia đình (In-Fridge Inventory).
+- **M12 (Ăn nhóm & Đánh giá GPS — 3 screens):**
+  - `M12-S01`: Tạo Phòng Bình Chọn Ăn Nhóm bằng Mã PIN & Mã QR.
+  - `M12-S02`: Bảng Biểu Quyết Thời Gian Thực (Tự động lọc giao thoa dị ứng cả nhóm).
+  - `M12-S03`: Đánh giá Quán Ăn có Xác thực GPS Bán kính ≤ 500m (Chống review ảo).
+- **M13 (Đặt bàn & QR Voucher — 2 screens):**
+  - `M13-S01`: Đặt bàn Giữ chỗ Tức thì (Instant Confirmed - Số người, giờ, ghế trẻ em).
+  - `M13-S02`: Ví Mã QR Voucher Điện tử độc quyền trừ tiền trực tiếp tại quầy.
+- **M14 (Văn hóa ẩm thực 3 miền — 2 screens):**
+  - `M14-S01`: Kho Tư liệu Lịch sử & Câu chuyện Cội nguồn Món ăn Truyền thống.
+  - `M14-S02`: Bản đồ Biến thể Vùng miền (So sánh Phở Bắc vs Phở Nam, Bún Bò Huế gốc vs Sài Gòn).
+- **M15 (Lộ trình Food Trail & Hộ chiếu — 2 screens):**
+  - `M15-S01`: Lộ trình Food Trail Tuyển chọn theo Chủ đề (Phố Bún, Chợ Đêm, Trà Chiều).
+  - `M15-S02`: Hộ chiếu Ẩm thực Số tích dấu QR khi ghé thăm từng trạm.
+- **M16 (Dịch Menu Đa Ngữ AI — 2 screens):**
+  - `M16-S01`: Dịch Thực đơn Chuẩn xác 4 Thứ tiếng (EN, KO, JA, ZH - Giữ tên gốc tiếng Việt).
+  - `M16-S02`: Audio Phát âm Chuẩn Bản xứ & Hướng dẫn Cách ăn Chuẩn vị.
+- **M17 (B2G & Brand Enterprise Insights — 2 screens):**
+  - `M17-S01`: Cổng Dữ liệu Phân tích Du lịch Ẩm thực Vĩ mô dành cho Sở Du lịch / BQL Văn hóa.
+  - `M17-S02`: Bảng Quản trị Chiến dịch Đồng Tiếp thị dành cho Nhãn hàng FMCG / F&B.
+
+#### Nhóm Nền Tảng Consumer Web Core & PWA (Web Core: 5 Màn hình)
+- `WEB-S01`: Trang chủ Responsive PWA (Đồng bộ thời tiết, gợi ý 3 món & decision hub).
+- `WEB-S02`: Cổng Khám phá Ẩm thực & Bản đồ Tương tác Toàn màn hình.
+- `WEB-S03`: Trang Chi tiết Công thức Chuẩn SEO & Dynamic Portion Scaler.
+- `WEB-S04`: Trung tâm Điều phối 17 Live Panels (Studio Dashboard).
+- `WEB-S05`: Trang Cài đặt Ứng dụng, Chế độ Ngoại tuyến PWA & Chính sách Bảo mật PDPD.
+
+---
 
 ---
 
