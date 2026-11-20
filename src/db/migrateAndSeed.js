@@ -53,17 +53,17 @@ export async function runMigrationAndSeed(customConnectionString = null) {
         [
           d.id,
           d.name,
-          d.unaccented_name,
+          d.unaccented_name || d.name,
           d.region,
-          d.meal_slots,
-          d.diet_flags,
-          d.allergen_flags,
-          d.spice_level,
-          d.calories,
-          d.prep_time_minutes,
-          d.estimated_price_vnd,
-          JSON.stringify(d.ingredients),
-          JSON.stringify(d.recipe_steps),
+          d.meal_slots || ['lunch', 'dinner'],
+          d.diet_flags || [d.diet_mode || 'balanced'],
+          d.allergen_flags || d.allergen_tags || [],
+          d.spice_level ?? 1,
+          d.calories || 400,
+          d.prep_time_minutes || d.prep_minutes || 25,
+          d.estimated_price_vnd || d.ref_price || 45000,
+          JSON.stringify(d.ingredients || []),
+          JSON.stringify(d.recipe_steps || d.steps || []),
         ]
       );
     }
@@ -71,6 +71,11 @@ export async function runMigrationAndSeed(customConnectionString = null) {
     // 4. Seed Places with PostGIS Geometries (M4 Places)
     console.log(`📍 Seeding ${store.places.length} places into 'places' table with PostGIS geometry...`);
     for (const p of store.places) {
+      const openTime = p.open_time || (p.open_hour !== undefined ? `${String(p.open_hour).padStart(2, '0')}:00:00` : '06:00:00');
+      const closeTime = p.close_time || (p.close_hour !== undefined ? `${String(p.close_hour).padStart(2, '0')}:00:00` : '22:00:00');
+      const reportCount = p.report_count || p.closed_report_count || 0;
+      const isPaused = p.is_paused !== undefined ? p.is_paused : false;
+
       await pool.query(
         `INSERT INTO places (
           id, name, address, geom, open_time, close_time, rating, review_count, report_count, is_paused, is_verified
@@ -89,20 +94,22 @@ export async function runMigrationAndSeed(customConnectionString = null) {
           p.address,
           p.lng, // PostGIS Point takes (lng, lat)
           p.lat,
-          p.open_time,
-          p.close_time,
-          p.rating,
-          p.review_count,
-          p.report_count,
-          p.is_paused,
-          p.is_verified,
+          openTime,
+          closeTime,
+          p.rating || 4.5,
+          p.review_count || 0,
+          reportCount,
+          isPaused,
+          p.is_verified ?? true,
         ]
       );
 
       // Seed Place Dishes
-      for (const dishId of p.dish_ids) {
+      const dishIds = p.dish_ids || (p.menu ? p.menu.map((m) => m.dish_id) : ['DISH-101']);
+      for (const dishId of dishIds) {
         const dish = store.dishes.find((d) => d.id === dishId);
-        const price = dish ? dish.estimated_price_vnd : 50000;
+        const menuItem = p.menu ? p.menu.find((m) => m.dish_id === dishId) : null;
+        const price = menuItem ? menuItem.price : (dish ? (dish.ref_price || dish.estimated_price_vnd) : 50000);
         await pool.query(
           `INSERT INTO place_dishes (place_id, dish_id, price_vnd, is_available)
            VALUES ($1, $2, $3, true)
@@ -113,24 +120,34 @@ export async function runMigrationAndSeed(customConnectionString = null) {
     }
 
     // 5. Seed Ad Campaigns (M7 Sponsored)
-    console.log(`🎯 Seeding ${store.ad_campaigns.length} campaigns into 'ad_campaigns' table...`);
-    for (const c of store.ad_campaigns) {
+    const campaigns = store.ad_campaigns || store.campaigns || [];
+    console.log(`🎯 Seeding ${campaigns.length} campaigns into 'ad_campaigns' table...`);
+    for (const c of campaigns) {
       await pool.query(
         `INSERT INTO ad_campaigns (id, place_id, dish_id, cpc_vnd, balance_vnd, is_active)
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (id) DO UPDATE SET balance_vnd = EXCLUDED.balance_vnd;`,
-        [c.id, c.place_id, c.dish_id, c.cpc_vnd, c.balance_vnd, c.is_active]
+        [c.id, c.place_id, c.dish_id, c.cpc_vnd || 3500, c.balance_vnd || c.budget_monthly_vnd || 500000, c.is_active ?? (c.status === 'active')]
       );
     }
 
     // 6. Seed OCR Queue (M6/M9 Review)
-    console.log(`📋 Seeding ${store.ocr_queue.length} items into 'ocr_review_queue' table...`);
-    for (const q of store.ocr_queue) {
+    const ocrQueue = store.ocr_queue || store.ocrQueue || [];
+    console.log(`📋 Seeding ${ocrQueue.length} items into 'ocr_review_queue' table...`);
+    for (const q of ocrQueue) {
       await pool.query(
         `INSERT INTO ocr_review_queue (id, place_id, raw_text, extracted_dish_name, extracted_price_vnd, confidence_score, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id) DO NOTHING;`,
-        [q.id, q.place_id, q.raw_text, q.extracted_dish_name, q.extracted_price_vnd, q.confidence_score, q.status]
+        [
+          q.id,
+          q.place_id,
+          q.raw_text,
+          q.extracted_dish_name || q.extracted_name || 'Phở',
+          q.extracted_price_vnd || q.extracted_price || 45000,
+          q.confidence_score || q.confidence || 0.9,
+          q.status || 'pending',
+        ]
       );
     }
 
