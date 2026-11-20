@@ -307,6 +307,12 @@
       <button onclick="setLiveAppTab('analytics')" id="ltab-analytics" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
         <span>📊</span> Phễu &amp; NLU Analytics (M10)
       </button>
+      <button onclick="setLiveAppTab('profile')" id="ltab-profile" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>👤</span> Khẩu Vị &amp; PDPD (M1)
+      </button>
+      <button onclick="setLiveAppTab('notifications')" id="ltab-notifications" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-subtle)] transition shrink-0 flex items-center gap-2">
+        <span>🔔</span> Nhắc Bữa Ăn (M8)
+      </button>
     </div>
 
     <!-- TAB PANEL 1: GỢI Ý HÔM NAY (TODAY SUGGESTIONS) -->
@@ -974,6 +980,42 @@
       </div>
     </div>
 
+    <!-- TAB PANEL: HỒ SƠ KHẨU VỊ & PDPD (M1) -->
+    <div id="lpanel-profile" class="hidden space-y-6 max-w-4xl mx-auto">
+      <div class="flex items-center justify-between">
+        <div>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FBBF24]/20 text-[#B45309]">M1 · TASTE PROFILE &amp; PDPD COMPLIANCE</span>
+          <h2 class="text-xl font-black mt-1">Hồ Sơ Khẩu Vị &amp; Bảo Vệ Quyền Riêng Tư Dữ Liệu</h2>
+          <p class="text-xs text-[var(--text-muted)]">Bộ lọc vị giác 3 miền, ngân sách, chặn 100% dị ứng &amp; tuân thủ nghiêm ngặt Nghị định 13/2023/NĐ-CP (PDPD)</p>
+        </div>
+        <button onclick="loadLiveProfile()" class="px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] text-xs font-bold hover:border-[#FBBF24] flex items-center gap-1">
+          🔄 Tải lại
+        </button>
+      </div>
+
+      <div id="live-profile-content" class="space-y-6">
+        <!-- Rendered dynamically via loadLiveProfile -->
+      </div>
+    </div>
+
+    <!-- TAB PANEL: NHẮC NHỞ GIỜ ĂN & THÔNG BÁO (M8) -->
+    <div id="lpanel-notifications" class="hidden space-y-6 max-w-4xl mx-auto">
+      <div class="flex items-center justify-between">
+        <div>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#22C55E]/20 text-[#15803D]">M8 · SMART WEATHER-AWARE REMINDERS</span>
+          <h2 class="text-xl font-black mt-1">Cài Đặt Lịch Nhắc Giờ Ăn &amp; Thông Báo</h2>
+          <p class="text-xs text-[var(--text-muted)]">Tự động gợi ý món trưa (10:30) &amp; tối (17:00) theo thời tiết, giới hạn ≤ 2 thông báo/ngày chống làm phiền</p>
+        </div>
+        <button onclick="loadLiveNotifications()" class="px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] text-xs font-bold hover:border-[#FBBF24] flex items-center gap-1">
+          🔄 Tải lại
+        </button>
+      </div>
+
+      <div id="live-notifications-content" class="space-y-6">
+        <!-- Rendered dynamically via loadLiveNotifications -->
+      </div>
+    </div>
+
   </div>
   <div id="main-screens" class="hidden flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-6 py-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
@@ -1567,7 +1609,7 @@ export async function load${activeScr.id.replace('-','')}() {
 
     function setLiveAppTab(tab) {
       currentLiveTab = tab;
-      const tabs = ['today', 'explore', 'recipe', 'chat', 'wheel', 'places', 'mealplan', 'poll', 'merchant', 'booking', 'stories', 'translator', 'insights', 'admin', 'analytics'];
+      const tabs = ['today', 'explore', 'recipe', 'chat', 'wheel', 'places', 'mealplan', 'poll', 'merchant', 'booking', 'stories', 'translator', 'insights', 'admin', 'analytics', 'profile', 'notifications'];
       tabs.forEach(t => {
         const p = document.getElementById(`lpanel-${t}`);
         if (p) p.classList.toggle('hidden', t !== tab);
@@ -1592,6 +1634,8 @@ export async function load${activeScr.id.replace('-','')}() {
       if (tab === 'insights') loadLiveInsights();
       if (tab === 'admin') loadLiveAdmin();
       if (tab === 'analytics') loadLiveAnalytics();
+      if (tab === 'profile') loadLiveProfile();
+      if (tab === 'notifications') loadLiveNotifications();
     }
 
     async function initLiveApp() {
@@ -3009,7 +3053,7 @@ export async function load${activeScr.id.replace('-','')}() {
 
             <div class="space-y-3">
               ${(data.user_reports || []).map(r => `
-                <div class="p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
+                <div id="report-card-${r.place_id}" class="p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div class="font-bold text-xs text-white">${r.place_name} (${r.place_id})</div>
                     <div class="text-[11px] text-[var(--text-muted)] mt-0.5">Lý do: <span class="text-yellow-400 font-medium">${r.reason}</span> (${r.report_count} phản ánh)</div>
@@ -3017,7 +3061,7 @@ export async function load${activeScr.id.replace('-','')}() {
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-[#EF4444] text-white">Auto-Paused</span>
-                    <button onclick="alert('Đã kích hoạt lại quán ' + r.place_name + ' sau khi xác minh chủ quán!')" class="px-3 py-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[11px] font-bold hover:border-[#FBBF24]">
+                    <button onclick="unpausePlace('${r.place_id}', '${r.place_name}')" class="px-3 py-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[11px] font-bold hover:border-[#FBBF24]">
                       Mở lại quán
                     </button>
                   </div>
@@ -3072,25 +3116,62 @@ export async function load${activeScr.id.replace('-','')}() {
     }
 
     async function submitOcrReview(ocrId, action) {
+      let reason = '';
+      if (action === 'rejected') {
+        const inputReason = prompt('Nhập lý do từ chối (hoặc bấm OK để dùng lý do mặc định):', 'Ảnh chụp bị mờ / Tên món không rõ ràng');
+        if (inputReason === null) return;
+        reason = inputReason || 'Ảnh chụp bị mờ / Tên món không rõ ràng';
+      }
+
       try {
         const res = await fetch('/api/v1/admin/ocr-review', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ocr_id: ocrId, action: action })
+          body: JSON.stringify({ ocr_id: ocrId, decision: action, reason: reason })
         });
         const resData = await res.json();
         const card = document.getElementById(`ocr-card-${ocrId}`);
         if (card) {
-          card.className = 'p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[#22C55E] flex items-center justify-between';
-          card.innerHTML = `
-            <div class="text-xs font-bold text-[#22C55E] flex items-center gap-2">
-              <span>✅</span> Đã duyệt ghép món thành công! Món mới đã được cập nhật vào thực đơn quán đối tác.
-            </div>
-            <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-[#22C55E] text-white">Đã Duyệt</span>
-          `;
+          if (action === 'approved') {
+            card.className = 'p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[#22C55E] flex items-center justify-between';
+            card.innerHTML = `
+              <div class="text-xs font-bold text-[#22C55E] flex items-center gap-2">
+                <span>✅</span> Đã duyệt ghép món thành công! Món mới đã được cập nhật vào thực đơn quán đối tác.
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-[#22C55E] text-white">Đã Duyệt</span>
+            `;
+          } else {
+            card.className = 'p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[#EF4444] flex items-center justify-between';
+            card.innerHTML = `
+              <div class="text-xs font-bold text-[#EF4444] flex items-center gap-2">
+                <span>❌</span> Đã từ chối mục OCR. Lý do: ${reason}
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-[#EF4444] text-white">Đã Từ Chối</span>
+            `;
+          }
         }
       } catch (e) {
         alert('Lỗi phê duyệt OCR.');
+      }
+    }
+
+    async function unpausePlace(placeId, placeName) {
+      try {
+        const res = await fetch(`/api/v1/admin/places/${placeId}/unpause`, { method: 'POST' });
+        const resData = await res.json();
+        const card = document.getElementById(`report-card-${placeId}`);
+        if (card) {
+          card.className = 'p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[#22C55E] flex items-center justify-between';
+          card.innerHTML = `
+            <div class="text-xs font-bold text-[#22C55E] flex items-center gap-2">
+              <span>✅</span> Đã mở lại quán "${placeName}" và gỡ cờ tạm dừng tự động thành công!
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-[#22C55E] text-white">Đang Hoạt Động</span>
+          `;
+        }
+        showFloatingToast('Mở Lại Quán Thành Công', `Quán "${placeName}" đã được mở lại và hiển thị trên bản đồ 3km.`, '🏪');
+      } catch (e) {
+        alert('Lỗi gỡ tạm dừng quán.');
       }
     }
 
@@ -3199,6 +3280,414 @@ export async function load${activeScr.id.replace('-','')}() {
       } catch (err) {
         c.innerHTML = '<div class="text-center py-10 text-xs text-red-500">Lỗi kết nối Analytics.</div>';
       }
+    }
+
+    // ─── MODULE M1: HỒ SƠ KHẨU VỊ & TUÂN THỦ PDPD ───────────────────────────
+    let liveUserProfile = null;
+
+    async function loadLiveProfile() {
+      const c = document.getElementById('live-profile-content');
+      if (!c) return;
+      c.innerHTML = '<div class="text-center py-12 text-xs text-[var(--text-muted)]">⏳ Đang tải hồ sơ vị giác và thiết lập riêng tư...</div>';
+
+      try {
+        const res = await fetch('/api/v1/me/profile');
+        const profile = await res.json();
+        liveUserProfile = profile;
+
+        const currentSpice = profile.spice_level ?? 1;
+        const currentDiet = profile.diet_mode || 'balanced';
+        const currentAllergies = profile.hard_allergies || [];
+        const currentRegions = profile.regions || ['bac', 'nam', 'trung'];
+        const budgetMin = profile.budget_min || 30000;
+        const budgetMax = profile.budget_max || 65000;
+
+        c.innerHTML = `
+          <!-- Section 1: Taste Preferences & Diets -->
+          <div class="genui-card p-6 rounded-3xl space-y-6 border border-[var(--border-subtle)]">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-black text-base flex items-center gap-2">
+                  <span>🍽️</span> Hồ Sơ Khẩu Vị Ẩm Thực Cá Nhân
+                </h3>
+                <p class="text-xs text-[var(--text-muted)]">Cung cấp dữ liệu để AI Chef Măm cá nhân hóa đề xuất 3 món hằng ngày phù hợp nhất</p>
+              </div>
+              <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-[#FBBF24]/20 text-[#B45309]">Hồ sơ kích hoạt</span>
+            </div>
+
+            <!-- Regions -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-white block">1. Vùng miền ẩm thực ưa thích:</label>
+              <div class="flex flex-wrap gap-2.5">
+                ${[
+                  { id: 'bac', label: '🍜 Vị Bắc (Thanh tao, thảo mộc nhẹ nhàng)' },
+                  { id: 'trung', label: '🌶️ Vị Trung (Chua cay, mắm ruốc đậm đà)' },
+                  { id: 'nam', label: '🥥 Vị Nam (Ngọt béo cốt dừa, rau phong phú)' }
+                ].map(r => `
+                  <label class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] cursor-pointer hover:border-[#FBBF24] transition text-xs font-semibold">
+                    <input type="checkbox" id="reg-${r.id}" ${currentRegions.includes(r.id) ? 'checked' : ''} class="accent-[#FBBF24]" />
+                    <span>${r.label}</span>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Spice Level -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-white block">2. Khả năng ăn cay:</label>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                ${[
+                  { lvl: 0, label: '0. Không cay', icon: '🟢' },
+                  { lvl: 1, label: '1. Cay nhẹ (Tiêu/ớt ít)', icon: '🟡' },
+                  { lvl: 2, label: '2. Cay vừa (Chuẩn vị Huế)', icon: '🟠' },
+                  { lvl: 3, label: '3. Rất cay (Ớt hiểm)', icon: '🌶️🌶️' }
+                ].map(s => `
+                  <button type="button" onclick="selectSpiceLevel(${s.lvl})" id="spice-btn-${s.lvl}" class="p-3 rounded-2xl text-left border ${currentSpice === s.lvl ? 'bg-[#FBBF24]/20 border-[#FBBF24] text-[#FBBF24] font-extrabold' : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold'} transition text-xs">
+                    <div>${s.icon} ${s.label}</div>
+                  </button>
+                `).join('')}
+              </div>
+              <input type="hidden" id="input-spice-level" value="${currentSpice}" />
+            </div>
+
+            <!-- Hard Allergy Filter -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-bold text-white block">3. Bộ lọc cứng dị ứng (Hard Allergy Filter — Chặn 100%):</label>
+                <span class="text-[10px] text-red-400 font-bold">Tuyệt đối không đề xuất món có dị ứng</span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                ${[
+                  { id: 'shrimp', label: 'Tôm, Cua, Hải sản', icon: '🦐' },
+                  { id: 'peanut', label: 'Đậu phộng, Lạc rang', icon: '🥜' },
+                  { id: 'shrimp_paste', label: 'Mắm tôm, Mắm nêm', icon: '🫙' },
+                  { id: 'dairy', label: 'Sữa, Phô mai, Lactose', icon: '🥛' },
+                  { id: 'egg', label: 'Trứng gà, Trứng vịt', icon: '🥚' },
+                  { id: 'gluten', label: 'Gluten, Bột mì', icon: '🌾' }
+                ].map(a => `
+                  <label class="flex items-center gap-2 p-3 rounded-2xl bg-[var(--bg-elevated)] border ${currentAllergies.includes(a.id) ? 'border-red-500/80 bg-red-500/10' : 'border-[var(--border-subtle)]'} cursor-pointer hover:border-red-400 transition font-semibold">
+                    <input type="checkbox" id="allergy-${a.id}" ${currentAllergies.includes(a.id) ? 'checked' : ''} class="accent-red-500" />
+                    <span>${a.icon} ${a.label}</span>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Diet Mode -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-white block">4. Chế độ ăn uống đặc biệt:</label>
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-xs">
+                ${[
+                  { id: 'balanced', label: 'Cân bằng', icon: '🍲' },
+                  { id: 'vegetarian', label: 'Ăn chay', icon: '🥗' },
+                  { id: 'vegan', label: 'Thuần chay', icon: '🌱' },
+                  { id: 'low_carb', label: 'Low Carb/Keto', icon: '🥩' },
+                  { id: 'eat_clean', label: 'Eat Clean', icon: '🥑' }
+                ].map(d => `
+                  <button type="button" onclick="selectDietMode('${d.id}')" id="diet-btn-${d.id}" class="p-3 rounded-2xl text-center border ${currentDiet === d.id ? 'bg-[#22C55E]/20 border-[#22C55E] text-[#22C55E] font-extrabold' : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold'} transition">
+                    <div class="text-base">${d.icon}</div>
+                    <div class="mt-1">${d.label}</div>
+                  </button>
+                `).join('')}
+              </div>
+              <input type="hidden" id="input-diet-mode" value="${currentDiet}" />
+            </div>
+
+            <!-- Budget Range -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-white block">5. Khoảng ngân sách một bữa (VND):</label>
+              <div class="flex items-center gap-3">
+                <input type="number" id="input-budget-min" value="${budgetMin}" step="5000" class="w-1/2 p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-white focus:border-[#FBBF24] outline-none" />
+                <span class="text-xs text-[var(--text-muted)]">đến</span>
+                <input type="number" id="input-budget-max" value="${budgetMax}" step="5000" class="w-1/2 p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-white focus:border-[#FBBF24] outline-none" />
+              </div>
+            </div>
+
+            <!-- Save Action Button -->
+            <div class="pt-2">
+              <button onclick="saveLiveProfile()" class="w-full py-3 rounded-2xl bg-[#FBBF24] text-[#0F172A] font-black text-xs hover:bg-[#F59E0B] transition flex items-center justify-center gap-2 shadow-lg">
+                <span>💾</span> Cập Nhật &amp; Lưu Hồ Sơ Vị Giác
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 2: PDPD Compliance (Nghị định 13/2023/NĐ-CP) -->
+          <div class="genui-card p-6 rounded-3xl space-y-4 border border-[var(--border-subtle)] bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-elevated)]">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-black text-sm flex items-center gap-2 text-white">
+                  <span>🛡️</span> Tuân Thủ Nghị Định 13/2023/NĐ-CP (PDPD) Về Dữ Liệu Cá Nhân
+                </h3>
+                <p class="text-[11px] text-[var(--text-muted)]">Quyền của chủ thể dữ liệu: Tải về toàn bộ hồ sơ hoặc xóa vĩnh viễn không lưu trữ bản sao</p>
+              </div>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#22C55E]/20 text-[#15803D]">100% Compliant</span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs space-y-2 text-[var(--text-muted)]">
+              <div class="flex items-center gap-2 text-white font-semibold">
+                <span>🔒</span> Cam kết bảo mật:
+              </div>
+              <p>Mọi thông tin dị ứng, vị trí định vị GPS và lịch sử ăn uống của bạn được bảo mật tuyệt đối, không chia sẻ cho bên thứ ba vì mục đích tiếp thị trái phép.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <button onclick="exportPdpdData()" class="px-4 py-2.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] hover:border-[#FBBF24] text-xs font-bold flex items-center gap-2 transition">
+                <span>📥</span> Tải Về Bản Sao Dữ Liệu Cá Nhân (.json)
+              </button>
+              <button onclick="deleteAccountPdpd()" class="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white text-xs font-bold flex items-center gap-2 transition">
+                <span>⚠️</span> Xóa Vĩnh Viễn Tài Khoản &amp; Dữ Liệu (Right to be Forgotten)
+              </button>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        c.innerHTML = '<div class="text-center py-10 text-xs text-red-500">Lỗi kết nối tải hồ sơ vị giác.</div>';
+      }
+    }
+
+    function selectSpiceLevel(lvl) {
+      const el = document.getElementById('input-spice-level');
+      if (el) el.value = lvl;
+      for (let i = 0; i <= 3; i++) {
+        const btn = document.getElementById(`spice-btn-${i}`);
+        if (btn) {
+          if (i === lvl) {
+            btn.className = 'p-3 rounded-2xl text-left border bg-[#FBBF24]/20 border-[#FBBF24] text-[#FBBF24] font-extrabold transition text-xs';
+          } else {
+            btn.className = 'p-3 rounded-2xl text-left border bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold transition text-xs';
+          }
+        }
+      }
+    }
+
+    function selectDietMode(mode) {
+      const el = document.getElementById('input-diet-mode');
+      if (el) el.value = mode;
+      const modes = ['balanced', 'vegetarian', 'vegan', 'low_carb', 'eat_clean'];
+      modes.forEach(m => {
+        const btn = document.getElementById(`diet-btn-${m}`);
+        if (btn) {
+          if (m === mode) {
+            btn.className = 'p-3 rounded-2xl text-center border bg-[#22C55E]/20 border-[#22C55E] text-[#22C55E] font-extrabold transition';
+          } else {
+            btn.className = 'p-3 rounded-2xl text-center border bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold transition';
+          }
+        }
+      });
+    }
+
+    async function saveLiveProfile() {
+      const regions = [];
+      if (document.getElementById('reg-bac')?.checked) regions.push('bac');
+      if (document.getElementById('reg-trung')?.checked) regions.push('trung');
+      if (document.getElementById('reg-nam')?.checked) regions.push('nam');
+
+      const spice_level = Number(document.getElementById('input-spice-level')?.value || 1);
+      const diet_mode = document.getElementById('input-diet-mode')?.value || 'balanced';
+
+      const hard_allergies = [];
+      ['shrimp', 'peanut', 'shrimp_paste', 'dairy', 'egg', 'gluten'].forEach(a => {
+        if (document.getElementById(`allergy-${a}`)?.checked) hard_allergies.push(a);
+      });
+
+      const budget_min = Number(document.getElementById('input-budget-min')?.value || 30000);
+      const budget_max = Number(document.getElementById('input-budget-max')?.value || 65000);
+
+      try {
+        const res = await fetch('/api/v1/me/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ regions, spice_level, diet_mode, hard_allergies, budget_min, budget_max })
+        });
+        showFloatingToast('Hồ Sơ Vị Giác Đã Cập Nhật', 'AI Chef Măm đã làm mới bộ lọc và sẽ đề xuất món chuẩn vị của bạn!', '✅');
+        refreshLiveSuggestions();
+      } catch (e) {
+        showFloatingToast('Lỗi Lưu Hồ Sơ', 'Không thể kết nối đến máy chủ.', '⚠️');
+      }
+    }
+
+    function exportPdpdData() {
+      if (!liveUserProfile) return;
+      const blob = new Blob([JSON.stringify(liveUserProfile, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pdpd-user-profile-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showFloatingToast('Xuất Dữ Liệu Thành Công', 'Tệp JSON chứa toàn bộ dữ liệu cá nhân theo Nghị định 13/2023/NĐ-CP đã được tải xuống.', '📥');
+    }
+
+    async function deleteAccountPdpd() {
+      if (!confirm('CẢNH BÁO NGHỊ ĐỊNH 13/2023/NĐ-CP:\nBạn có chắc chắn muốn xóa vĩnh viễn tài khoản và toàn bộ lịch sử ăn uống, vị giác không? Hành động này không thể hoàn tác!')) {
+        return;
+      }
+      try {
+        const res = await fetch('/api/v1/me', { method: 'DELETE' });
+        const data = await res.json();
+        showFloatingToast('Đã Xóa Toàn Bộ Dữ Liệu', data.pdpd_compliance || 'Đã xóa tài khoản vĩnh viễn theo PDPD.', '🗑️');
+        setTimeout(() => location.reload(), 2000);
+      } catch (e) {
+        alert('Lỗi xử lý xóa dữ liệu.');
+      }
+    }
+
+    // ─── MODULE M8: NHẮC NHỞ BỮA ĂN & THÔNG BÁO THỜI TIẾT ───────────────────
+    async function loadLiveNotifications() {
+      const c = document.getElementById('live-notifications-content');
+      if (!c) return;
+      c.innerHTML = '<div class="text-center py-12 text-xs text-[var(--text-muted)]">⏳ Đang tải cấu hình thông báo &amp; lịch nhắc giờ ăn...</div>';
+
+      try {
+        const res = await fetch('/api/v1/notifications');
+        const data = await res.json();
+        const items = data.items || [];
+
+        c.innerHTML = `
+          <!-- Section 1: Scheduler Rules -->
+          <div class="genui-card p-6 rounded-3xl space-y-5 border border-[var(--border-subtle)]">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-black text-base flex items-center gap-2">
+                  <span>⏰</span> Lịch Nhắc Giờ Ăn Thông Minh (Smart Meal Reminders)
+                </h3>
+                <p class="text-xs text-[var(--text-muted)]">Gợi ý món đúng thời điểm trước bữa ăn 30-45 phút, kèm yếu tố thời tiết và khoảng cách quán</p>
+              </div>
+              <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-[#22C55E]/20 text-[#15803D]">Tối đa 2 push/ngày</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Lunch Slot -->
+              <div class="p-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="font-extrabold text-xs flex items-center gap-2 text-white">
+                    <span>🍜</span> Khung Giờ Bữa Trưa
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="notif-lunch-enabled" checked class="sr-only peer">
+                    <div class="w-9 h-5 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#22C55E]"></div>
+                  </label>
+                </div>
+                <div class="text-xs text-[var(--text-muted)]">Thời gian nhắc mặc định:</div>
+                <input type="time" id="notif-lunch-time" value="10:30" class="p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs text-white font-mono focus:border-[#FBBF24] outline-none" />
+                <div class="text-[11px] text-[#FBBF24]">🌤️ Ngữ cảnh: Tự động phân tích thời tiết mưa/nắng để gợi ý món nước hoặc món thanh mát.</div>
+              </div>
+
+              <!-- Dinner Slot -->
+              <div class="p-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="font-extrabold text-xs flex items-center gap-2 text-white">
+                    <span>🍲</span> Khung Giờ Bữa Tối
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="notif-dinner-enabled" checked class="sr-only peer">
+                    <div class="w-9 h-5 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#22C55E]"></div>
+                  </label>
+                </div>
+                <div class="text-xs text-[var(--text-muted)]">Thời gian nhắc mặc định:</div>
+                <input type="time" id="notif-dinner-time" value="17:00" class="p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs text-white font-mono focus:border-[#FBBF24] outline-none" />
+                <div class="text-[11px] text-[#22C55E]">🏡 Ngữ cảnh: Gợi ý công thức nấu cơm nhà gia đình hoặc quán ăn ấm cúng gần nhà.</div>
+              </div>
+            </div>
+
+            <div class="pt-2">
+              <button onclick="saveLiveNotifications()" class="px-5 py-2.5 rounded-2xl bg-[#FBBF24] text-[#0F172A] font-extrabold text-xs hover:bg-[#F59E0B] transition flex items-center gap-2">
+                <span>💾</span> Lưu Lịch Nhắc Nhở
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 2: Live Simulator -->
+          <div class="genui-card p-6 rounded-3xl space-y-4 border border-[var(--border-subtle)]">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-black text-sm flex items-center gap-2">
+                  <span>📱</span> Mô Phỏng &amp; Bắn Thử Thông Báo (Live Push Simulator)
+                </h3>
+                <p class="text-[11px] text-[var(--text-muted)]">Kiểm thử thông báo đẩy Web Push và biểu ngữ nổi trực tiếp trên trình duyệt</p>
+              </div>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FBBF24]/20 text-[#B45309]">Interactive Simulator</span>
+            </div>
+
+            <div class="space-y-3">
+              ${items.map(it => `
+                <div class="p-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
+                  <div class="space-y-1">
+                    <div class="font-extrabold text-xs flex items-center gap-2">
+                      <span class="px-2 py-0.5 rounded-full bg-white/10 font-mono text-[10px] text-[#FBBF24]">${it.slot}</span>
+                      <span class="text-white">${it.title}</span>
+                    </div>
+                    <div class="text-[11px] text-[var(--text-muted)]">${it.body}</div>
+                  </div>
+                  <button onclick="simulateTestNotification('${it.slot}', '${it.title}', '${it.body}')" class="px-3.5 py-1.5 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs hover:bg-[#16A34A] transition flex items-center gap-1.5 shrink-0">
+                    <span>🔔</span> Bắn Thử Ngay
+                  </button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        c.innerHTML = '<div class="text-center py-10 text-xs text-red-500">Lỗi kết nối cấu hình thông báo.</div>';
+      }
+    }
+
+    async function saveLiveNotifications() {
+      const lunch = document.getElementById('notif-lunch-time')?.value || '10:30';
+      const dinner = document.getElementById('notif-dinner-time')?.value || '17:00';
+      try {
+        const res = await fetch('/api/v1/me/meal-schedule', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lunch, dinner, max_per_day: 2, weather_aware: true })
+        });
+        showFloatingToast('Lịch Nhắc Đã Lưu', `Đã lên lịch nhắc bữa trưa (${lunch}) & bữa tối (${dinner}), tối đa 2 lần/ngày.`, '⏰');
+      } catch (e) {
+        showFloatingToast('Lỗi Lưu Lịch', 'Không thể cập nhật máy chủ.', '⚠️');
+      }
+    }
+
+    function simulateTestNotification(slot, title, body) {
+      showFloatingToast(title, body, slot === '10:30' ? '🍜' : '🍲', 7000);
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification(title, { body: body, icon: '/favicon.ico' });
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission().then(perm => {
+            if (perm === 'granted') {
+              new Notification(title, { body: body, icon: '/favicon.ico' });
+            }
+          });
+        }
+      }
+    }
+
+    function showFloatingToast(title, body, icon = '🔔', duration = 5000) {
+      let c = document.getElementById('floating-toast-container');
+      if (!c) {
+        c = document.createElement('div');
+        c.id = 'floating-toast-container';
+        c.className = 'fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none';
+        document.body.appendChild(c);
+      }
+      const toast = document.createElement('div');
+      toast.className = 'pointer-events-auto p-4 rounded-2xl bg-[#18181B] text-white border border-[#FBBF24]/50 shadow-2xl flex items-start gap-3 transition-all duration-300 transform translate-y-[-10px] opacity-0';
+      toast.innerHTML = `
+        <span class="text-2xl shrink-0">${icon}</span>
+        <div class="flex-1 space-y-1">
+          <div class="font-extrabold text-xs text-[#FBBF24]">${title}</div>
+          <div class="text-[11px] text-white/90 leading-relaxed">${body}</div>
+        </div>
+        <button onclick="this.parentElement.remove()" class="text-white/40 hover:text-white text-xs shrink-0">✕</button>
+      `;
+      c.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-[-10px]', 'opacity-0');
+      });
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-[-10px]');
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
     }
 
     async function runLiveModuleAction(screenId) {

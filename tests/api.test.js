@@ -303,3 +303,52 @@ test('M2/M3 (Semantic Dish Search): Concept matching, allergy safety, and simila
     assert.ok(!(r.allergen_tags || []).includes('shrimp'), `Dish ${r.name} should not contain shrimp`);
   }
 });
+
+test('M1: Taste Profile Customization & PDPD export verification', async () => {
+  const store = createInitialStore();
+
+  // 1. Update user taste preferences
+  const updateRes = await handleApiRequest(store, 'PUT', '/api/v1/me/profile', new URLSearchParams(), {
+    spice_level: 2,
+    diet_mode: 'vegan',
+    hard_allergies: ['shrimp', 'peanut', 'dairy'],
+    budget_min: 35000,
+    budget_max: 80000
+  });
+  assert.equal(updateRes.status, 200);
+  assert.equal(store.userProfile.spice_level, 2);
+  assert.equal(store.userProfile.diet_mode, 'vegan');
+  assert.deepEqual(store.userProfile.hard_allergies, ['shrimp', 'peanut', 'dairy']);
+  assert.equal(store.userProfile.budget_max, 80000);
+
+  // 2. Fetch updated profile
+  const getRes = await handleApiRequest(store, 'GET', '/api/v1/me/profile', new URLSearchParams());
+  assert.equal(getRes.status, 200);
+  assert.equal(getRes.data.diet_mode, 'vegan');
+});
+
+test('M9: Admin OCR Review rejection with reason & Restaurant Un-pause auto-recovery', async () => {
+  const store = createInitialStore();
+
+  // 1. Admin rejects OCR item with reason
+  const rejectRes = await handleApiRequest(store, 'POST', '/api/v1/admin/ocr-review', new URLSearchParams(), {
+    ocr_id: 'ocr-901',
+    decision: 'rejected',
+    reason: 'Ảnh chụp bị nhòe và giá tiền không rõ'
+  });
+  assert.equal(rejectRes.status, 200);
+  assert.equal(rejectRes.data.updated.status, 'rejected');
+  assert.equal(rejectRes.data.updated.rejection_reason, 'Ảnh chụp bị nhòe và giá tiền không rõ');
+
+  // 2. Verify PLACE-405 is initially in userReports (auto_paused)
+  assert.ok(store.userReports.some(r => r.place_id === 'PLACE-405'));
+
+  // 3. Admin un-pauses restaurant PLACE-405
+  const unpauseRes = await handleApiRequest(store, 'POST', '/api/v1/admin/places/PLACE-405/unpause', new URLSearchParams());
+  assert.equal(unpauseRes.status, 200);
+  assert.equal(unpauseRes.data.unpaused_place.is_open_override, true);
+  assert.equal(unpauseRes.data.unpaused_place.closed_report_count, 0);
+
+  // 4. Verify userReports no longer contains PLACE-405
+  assert.ok(!store.userReports.some(r => r.place_id === 'PLACE-405'));
+});

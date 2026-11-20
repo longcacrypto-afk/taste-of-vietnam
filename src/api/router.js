@@ -490,17 +490,22 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     const item = store.ocrQueue.find(i => i.id === body.ocr_id);
     if (item) {
       item.status = body.decision || 'approved';
+      if (body.reason) item.rejection_reason = body.reason;
     }
     return { status: 200, data: { updated: item } };
   }
 
-  const approvePlaceMatch = pathname.match(/^\/api\/v1\/admin\/places\/([^/]+)\/approve$/);
-  if (approvePlaceMatch && method === 'POST') {
-    const place = store.places.find(p => p.id === approvePlaceMatch[1]) || store.places[0];
+  const unpausePlaceMatch = pathname.match(/^\/api\/v1\/admin\/places\/([^/]+)\/(?:approve|unpause)$/);
+  if (unpausePlaceMatch && method === 'POST') {
+    const placeId = unpausePlaceMatch[1];
+    const place = store.places.find(p => p.id === placeId) || store.places[0];
     place.is_verified = true;
     place.is_open_override = true;
     place.closed_report_count = 0;
-    return { status: 200, data: { approved_place: place } };
+    if (store.userReports) {
+      store.userReports = store.userReports.filter(r => r.place_id !== placeId);
+    }
+    return { status: 200, data: { unpaused_place: place, message: 'Đã mở lại quán và xóa cờ báo lỗi thành công.' } };
   }
 
   const moderateAdMatch = pathname.match(/^\/api\/v1\/admin\/ads\/([^/]+)\/moderate$/);
