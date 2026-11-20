@@ -116,9 +116,10 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 200, data: results };
   }
 
-  const storyMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)\/story$/);
+  const storyMatch = pathname.match(/^\/api\/v1\/(?:dishes\/([^/]+)\/story|stories\/([^/]+))$/);
   if (storyMatch && method === 'GET') {
-    const dish = store.dishes.find(d => d.id === storyMatch[1]) || store.dishes[0];
+    const targetId = storyMatch[1] || storyMatch[2];
+    const dish = store.dishes.find(d => d.id === targetId) || store.dishes[0];
     return { status: 200, data: await generateDishStory(dish) };
   }
 
@@ -661,8 +662,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ===========================================================================
   // MODULE M16: MULTILINGUAL AI MENU TRANSLATOR (M16-S01 .. M16-S02)
   // ===========================================================================
-  if (pathname === '/api/v1/translate/menu' && method === 'POST') {
-    return { status: 200, data: translateVietnameseMenu(store, body.target_lang || 'EN') };
+  if (pathname === '/api/v1/translate/menu') {
+    const targetLang = (method === 'POST' ? body.target_lang : searchParams.get('lang')) || 'EN';
+    return { status: 200, data: translateVietnameseMenu(store, targetLang) };
   }
 
   // ===========================================================================

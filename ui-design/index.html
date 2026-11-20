@@ -6089,8 +6089,11 @@ export async function load${activeScr.id.replace('-','')}() {
       try {
         const res = await fetch('/api/v1/places');
         const data = await res.json();
-        if (data && data.places) {
-          grid.innerHTML = data.places.map(p => `
+        const places = data.places || data.items || [];
+        if (places.length > 0) {
+          grid.innerHTML = places.map(p => {
+            const orderLink = p.order_link || (p.links && p.links.grabfood) || 'https://food.grab.com';
+            return `
             <div class="genui-card p-4 space-y-3 rounded-2xl flex items-center justify-between">
               <div class="flex items-center gap-3">
                 <div class="w-12 h-12 rounded-2xl bg-[var(--bg-elevated)] flex items-center justify-center text-2xl border border-[var(--border-subtle)]">
@@ -6103,17 +6106,20 @@ export async function load${activeScr.id.replace('-','')}() {
                   </div>
                   <div class="text-[11px] text-[var(--text-muted)]">${p.address}</div>
                   <div class="text-[10px] text-[#22C55E] font-bold mt-0.5">
-                    Cách bạn ${p.distance_meters || 500}m · ⭐ ${p.rating || 4.8} · Mở cửa đến 21:30
+                    Cách bạn ${p.distance_meters || 500}m · ⭐ ${p.rating || 4.8} · Mở cửa đến ${p.close_hour || 21}:30
                   </div>
                 </div>
               </div>
               <div class="flex flex-col gap-1.5 shrink-0">
-                <a href="${p.order_link || 'https://food.grab.com'}" target="_blank" class="px-3.5 py-1.5 rounded-xl bg-[#00B14F] text-white font-extrabold text-[11px] text-center">
+                <a href="${orderLink}" target="_blank" class="px-3.5 py-1.5 rounded-xl bg-[#00B14F] text-white font-extrabold text-[11px] text-center">
                   GrabFood ↗
                 </a>
               </div>
             </div>
-          `).join('');
+          `;
+          }).join('');
+        } else {
+          grid.innerHTML = '<div class="col-span-2 text-center py-10 text-xs text-[var(--text-muted)]">Không tìm thấy quán gần bạn trong bán kính 3km.</div>';
         }
       } catch (err) {
         grid.innerHTML = '<div class="col-span-2 text-center py-8 text-xs text-red-500">Lỗi kết nối quán.</div>';
