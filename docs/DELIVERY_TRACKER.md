@@ -1,8 +1,8 @@
 # Hôm nay ăn gì · Taste of Vietnam v0.2 — Delivery Tracker (20/20 Modules Hoàn Thành)
 
-> Cập nhật: 2026-11-21 14:40 +07:00 · **28/28 Automated Tests PASS** · **CI/CD Dual-Job PASS (Run 44881108850)** · **PostgreSQL 16 + PostGIS + pgvector (Render Singapore) CONNECTED & SEEDED** · **20 Modules (M1 → M20) Mobile & Web Parity** · **E2E Full Loop & Health Check (/health: postgres_connected: true)**  
+> Cập nhật: 2026-11-21 20:20 +07:00 · **33/33 Automated Tests PASS** · **CI/CD Dual-Job PASS (Run 44908313991)** · **PostgreSQL 16 + PostGIS + pgvector (Render Singapore) CONNECTED & SEEDED** · **LRU In-Memory Caching & Push Queue Scheduler Live** · **Flutter Android & Web Scaffolds Ready** · **20 Modules (M1 → M20) Mobile & Web Parity** · **E2E Full Loop & Health Check (/health: postgres_connected: true)**  
 > 🌐 **Production URL (Render Singapore):** **https://taste-of-vietnam.onrender.com**  
-> 💻 **GitHub Repo:** **https://github.com/longcacrypto-afk/taste-of-vietnam** (Commit `6006c1b`)  
+> 💻 **GitHub Repo:** **https://github.com/longcacrypto-afk/taste-of-vietnam** (Commit `8b97d99`)  
 > 📊 **Render Dashboard:** [dashboard.render.com/web/srv-dbur1uom7kps73d88690](https://dashboard.render.com/web/srv-dbur1uom7kps73d88690) | **DB:** `taste-of-vietnam-db`
 
 ---
