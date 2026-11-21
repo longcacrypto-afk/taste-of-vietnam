@@ -19,9 +19,12 @@ export function initDatabase() {
   }
 
   try {
+    const useSsl = process.env.NODE_ENV === 'production' ||
+      (connectionString && (connectionString.includes('render.com') || connectionString.includes('sslmode=require')));
+
     pool = new Pool({
       connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl: useSsl ? { rejectUnauthorized: false } : false,
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,

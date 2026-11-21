@@ -20,10 +20,13 @@ export async function runMigrationAndSeed(customConnectionString = null) {
     return { success: false, reason: 'NO_DATABASE_URL' };
   }
 
+  const useSsl = process.env.NODE_ENV === 'production' ||
+    (connectionString && (connectionString.includes('render.com') || connectionString.includes('sslmode=require')));
+
   console.log('🚀 Connecting to PostgreSQL for migration...');
   const pool = new Pool({
     connectionString,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
     connectionTimeoutMillis: 10000,
   });
 
@@ -202,6 +205,46 @@ export async function runMigrationAndSeed(customConnectionString = null) {
         142500,
         18400,
         JSON.stringify(['Phở Bò Tái Nạm', 'Cơm Tấm Sườn Bì Chả', 'Bún Bò Huế O Xuân'])
+      ]
+    );
+
+    // 10. Seed v0.2: Smart Fridge Inventory (M18)
+    console.log(`🧊 Seeding Smart Fridge items into 'fridge_items' table...`);
+    await pool.query(
+      `INSERT INTO fridge_items (id, user_id, barcode, name, quantity, compartment, expires_at, is_expiring_soon)
+       VALUES 
+       ('FRIDGE-01', 'usr-demo-01', '8936036021012', 'Trứng gà Ba Huân (Hộp 10 quả)', '6 quả', 'door', NOW() + INTERVAL '2 days', false),
+       ('FRIDGE-02', 'usr-demo-01', '8935001234567', 'Thịt nạc vai heo CP', '400g', 'chill', NOW() + INTERVAL '1 day', true)
+       ON CONFLICT (id) DO NOTHING;`
+    );
+
+    // 11. Seed v0.2: Health Metrics (M19)
+    console.log(`🏃 Seeding Wearable Health metrics into 'health_metrics' table...`);
+    await pool.query(
+      `INSERT INTO health_metrics (id, user_id, wearable_source, daily_steps, active_calories_burned, calculated_tdee, target_calories_daily, target_protein_g, target_carbs_g, target_fat_g)
+       VALUES ('HLT-DEMO-01', 'usr-demo-01', 'Apple Health & Google Fit', 8800, 480, 2150, 2150, 120, 220, 50)
+       ON CONFLICT (id) DO NOTHING;`
+    );
+
+    // 12. Seed v0.2: Community Recipes (M20)
+    console.log(`👩‍🍳 Seeding Community Recipes into 'community_recipes' table...`);
+    await pool.query(
+      `INSERT INTO community_recipes (id, author_id, author_name, title, prep_time_minutes, difficulty, calories, ingredients, steps, zero_waste_tag, likes_count, total_tips_vnd)
+       VALUES 
+       ('CREC-101', 'usr-chef-an', 'Bếp Nhà Sen', 'Canh Rau Củ Thập Cẩm Thanh Mát (Zero-Waste)', 20, 'Dễ', 210, 
+        $1, $2, 'Tận dụng rau củ tủ lạnh', 142, 350000)
+       ON CONFLICT (id) DO NOTHING;`,
+      [
+        JSON.stringify([
+          { name: 'Cà rốt tỉa hoa', amount: '1 củ' },
+          { name: 'Bắp ngọt', amount: '1 trái' },
+          { name: 'Nấm rơm', amount: '100g' }
+        ]),
+        JSON.stringify([
+          'Hầm nước dùng với bắp ngọt trong 15 phút.',
+          'Cho cà rốt và nấm rơm vào đun sôi thêm 5 phút.',
+          'Nêm chút muối hạt và rắc hành ngò lên trên.'
+        ])
       ]
     );
 

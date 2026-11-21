@@ -9,6 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 CREATE EXTENSION IF NOT EXISTS "unaccent";
 CREATE EXTENSION IF NOT EXISTS "vector";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- 2. BẢNG MÓN ĂN & CÔNG THỨC (M2 DISH LIBRARY)
 CREATE TABLE IF NOT EXISTS dishes (
@@ -226,7 +227,7 @@ CREATE TABLE IF NOT EXISTS b2g_tourism_reports (
 -- 18. BẢNG TỦ LẠNH THÔNG MINH & QUÉT MÃ VẠCH IOT (M18 SMART FRIDGE)
 CREATE TABLE IF NOT EXISTS fridge_items (
     id VARCHAR(64) PRIMARY KEY,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    user_id VARCHAR(64),
     barcode VARCHAR(64),
     name VARCHAR(255) NOT NULL,
     quantity VARCHAR(64) DEFAULT '1',
@@ -238,8 +239,8 @@ CREATE TABLE IF NOT EXISTS fridge_items (
 
 -- 19. BẢNG ĐỒNG BỘ THIẾT BỊ ĐEO SỨC KHỎE (M19 HEALTH WEARABLES SYNC)
 CREATE TABLE IF NOT EXISTS health_metrics (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64),
     wearable_source VARCHAR(64) NOT NULL, -- 'Apple Health', 'Google Fit', 'Garmin'
     daily_steps INT NOT NULL DEFAULT 0,
     active_calories_burned INT NOT NULL DEFAULT 0,
@@ -254,7 +255,7 @@ CREATE TABLE IF NOT EXISTS health_metrics (
 -- 20. BẢNG CÔNG THỨC CỘNG ĐỒNG & SÁNG TẠO NỘI DUNG (M20 CREATOR KITCHEN)
 CREATE TABLE IF NOT EXISTS community_recipes (
     id VARCHAR(64) PRIMARY KEY,
-    author_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    author_id VARCHAR(64),
     author_name VARCHAR(128) NOT NULL,
     title VARCHAR(255) NOT NULL,
     prep_time_minutes INT NOT NULL DEFAULT 20,
