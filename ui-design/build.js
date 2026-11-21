@@ -1,5 +1,5 @@
 // =============================================================================
-// BUNDLER FOR 93-SCREEN UI/UX STUDIO & LIVE MODULE ACTION RUNNER
+// BUNDLER FOR 99-SCREEN UI/UX STUDIO & LIVE MODULE ACTION RUNNER (M1-M20)
 // =============================================================================
 
 import fs from 'node:fs';
@@ -44,4 +44,4 @@ const outArtifact = '/Users/longx/.gemini/antigravity/brain/176623c3-3f6e-4106-8
 
 fs.writeFileSync(outIndex, bundled, 'utf8');
 fs.writeFileSync(outArtifact, bundled, 'utf8');
-console.log(`✔ Bundled 93-Screen UI/UX Studio (${(bundled.length / 1024 / 1024).toFixed(2)} MB) to index.html and artifact.`);
+console.log(`✔ Bundled 99-Screen UI/UX Studio (${(bundled.length / 1024 / 1024).toFixed(2)} MB) to index.html and artifact.`);

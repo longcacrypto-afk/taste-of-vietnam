@@ -352,4 +352,105 @@ class ApiService {
     } catch (e) {}
     return null;
   }
+
+  // ─── 13. M18: TỦ LẠNH THÔNG MINH & QUÉT MÃ VẠCH IOT ───────────────────────
+  static Future<Map<String, dynamic>?> fetchFridgeInventory() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/fridge/inventory')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> scanFridgeItem({
+    String barcode = '8934567890123',
+    String? itemName,
+    int expiresInDays = 3,
+    String compartment = 'chill',
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/fridge/scan'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'barcode': barcode,
+          if (itemName != null) 'item_name': itemName,
+          'expires_in_days': expiresInDays,
+          'compartment': compartment,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 14. M19: TRỢ LÝ DINH DƯỠNG & ĐỒNG BỘ WEARABLES ────────────────────────
+  static Future<Map<String, dynamic>?> fetchHealthProfile() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/health/nutrition-profile')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> syncHealthWearable({
+    String wearable = 'Apple Health',
+    int dailySteps = 8420,
+    int activeCalories = 480,
+    String goal = 'maintain',
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/health/sync'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'wearable': wearable,
+          'daily_steps': dailySteps,
+          'active_calories_burned': activeCalories,
+          'goal': goal,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 15. M20: BẾP SÁNG TẠO & MẠNG XÃ HỘI CÔNG THỨC NẤU ĂN ─────────────────
+  static Future<Map<String, dynamic>?> fetchCommunityRecipes({String? tag}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/community/recipes').replace(queryParameters: {
+        if (tag != null) 'tag': tag,
+      });
+      final res = await http.get(uri).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> tipCommunityRecipe(String recipeId, int amountVnd) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/community/recipes/$recipeId/tip'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'amount_vnd': amountVnd}),
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
 }

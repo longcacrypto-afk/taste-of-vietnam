@@ -22,6 +22,9 @@ import 'screens/merchant_portal_screen.dart';
 import 'screens/admin_cms_screen.dart';
 import 'screens/profile_expansion_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/fridge_scanner_screen.dart';
+import 'screens/health_dietitian_screen.dart';
+import 'screens/community_recipes_screen.dart';
 
 void main() {
   runApp(const TasteOfVietnamApp());
@@ -135,7 +138,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   Drawer _buildDrawer(BuildContext context) {
     return Drawer(
-      child: Column(
+      child: ListView(
+        padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
             decoration: const BoxDecoration(color: AppTheme.charcoalHero),
@@ -148,7 +152,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: AppTheme.goldenAmber, borderRadius: BorderRadius.circular(99)),
-                  child: const Text('Taste of Vietnam v0.1', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.slateDark)),
+                  child: const Text('Taste of Vietnam v0.2 · 20 Modules', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.slateDark)),
                 ),
               ],
             ),
@@ -196,6 +200,34 @@ class _MainShellScreenState extends State<MainShellScreen> {
             onTap: () {
               Navigator.pop(context);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingScreen()));
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.kitchen_rounded, color: Colors.cyan),
+            title: const Text('🧊 Tủ Lạnh Thông Minh AI (M18)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('Quét mã EAN-13 · Zero Food Waste', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const FridgeScannerScreen()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.health_and_safety_rounded, color: AppTheme.emeraldBadge),
+            title: const Text('🩺 Bác Sĩ Dinh Dưỡng AI (M19)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('Apple Health · TDEE · Macro Low-GI', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const HealthDietitianScreen()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.restaurant_rounded, color: AppTheme.goldenAmber),
+            title: const Text('🍳 Bếp Sáng Tạo & Tipping (M20)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('Mạng xã hội công thức · VietQR 1-Click Tip', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityRecipesScreen()));
             },
           ),
           const Divider(),
@@ -254,7 +286,6 @@ class _MainShellScreenState extends State<MainShellScreen> {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminCmsScreen()));
             },
           ),
-          const Spacer(),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -273,6 +304,19 @@ class _MainShellScreenState extends State<MainShellScreen> {
                       SizedBox(width: 6),
                       Text('Cloud: Render Singapore (LIVE)',
                           style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.emeraldBadge)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text('API: https://taste-of-vietnam.onrender.com/api/v1\nWS: wss://taste-of-vietnam.onrender.com/ws/merchant',
+                    style: TextStyle(fontSize: 9, color: AppTheme.slateMuted), textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
                     ],
                   ),
                 ),

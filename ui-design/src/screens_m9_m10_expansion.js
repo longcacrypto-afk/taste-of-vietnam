@@ -854,5 +854,193 @@ window.SCREENS_M9_M10_EXP = {
         </div>
       `
     )
+  },
+
+  // ===========================================================================
+  // GIAI ĐOẠN 4 / v0.2: MODULE M18, M19 & M20 SCREENS
+  // ===========================================================================
+
+  'M18-S01': {
+    id: 'M18-S01',
+    module: 'M18 · Tủ Lạnh AI & IoT',
+    platform: 'mobile',
+    title: 'M18-S01 · Quản Lý Kho Tủ Lạnh Thông Minh AI (Zero Waste)',
+    subtitle: 'Theo dõi nguyên liệu theo từng ngăn, hạn sử dụng và cảnh báo đồ sắp hỏng',
+    api: 'GET /v1/fridge/inventory',
+    ac: ['Phân loại 4 ngăn (mát, đông, cánh tủ, rau củ), tính ngày hết hạn, cảnh báo < 48h'],
+    render: () => {
+      const k = window.UI_KIT;
+      return `
+        <div class="p-4 space-y-3 bg-white text-[#0F172A] text-xs">
+          ${k.mobileHeader('Smart Fridge Inventory', 'M18-S01 · Kho tủ lạnh AI 4 ngăn', 'Today')}
+          <div class="p-3 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] flex items-center gap-3">
+            <span class="text-xl">⚠️</span>
+            <div><b class="text-[#DC2626]">2 nguyên liệu cần dùng gấp trong 48h</b><div class="text-[10px] text-[#7F1D1D]">Đậu hũ non (1 ngày), Trứng gà (2 ngày) · Gợi ý: Canh đậu hũ cà chua</div></div>
+          </div>
+          <div class="space-y-2">
+            <div class="p-3 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex justify-between items-center">
+              <div><b>🥚 Trứng gà ta (6 quả)</b><div class="text-[10px] text-[#64748B]">Cánh tủ · Còn 2 ngày</div></div>
+              <span class="px-2 py-0.5 rounded-full bg-[#FEE2E2] text-[#DC2626] font-bold text-[10px]">Cận hạn</span>
+            </div>
+            <div class="p-3 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex justify-between items-center">
+              <div><b>🥦 Cà chua Đà Lạt (4 quả)</b><div class="text-[10px] text-[#64748B]">Ngăn rau củ · Còn 3 ngày</div></div>
+              <span class="px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#16A34A] font-bold text-[10px]">Tươi ngon</span>
+            </div>
+          </div>
+          <button class="w-full py-2.5 rounded-xl bg-[#FBBF24] font-extrabold text-[#18181B] text-center">Nấu ngay với đồ có sẵn (Mẹ AI gợi ý)</button>
+        </div>
+      `;
+    }
+  },
+
+  'M18-S02': {
+    id: 'M18-S02',
+    module: 'M18 · Tủ Lạnh AI & IoT',
+    platform: 'mobile',
+    title: 'M18-S02 · Quét Mã Vạch GS1 EAN-13 & Nhận Diện Nguyên Liệu',
+    subtitle: 'Camera AI quét mã vạch hoặc chụp ảnh bao bì để tự động điền hạn sử dụng',
+    api: 'POST /v1/fridge/scan',
+    ac: ['Nhận diện mã vạch GS1 893... Việt Nam, gợi ý vị trí lưu trữ và công thức Zero-Waste'],
+    render: () => {
+      const k = window.UI_KIT;
+      return `
+        <div class="p-4 space-y-3 bg-[#18181B] text-white text-xs">
+          ${k.mobileHeader('Barcode & OCR Scanner', 'M18-S02 · Quét mã vạch nguyên liệu', 'M18-S01')}
+          <div class="h-44 rounded-2xl border-2 border-dashed border-[#FBBF24] flex flex-col items-center justify-center space-y-2 relative overflow-hidden bg-black/40">
+            <div class="w-36 h-24 border-2 border-[#22C55E] rounded-xl flex items-center justify-center animate-pulse"><span class="text-2xl">📷</span></div>
+            <div class="text-[11px] text-white/80">Đặt mã vạch hoặc bao bì vào khung quét</div>
+          </div>
+          <div class="p-3 rounded-xl bg-white/10 border border-white/20 space-y-1">
+            <div class="flex justify-between items-center"><b class="text-[#FBBF24]">Đã nhận diện: Sữa chua Probi</b><span class="text-[10px] text-white/60">EAN: 8934567890123</span></div>
+            <div class="text-[10px] text-white/80">Tự động đề xuất: Ngăn mát · Hạn sử dụng: 5 ngày</div>
+          </div>
+          <button class="w-full py-2.5 rounded-xl bg-[#22C55E] text-white font-extrabold text-center">Lưu vào Tủ Lạnh</button>
+        </div>
+      `;
+    }
+  },
+
+  'M19-S01': {
+    id: 'M19-S01',
+    module: 'M19 · Dinh Dưỡng Wearables',
+    platform: 'mobile',
+    title: 'M19-S01 · Bảng Chỉ Số Dinh Dưỡng & Đồng Bộ Apple Health',
+    subtitle: 'Đồng bộ số bước, calo tiêu hao và tự động cập nhật TDEE theo thời gian thực',
+    api: 'POST /v1/health/sync',
+    ac: ['Tích hợp Apple Health/Google Fit, hiển thị TDEE, Calo nạp/đốt và cảnh báo mất cân bằng'],
+    render: () => {
+      const k = window.UI_KIT;
+      return `
+        <div class="p-4 space-y-3 bg-white text-[#0F172A] text-xs">
+          ${k.mobileHeader('Smart Dietitian Dashboard', 'M19-S01 · Apple Health Sync', 'Profile')}
+          <div class="p-3.5 rounded-2xl bg-[#0F172A] text-white flex justify-between items-center">
+            <div><div class="text-[10px] text-white/60">ĐỒNG BỘ: Apple Health</div><b class="text-base text-[#FBBF24]">8,420 bước · 480 kcal</b></div>
+            <button class="px-3 py-1.5 rounded-xl bg-white/20 text-white font-bold text-[11px]">Đồng bộ</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-1">
+              <div class="text-[10px] text-[#64748B]">Mục tiêu calo / ngày</div>
+              <div class="text-base font-black text-[#0F172A]">2,150 kcal</div>
+            </div>
+            <div class="p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-1">
+              <div class="text-[10px] text-[#64748B]">TDEE thực tế</div>
+              <div class="text-base font-black text-[#16A34A]">2,280 kcal</div>
+            </div>
+          </div>
+          <div class="p-3 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] flex items-center gap-2">
+            <span class="text-lg">🩺</span>
+            <div class="text-[11px] text-[#15803D]">Bạn đã vận động nhiều! Bữa trưa có thể nạp thêm 150 kcal từ đạm sạch.</div>
+          </div>
+        </div>
+      `;
+    }
+  },
+
+  'M19-S02': {
+    id: 'M19-S02',
+    module: 'M19 · Dinh Dưỡng Wearables',
+    platform: 'mobile',
+    title: 'M19-S02 · Phân Bổ Macro Đạm/Carb/Béo & Chế Độ Low-GI',
+    subtitle: 'Cân bằng vi chất, chỉ số đường huyết món Việt cho người giảm cân hoặc tiền tiểu đường',
+    api: 'GET /v1/health/nutrition-profile',
+    ac: ['Hiển thị biểu đồ phân bổ Protein 120g, Carbs 230g, Fat 55g, cảnh báo món nhiều tinh bột nhanh'],
+    render: () => {
+      const k = window.UI_KIT;
+      return `
+        <div class="p-4 space-y-3 bg-white text-[#0F172A] text-xs">
+          ${k.mobileHeader('Macronutrients & Low-GI', 'M19-S02 · Phân bổ Macro chuẩn y khoa', 'M19-S01')}
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="p-2.5 rounded-xl bg-[#EFF6FF] border border-[#DBEAFE]"><div class="text-[10px] text-[#3B82F6]">Đạm (Protein)</div><b class="text-sm text-[#1D4ED8]">120g</b><div class="text-[9px] text-[#64748B]">30%</div></div>
+            <div class="p-2.5 rounded-xl bg-[#FFFBEB] border border-[#FEF3C7]"><div class="text-[10px] text-[#F59E0B]">Tinh bột (Carb)</div><b class="text-sm text-[#B45309]">230g</b><div class="text-[9px] text-[#64748B]">50%</div></div>
+            <div class="p-2.5 rounded-xl bg-[#FDF2F8] border border-[#FCE7F3]"><div class="text-[10px] text-[#EC4899]">Chất béo (Fat)</div><b class="text-sm text-[#BE185D]">55g</b><div class="text-[9px] text-[#64748B]">20%</div></div>
+          </div>
+          <div class="p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-1.5">
+            <div class="font-extrabold">🥗 Gợi ý món đạt chuẩn Low-GI hôm nay:</div>
+            <div class="text-[11px] text-[#334155]">Bún bò Huế ít bún thêm bắp bò rau sống, hoặc Cơm gạo lứt ức gà áp chảo.</div>
+          </div>
+        </div>
+      `;
+    }
+  },
+
+  'M20-S01': {
+    id: 'M20-S01',
+    module: 'M20 · Bếp Sáng Tạo & Social',
+    platform: 'mobile',
+    title: 'M20-S01 · Bếp Sáng Tạo & Mạng Xã Hội Công Thức Nấu Ăn',
+    subtitle: 'Khám phá công thức nấu ăn từ cộng đồng foodie, gắn thẻ Zero-Waste và lọc theo thời gian',
+    api: 'GET /v1/community/recipes',
+    ac: ['Bảng tin công thức nấu ăn, tìm kiếm theo tag, hiển thị lượt thích & số tiền tip đã nhận'],
+    render: () => {
+      const k = window.UI_KIT;
+      return `
+        <div class="p-4 space-y-3 bg-white text-[#0F172A] text-xs">
+          ${k.mobileHeader('Community Recipe Hub', 'M20-S01 · Bếp sáng tạo & chia sẻ', 'Explore')}
+          <div class="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-2"><span>🍳</span><b>Chef Hưng (Biên Hòa)</b></div>
+              <span class="px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] font-bold text-[10px]">Đã nhận 250k đ Tip</span>
+            </div>
+            <div class="font-black text-sm text-[#0F172A]">Cơm Chiên Kim Chi Bò Áp Chảo</div>
+            <div class="text-[10px] text-[#16A34A] font-bold">♻️ Tận dụng cơm nguội & bò thừa trong tủ lạnh</div>
+            <div class="flex justify-between items-center pt-1 border-t border-[#E2E8F0] text-[11px] text-[#64748B]">
+              <span>⏱️ 20 phút · 520 kcal</span>
+              <span class="font-bold text-[#F59E0B]">❤️ 342 Thích</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  },
+
+  'M20-S02': {
+    id: 'M20-S02',
+    module: 'M20 · Bếp Sáng Tạo & Social',
+    platform: 'mobile',
+    title: 'M20-S02 · Tặng Thưởng Đầu Bếp 1-Click VietQR Tipping',
+    subtitle: 'Ủng hộ tác giả công thức nấu ăn trực tiếp qua mã QR Napas 24/7 không trung gian',
+    api: 'POST /v1/community/recipes/:id/tip',
+    ac: ['Tạo mã VietQR động chuẩn Napas, định danh người nhận và số tiền ủng hộ (10k/20k/50k)'],
+    render: () => {
+      const k = window.UI_KIT;
+      return `
+        <div class="p-4 space-y-3 bg-white text-[#0F172A] text-xs">
+          ${k.mobileHeader('VietQR 1-Click Tipping', 'M20-S02 · Thưởng đầu bếp cộng đồng', 'M20-S01')}
+          <div class="p-3.5 rounded-2xl bg-[#FFFBEB] border border-[#FCD34D] text-center space-y-2">
+            <div class="text-sm font-black text-[#B45309]">Tặng Thưởng Tác Giả: Chef Hưng</div>
+            <div class="text-[11px] text-[#78350F]">100% tiền tip chuyển trực tiếp vào tài khoản ngân hàng tác giả</div>
+            <div class="w-32 h-32 mx-auto bg-white rounded-xl border-2 border-[#FBBF24] flex items-center justify-center font-mono text-xs">
+              [VietQR Napas]
+            </div>
+            <div class="flex justify-center gap-2">
+              <button class="px-3 py-1 rounded-lg bg-white border border-[#D97706] font-bold text-[#B45309]">10k đ</button>
+              <button class="px-3 py-1 rounded-lg bg-[#D97706] text-white font-bold">20k đ</button>
+              <button class="px-3 py-1 rounded-lg bg-white border border-[#D97706] font-bold text-[#B45309]">50k đ</button>
+            </div>
+          </div>
+          <button class="w-full py-2.5 rounded-xl bg-[#18181B] text-white font-extrabold text-center">Xác nhận đã chuyển khoản</button>
+        </div>
+      `;
+    }
   }
 };
