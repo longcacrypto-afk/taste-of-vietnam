@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import 'notifications_screen.dart';
+import 'fridge_scanner_screen.dart';
+import 'health_dietitian_screen.dart';
+import 'community_recipes_screen.dart';
 
 class ProfileExpansionScreen extends StatefulWidget {
   const ProfileExpansionScreen({super.key});
@@ -414,6 +417,72 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
                 },
                 child: const Text('Cài đặt', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 5c. Giai Đoạn 4 (v0.2): Smart Living & Community Hub Shortcuts
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('🚀 Hệ Sinh Thái Mới (Giai Đoạn 4 / v0.2)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(color: AppTheme.emeraldBadge.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                    child: const Text('v0.2 LIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppTheme.emeraldBadge)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.cyan.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                  child: const Text('🧊', style: TextStyle(fontSize: 20)),
+                ),
+                title: const Text('Tủ Lạnh Thông Minh AI (M18)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                subtitle: const Text('Quét mã EAN-13 · Cảnh báo cận hạn & Zero-Waste', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FridgeScannerScreen())),
+              ),
+              const Divider(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                  child: const Text('🩺', style: TextStyle(fontSize: 20)),
+                ),
+                title: const Text('Bác Sĩ Dinh Dưỡng & Apple Health (M19)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                subtitle: const Text('Đồng bộ bước chân · TDEE · Macro Low-GI', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HealthDietitianScreen())),
+              ),
+              const Divider(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppTheme.goldenAmber.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                  child: const Text('🍳', style: TextStyle(fontSize: 20)),
+                ),
+                title: const Text('Bếp Sáng Tạo & Tipping VietQR (M20)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                subtitle: const Text('Công thức món Việt · Tặng thưởng 1-click Napas 24/7', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityRecipesScreen())),
               ),
             ],
           ),

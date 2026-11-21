@@ -1,7 +1,7 @@
 name: hom_nay_an_gi_mobile
-description: Hôm nay ăn gì · Taste of Vietnam — Consumer Mobile App (Flutter MVP M1–M5, M8)
+description: Hôm nay ăn gì · Taste of Vietnam v0.2 — Consumer Mobile App (Flutter 20 Modules M1–M20)
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
