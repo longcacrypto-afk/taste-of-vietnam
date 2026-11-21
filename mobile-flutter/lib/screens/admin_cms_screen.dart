@@ -161,9 +161,7 @@ class _AdminCmsScreenState extends State<AdminCmsScreen>
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('❌ Đã từ chối dòng OCR ${item['id']}')),
-                    ),
+                    onPressed: () => _rejectOcrItem(item),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.redAccent,
                       side: const BorderSide(color: Colors.redAccent),
@@ -175,9 +173,7 @@ class _AdminCmsScreenState extends State<AdminCmsScreen>
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('✅ Đã phê duyệt món "${item['dish']}"')),
-                    ),
+                    onPressed: () => _approveOcrItem(item),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.emeraldBadge,
                       foregroundColor: Colors.white,
@@ -191,6 +187,87 @@ class _AdminCmsScreenState extends State<AdminCmsScreen>
           ],
         ),
       );
+
+  void _rejectOcrItem(Map<String, dynamic> item) {
+    final reasonController = TextEditingController(text: 'Ảnh chụp bị nhòe và giá tiền không rõ');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.charcoalHero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Từ chối dòng OCR: ${item['id']}', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Nhập lý do từ chối để phản hồi cho chủ quán:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: reasonController,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFF27272A),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                hintText: 'Lý do từ chối...',
+                hintStyle: const TextStyle(color: Colors.white38),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final reason = reasonController.text;
+              Navigator.pop(ctx);
+              setState(() {
+                _ocrQueue.removeWhere((q) => q['id'] == item['id']);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('❌ Đã từ chối dòng OCR ${item['id']}: "$reason"'),
+                  backgroundColor: AppTheme.charcoalHero,
+                ),
+              );
+            },
+            child: const Text('Xác nhận từ chối'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _approveOcrItem(Map<String, dynamic> item) {
+    setState(() {
+      _ocrQueue.removeWhere((q) => q['id'] == item['id']);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✅ Đã phê duyệt món "${item['dish']}" vào menu chính thức!'),
+        backgroundColor: AppTheme.charcoalHero,
+      ),
+    );
+  }
+
+  void _unpausePlace(Map<String, dynamic> place) {
+    setState(() {
+      _pausedPlaces.removeWhere((p) => p['id'] == place['id']);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✅ Đã xác minh & phục hồi hoạt động cho "${place['name']}"!'),
+        backgroundColor: AppTheme.charcoalHero,
+      ),
+    );
+  }
 
   // ─── TAB 2: PAUSED PLACES ───────────────────────────────────────
   Widget _buildPausedPlacesTab() {
@@ -233,9 +310,7 @@ class _AdminCmsScreenState extends State<AdminCmsScreen>
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('✅ Đã xác minh quán mở cửa lại: ${place['name']}')),
-                ),
+                onPressed: () => _unpausePlace(place),
                 icon: const Icon(Icons.check_circle_outline, size: 16),
                 label: const Text('Xác Minh & Mở Lại Quán'),
                 style: ElevatedButton.styleFrom(
