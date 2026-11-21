@@ -357,3 +357,41 @@ test('M9: Admin OCR Review rejection with reason & Restaurant Un-pause auto-reco
   // 4. Verify userReports no longer contains PLACE-405
   assert.ok(!store.userReports.some(r => r.place_id === 'PLACE-405'));
 });
+
+test('M8 & M3-S06: Notification Queue API & Suggestion Feedback actions (liked, skipped, eaten)', async () => {
+  const store = createInitialStore();
+
+  // 1. Fetch notifications
+  const notifRes = await handleApiRequest(store, 'GET', '/api/v1/notifications', new URLSearchParams());
+  assert.equal(notifRes.status, 200);
+  assert.equal(notifRes.data.max_push_per_day, 2);
+  assert.ok(Array.isArray(notifRes.data.items));
+  assert.ok(notifRes.data.items.length >= 2);
+
+  // 2. Feedback 'liked'
+  const likeRes = await handleApiRequest(store, 'POST', '/api/v1/suggestions/feedback', new URLSearchParams(), {
+    dish_id: 'DISH-102',
+    action: 'liked'
+  });
+  assert.equal(likeRes.status, 200);
+  assert.equal(likeRes.data.recorded.action, 'liked');
+
+  // 3. Feedback 'skipped'
+  const skipRes = await handleApiRequest(store, 'POST', '/api/v1/suggestions/feedback', new URLSearchParams(), {
+    dish_id: 'DISH-103',
+    action: 'skipped',
+    skip_reason: 'Ngán món nước'
+  });
+  assert.equal(skipRes.status, 200);
+  assert.equal(skipRes.data.recorded.action, 'skipped');
+  assert.equal(skipRes.data.recorded.skip_reason, 'Ngán món nước');
+
+  // 4. Feedback 'eaten'
+  const eatenRes = await handleApiRequest(store, 'POST', '/api/v1/suggestions/feedback', new URLSearchParams(), {
+    dish_id: 'DISH-104',
+    action: 'eaten'
+  });
+  assert.equal(eatenRes.status, 200);
+  assert.equal(eatenRes.data.recorded.action, 'eaten');
+  assert.ok(eatenRes.data.history_count > 0);
+});

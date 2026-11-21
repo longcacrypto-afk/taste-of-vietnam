@@ -84,6 +84,56 @@ Sản phẩm gồm **4 giao diện chính**, dùng chung một Design System th�
 4. **Đã lưu (`Saved`):** Quản lý món yêu thích, bộ sưu tập, quán đã lưu.
 5. **Cá nhân (`Profile`):** Quản lý hồ sơ khẩu vị, ngân sách, dị ứng, thông báo và cài đặt.
 
+### 3.2. Sơ đồ Luồng Trải Nghiệm & Vòng Lặp Giữ Chân (End-to-End User Journey Map)
+
+```text
+                                  ┌───────────────────────────┐
+                                  │   ONBOARDING (M1: <45s)   │
+                                  │  Khẩu vị, Dị ứng, Vùng    │
+                                  └─────────────┬─────────────┘
+                                                │
+                                                ▼
+                                  ┌───────────────────────────┐
+                       ┌─────────►│    TODAY HOME (M3-S01)    │◄─────────────────┐
+                       │          │  3 Gợi ý AI hằng ngày     │                  │
+                       │          │  Vòng quay 3D · Chat Măm  │                  │
+                       │          └─────────────┬─────────────┘                  │
+                       │                        │                                │
+                       │           ┌────────────┴────────────┐                   │
+                       │           ▼                         ▼                   │
+            [Rẽ Nhánh: TỰ NẤU]                      [Rẽ Nhánh: ĐI ĂN / ĐẶT MÓN]  │
+                       │                                     │                   │
+                       ▼                                     ▼                   │
+        ┌──────────────────────────────┐       ┌──────────────────────────────┐  │
+        │      CHI TIẾT MÓN (M2)       │       │    BẢN ĐỒ QUÁN 3KM (M4)      │  │
+        │  • Dynamic Portion Scaler    │       │  • PostGIS ST_DWithin        │  │
+        │  • Nấu từng bước & Timer     │       │  • Auto-Pause Guard (≥3 rpt) │  │
+        └──────────────┬───────────────┘       └──────────────┬───────────────┘  │
+                       │                                      │                  │
+                       ▼                                      ▼                  │
+        ┌──────────────────────────────┐       ┌──────────────────────────────┐  │
+        │    KẾ HOẠCH TUẦN (M11)       │       │    4-ACTION HUB (M5)         │  │
+        │  • Khấu trừ nguyên liệu kho  │       │  • GrabFood / ShopeeFood     │  │
+        │  • Giỏ đi chợ thông minh     │       │  • Google Maps / Gọi điện    │  │
+        └──────────────┬───────────────┘       └──────────────┬───────────────┘  │
+                       │                                      │                  │
+                       │                                      ▼                  │
+                       │                       ┌──────────────────────────────┐  │
+                       │                       │  XÁC NHẬN ĐÃ ĂN (M3-S06)     │  │
+                       │                       │  • Kích hoạt Cooldown 3 ngày │  │
+                       │                       │  • Không lặp lại món         │  │
+                       │                       └──────────────┬───────────────┘  │
+                       │                                      │                  │
+                       └──────────────────┬───────────────────┘                  │
+                                          │                                      │
+                                          ▼                                      │
+                               ┌──────────────────────────────┐                  │
+                               │   SMART MEAL REMINDER (M8)   │                  │
+                               │  • Nhắc trưa 10:30 & tối 17h │──────────────────┘
+                               │  • SLA ≤ 2 push/ngày        │ (Vòng lặp ngày tiếp theo)
+                               └──────────────────────────────┘
+```
+
 ---
 
 ## 4. Thiết kế chi tiết Module M3 — Gợi ý AI hằng ngày (Core Module)
