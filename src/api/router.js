@@ -14,7 +14,11 @@ import {
   generateWeeklyMealPlanAndGroceries,
   createOrVoteGroupPoll,
   submitGpsVerifiedReview,
-  translateVietnameseMenu
+  translateVietnameseMenu,
+  scanFridgeBarcodeOrPhoto,
+  syncHealthWearables,
+  getCommunityRecipes,
+  tipCommunityRecipe
 } from '../services/expansionServices.js';
 import { callGeminiChat, generateDishStory } from '../services/geminiService.js';
 import { generateVietQrInvoice, verifyPaymentWebhookSignature, processSuccessfulPayment } from '../services/paymentService.js';
@@ -696,6 +700,61 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
         ]
       }
     };
+  }
+
+  // ===========================================================================
+  // GIAI ĐOẠN 4 / v0.2: MODULE M18, M19 & M20 ROUTES
+  // ===========================================================================
+  // M18: AI Smart Fridge & IoT Barcode Scanner (Zero Food Waste)
+  if (pathname === '/api/v1/fridge/scan' && method === 'POST') {
+    return { status: 200, data: scanFridgeBarcodeOrPhoto(store, body) };
+  }
+  if (pathname === '/api/v1/fridge/inventory' && method === 'GET') {
+    return {
+      status: 200,
+      data: {
+        total_items: (store.fridgeInventory || []).length,
+        items: store.fridgeInventory || [],
+        expiring_soon_count: (store.fridgeInventory || []).filter(i => i.is_expiring_soon).length
+      }
+    };
+  }
+
+  // M19: Smart Dietitian & Health Wearables Sync (Apple Health / Google Fit)
+  if (pathname === '/api/v1/health/sync' && method === 'POST') {
+    return { status: 200, data: syncHealthWearables(store, body) };
+  }
+  if (pathname === '/api/v1/health/nutrition-profile' && method === 'GET') {
+    return { status: 200, data: store.healthProfile || syncHealthWearables(store) };
+  }
+
+  // M20: Creator Kitchen & Community Recipe Hub (Tipping & Social Sharing)
+  if (pathname === '/api/v1/community/recipes' && method === 'GET') {
+    return { status: 200, data: getCommunityRecipes(store, Object.fromEntries(searchParams)) };
+  }
+  if (pathname === '/api/v1/community/recipes' && method === 'POST') {
+    const newRecipe = {
+      id: `CREC-${Date.now()}`,
+      title: body.title || 'Món Ngon Gia Đình',
+      author: body.author || 'Đầu Bếp Nghiệp Dư',
+      author_avatar: '👨‍🍳',
+      prep_time_minutes: body.prep_time_minutes || 25,
+      difficulty: body.difficulty || 'Dễ',
+      calories: body.calories || 450,
+      likes_count: 1,
+      tips_received_vnd: 0,
+      zero_waste_tag: body.zero_waste_tag || null,
+      ingredients: body.ingredients || []
+    };
+    store.communityRecipes = store.communityRecipes || [];
+    store.communityRecipes.unshift(newRecipe);
+    return { status: 201, data: newRecipe };
+  }
+
+  const tipMatch = pathname.match(/^\/api\/v1\/community\/recipes\/([^/]+)\/tip$/);
+  if (tipMatch && method === 'POST') {
+    const res = tipCommunityRecipe(store, tipMatch[1], body.amount_vnd || 50000);
+    return { status: res.success ? 200 : 404, data: res };
   }
 
   return { status: 404, data: { error: `Unknown endpoint ${method} ${pathname}` } };

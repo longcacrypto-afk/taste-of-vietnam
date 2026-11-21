@@ -395,3 +395,55 @@ test('M8 & M3-S06: Notification Queue API & Suggestion Feedback actions (liked, 
   assert.equal(eatenRes.data.recorded.action, 'eaten');
   assert.ok(eatenRes.data.history_count > 0);
 });
+
+test('Giai đoạn 4 / v0.2 (M18, M19, M20): Smart Fridge Scan, Health Wearables Sync & Community Recipe Hub', async () => {
+  const store = createInitialStore();
+
+  // 1. M18: Scan barcode into fridge & get Zero-Waste suggestion
+  const scanRes = await handleApiRequest(store, 'POST', '/api/v1/fridge/scan', new URLSearchParams(), {
+    barcode: '8934567890999',
+    item_name: 'Sữa chua men sống Probi',
+    expires_in_days: 1,
+    compartment: 'door'
+  });
+  assert.equal(scanRes.status, 200);
+  assert.equal(scanRes.data.scanned_item.name, 'Sữa chua men sống Probi');
+  assert.equal(scanRes.data.scanned_item.is_expiring_soon, true);
+  assert.ok(scanRes.data.zero_waste_suggestion.recommended_dish);
+
+  // Fetch fridge inventory
+  const invRes = await handleApiRequest(store, 'GET', '/api/v1/fridge/inventory', new URLSearchParams());
+  assert.equal(invRes.status, 200);
+  assert.ok(invRes.data.total_items >= 5);
+  assert.ok(invRes.data.expiring_soon_count >= 2);
+
+  // 2. M19: Health Wearables Sync & Nutrition Profiling
+  const healthRes = await handleApiRequest(store, 'POST', '/api/v1/health/sync', new URLSearchParams(), {
+    wearable: 'Apple Health',
+    daily_steps: 10450,
+    active_calories_burned: 620,
+    goal: 'cut'
+  });
+  assert.equal(healthRes.status, 200);
+  assert.equal(healthRes.data.daily_steps, 10450);
+  assert.ok(healthRes.data.tdee > 2000);
+  assert.ok(healthRes.data.macro_targets_g.protein >= 135);
+
+  const getHealth = await handleApiRequest(store, 'GET', '/api/v1/health/nutrition-profile', new URLSearchParams());
+  assert.equal(getHealth.status, 200);
+  assert.equal(getHealth.data.daily_steps, 10450);
+
+  // 3. M20: Community Recipe list, create & tipping
+  const crecList = await handleApiRequest(store, 'GET', '/api/v1/community/recipes', new URLSearchParams());
+  assert.equal(crecList.status, 200);
+  assert.ok(crecList.data.recipes.length >= 2);
+
+  // Tip author 20,000 VND
+  const tipRes = await handleApiRequest(store, 'POST', '/api/v1/community/recipes/CREC-01/tip', new URLSearchParams(), {
+    amount_vnd: 20000
+  });
+  assert.equal(tipRes.status, 200);
+  assert.equal(tipRes.data.success, true);
+  assert.equal(tipRes.data.tipped_amount_vnd, 20000);
+  assert.equal(tipRes.data.total_tips_vnd, 270000);
+});

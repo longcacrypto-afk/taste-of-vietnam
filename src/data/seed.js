@@ -755,6 +755,57 @@ export function createInitialStore() {
         verified_gps: true,
         created_at: new Date().toISOString()
       }
+    ],
+
+    // ===========================================================================
+    // GIAI ĐOẠN 4 / v0.2: MODULE M18, M19 & M20 SEED DATA
+    // ===========================================================================
+    fridgeInventory: [
+      { id: 'FRIDGE-01', name: 'Trứng gà ta', quantity: '6 quả', compartment: 'door', expires_in_days: 2, is_expiring_soon: true },
+      { id: 'FRIDGE-02', name: 'Đậu hũ non', quantity: '2 miếng', compartment: 'chill', expires_in_days: 1, is_expiring_soon: true },
+      { id: 'FRIDGE-03', name: 'Thịt bò phi lê', quantity: '300g', compartment: 'freeze', expires_in_days: 14, is_expiring_soon: false },
+      { id: 'FRIDGE-04', name: 'Cà chua Đà Lạt', quantity: '4 quả', compartment: 'vegetable', expires_in_days: 3, is_expiring_soon: false }
+    ],
+
+    healthProfile: {
+      user_id: 'usr_me',
+      connected_wearable: 'Apple Health',
+      last_synced_at: new Date().toISOString(),
+      daily_steps: 8420,
+      active_calories_burned: 480,
+      target_calories_daily: 2150,
+      tdee: 2280,
+      macro_targets_g: { protein: 120, carbs: 230, fat: 55 },
+      blood_sugar_support: true
+    },
+
+    communityRecipes: [
+      {
+        id: 'CREC-01',
+        title: 'Cơm Chiên Kim Chi Bò Áp Chảo',
+        author: 'Chef Hưng (Biên Hòa Foodie)',
+        author_avatar: '🍳',
+        prep_time_minutes: 20,
+        difficulty: 'Dễ',
+        calories: 520,
+        likes_count: 342,
+        tips_received_vnd: 250000,
+        zero_waste_tag: 'Tận dụng cơm nguội & bò thừa',
+        ingredients: ['Cơm nguội 2 chén', 'Thịt bò 150g', 'Kim chi 100g', 'Trứng gà 1 quả']
+      },
+      {
+        id: 'CREC-02',
+        title: 'Canh Đậu Hũ Non Nấu Cà Chua Thanh Mát',
+        author: 'Lá Healthy Kitchen',
+        author_avatar: '🌿',
+        prep_time_minutes: 15,
+        difficulty: 'Rất dễ',
+        calories: 180,
+        likes_count: 512,
+        tips_received_vnd: 420000,
+        zero_waste_tag: 'Thanh lọc cơ thể, giải nhiệt mùa nóng',
+        ingredients: ['Đậu hũ non 2 miếng', 'Cà chua 2 quả', 'Hành ngò', 'Nấm rơm 50g']
+      }
     ]
   };
 }

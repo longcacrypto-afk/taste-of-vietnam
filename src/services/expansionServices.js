@@ -270,3 +270,101 @@ export function translateVietnameseMenu(store, targetLang = 'EN') {
     items
   };
 }
+
+// =============================================================================
+// GIAI ĐOẠN 4 / v0.2: MODULE M18, M19 & M20 EXPANSION SERVICES
+// =============================================================================
+
+// M18: AI Smart Fridge & IoT Barcode Scanner (Zero Food Waste)
+export function scanFridgeBarcodeOrPhoto(store, payload = {}) {
+  const barcode = payload.barcode || '8934567890123';
+  const detectedName = payload.item_name || (payload.barcode ? 'Sữa tươi tiệt trùng Vinamilk 1L' : 'Cà chua bi hữu cơ');
+  const daysToExpire = payload.expires_in_days || 3;
+  const isExpiring = daysToExpire <= 2;
+
+  const newItem = {
+    id: `FRIDGE-${Date.now()}`,
+    barcode,
+    name: detectedName,
+    quantity: payload.quantity || '1 gói',
+    compartment: payload.compartment || 'chill',
+    expires_in_days: daysToExpire,
+    is_expiring_soon: isExpiring,
+    scanned_at: new Date().toISOString()
+  };
+
+  store.fridgeInventory = store.fridgeInventory || [];
+  store.fridgeInventory.unshift(newItem);
+
+  // Auto-generate Zero-Waste Recipe Suggestion using expiring ingredients
+  const expiringItems = store.fridgeInventory.filter(i => i.is_expiring_soon).map(i => i.name);
+  const zeroWasteDish = store.dishes.find(d => !d.allergen_tags.includes('shrimp')) || store.dishes[0];
+
+  return {
+    scanned_item: newItem,
+    total_fridge_items: store.fridgeInventory.length,
+    zero_waste_suggestion: {
+      message: `Tận dụng ${expiringItems.slice(0, 2).join(' & ')} sắp hết hạn!`,
+      recommended_dish: zeroWasteDish.name,
+      dish_id: zeroWasteDish.id,
+      prep_time_minutes: zeroWasteDish.prep_minutes || 20
+    }
+  };
+}
+
+// M19: Smart Dietitian & Health Wearables Sync (Apple Health / Google Fit)
+export function syncHealthWearables(store, payload = {}) {
+  const current = store.healthProfile || {};
+  const steps = payload.daily_steps || current.daily_steps || 8420;
+  const activeCalories = payload.active_calories_burned || current.active_calories_burned || 480;
+  const baseTdee = 1800 + Math.round(activeCalories * 0.9);
+
+  store.healthProfile = {
+    ...current,
+    connected_wearable: payload.wearable || current.connected_wearable || 'Apple Health',
+    last_synced_at: new Date().toISOString(),
+    daily_steps: steps,
+    active_calories_burned: activeCalories,
+    tdee: baseTdee,
+    target_calories_daily: Math.max(1600, baseTdee - (payload.goal === 'cut' ? 400 : 0)),
+    macro_targets_g: {
+      protein: Math.round(steps > 10000 ? 135 : 120),
+      carbs: Math.round(baseTdee * 0.45 / 4),
+      fat: Math.round(baseTdee * 0.25 / 9)
+    },
+    recommendation: steps >= 8000
+      ? 'Đạt mục tiêu vận động hôm nay! Khuyên dùng món giàu đạm phục hồi cơ bắp.'
+      : 'Cần đi thêm ~1.500 bước để đạt chỉ tiêu đốt năng lượng trong ngày.'
+  };
+
+  return store.healthProfile;
+}
+
+// M20: Creator Kitchen & Community Recipe Hub (Tipping & Social Sharing)
+export function getCommunityRecipes(store, query = {}) {
+  let list = [...(store.communityRecipes || [])];
+  if (query.tag === 'zero_waste') {
+    list = list.filter(r => r.zero_waste_tag);
+  }
+  return {
+    total: list.length,
+    recipes: list
+  };
+}
+
+export function tipCommunityRecipe(store, recipeId, amountVnd = 50000) {
+  const recipe = (store.communityRecipes || []).find(r => r.id === recipeId);
+  if (!recipe) {
+    return { success: false, error: 'Recipe not found' };
+  }
+
+  recipe.tips_received_vnd = (recipe.tips_received_vnd || 0) + Number(amountVnd);
+  return {
+    success: true,
+    recipe_id: recipe.id,
+    tipped_amount_vnd: Number(amountVnd),
+    total_tips_vnd: recipe.tips_received_vnd,
+    author: recipe.author,
+    message: `Cảm ơn anh đã ủng hộ ${amountVnd.toLocaleString('vi-VN')}đ cho đầu bếp ${recipe.author}!`
+  };
+}

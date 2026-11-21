@@ -218,3 +218,52 @@ CREATE TABLE IF NOT EXISTS b2g_tourism_reports (
     trending_dishes JSONB NOT NULL DEFAULT '[]',
     generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- =============================================================================
+-- GIAI ĐOẠN 4 / v0.2: BẢNG DDL CHO MODULE M18, M19, M20
+-- =============================================================================
+
+-- 18. BẢNG TỦ LẠNH THÔNG MINH & QUÉT MÃ VẠCH IOT (M18 SMART FRIDGE)
+CREATE TABLE IF NOT EXISTS fridge_items (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    barcode VARCHAR(64),
+    name VARCHAR(255) NOT NULL,
+    quantity VARCHAR(64) DEFAULT '1',
+    compartment VARCHAR(32) DEFAULT 'chill', -- 'chill', 'freeze', 'door', 'vegetable'
+    expires_at TIMESTAMPTZ NOT NULL,
+    is_expiring_soon BOOLEAN DEFAULT FALSE,
+    scanned_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 19. BẢNG ĐỒNG BỘ THIẾT BỊ ĐEO SỨC KHỎE (M19 HEALTH WEARABLES SYNC)
+CREATE TABLE IF NOT EXISTS health_metrics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    wearable_source VARCHAR(64) NOT NULL, -- 'Apple Health', 'Google Fit', 'Garmin'
+    daily_steps INT NOT NULL DEFAULT 0,
+    active_calories_burned INT NOT NULL DEFAULT 0,
+    calculated_tdee INT NOT NULL DEFAULT 2000,
+    target_calories_daily INT NOT NULL DEFAULT 2000,
+    target_protein_g INT NOT NULL DEFAULT 120,
+    target_carbs_g INT NOT NULL DEFAULT 220,
+    target_fat_g INT NOT NULL DEFAULT 50,
+    synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 20. BẢNG CÔNG THỨC CỘNG ĐỒNG & SÁNG TẠO NỘI DUNG (M20 CREATOR KITCHEN)
+CREATE TABLE IF NOT EXISTS community_recipes (
+    id VARCHAR(64) PRIMARY KEY,
+    author_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    author_name VARCHAR(128) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    prep_time_minutes INT NOT NULL DEFAULT 20,
+    difficulty VARCHAR(32) NOT NULL DEFAULT 'easy',
+    calories INT NOT NULL DEFAULT 400,
+    ingredients JSONB NOT NULL DEFAULT '[]',
+    steps JSONB NOT NULL DEFAULT '[]',
+    zero_waste_tag VARCHAR(255),
+    likes_count INT NOT NULL DEFAULT 0,
+    total_tips_vnd BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

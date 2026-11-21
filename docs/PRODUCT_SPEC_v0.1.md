@@ -55,7 +55,7 @@ Sản phẩm gồm **4 giao diện chính**, dùng chung một Design System th�
 
 ---
 
-## 3. Sơ đồ 17 Module và Phạm vi triển khai
+## 3. Sơ đồ 20 Module và Phạm vi triển khai
 
 | Nhóm | Module | Giai đoạn |
 | :--- | :--- | :---: |
@@ -76,6 +76,9 @@ Sản phẩm gồm **4 giao diện chính**, dùng chung một Design System th�
 | **Tourism** | **M15.** Du lịch ẩm thực | 3 (Mở rộng) |
 | **Localization** | **M16.** Đa ngôn ngữ (EN, KO, ZH, JA) | 3 (Mở rộng) |
 | **Enterprise** | **M17.** B2G / Brand | 3 (Mở rộng) |
+| **Smart Living** | **M18.** Tủ lạnh AI & Quét mã vạch (Zero Waste) | 4 (v0.2 Mở rộng) |
+| **Health Tech** | **M19.** Trợ lý dinh dưỡng & Wearables Sync | 4 (v0.2 Mở rộng) |
+| **Creator Hub** | **M20.** Bếp sáng tạo & Mạng xã hội công thức | 4 (v0.2 Mở rộng) |
 
 ### 3.1. Cấu trúc điều hướng Mobile (5 Tabs)
 1. **Hôm nay (`Today`):** Trung tâm của ứng dụng (AI gợi ý 3 món, Quay món, Chat với Măm AI).
@@ -243,9 +246,21 @@ Recommendation Engine (Search Dishes + Search Places + Weather + User Taste Prof
 - **2 màn hình (`M17-S01` → `M17-S02`):** Cổng dữ liệu phân tích vĩ mô dành cho Sở Du lịch / Ban Quản lý văn hóa địa phương (báo cáo món ăn được quan tâm nhất, bản đồ nhiệt ẩm thực, lưu lượng khách quốc tế); Bảng quản trị chiến dịch đồng tiếp thị dành cho nhãn hàng F&B / FMCG (tài trợ hiển thị gia vị, đồ uống dùng kèm chuẩn vị).
 - **API:** `/v1/enterprise/insights/regional`, `/v1/enterprise/brand-campaigns`.
 
+### M18 — AI Smart Fridge & IoT Barcode Scanner (Zero Food Waste)
+- **2 màn hình (`M18-S01` → `M18-S02`):** Quét mã vạch thực phẩm EAN-13 hoặc chụp ảnh nhận diện rau củ quả trong tủ lạnh; Quản lý hạn sử dụng 4 ngăn (ngăn mát, ngăn đông, cánh cửa, rau củ) và tự động tạo gợi ý món ăn "Zero Waste" tận dụng triệt để nguyên liệu sắp hết hạn trong 48 giờ.
+- **API:** `/v1/fridge/scan`, `/v1/fridge/inventory`.
+
+### M19 — Smart Dietitian & Health Wearables Sync (Apple Health / Google Fit)
+- **2 màn hình (`M19-S01` → `M19-S02`):** Trung tâm đồng bộ thiết bị đeo sức khỏe (Apple Health, Google Health Connect, Garmin); Tự động tính toán TDEE, BMR, Macro mục tiêu (Protein/Carbs/Fat) và điều chỉnh calo bữa ăn hằng ngày hỗ trợ tăng cơ, giảm mỡ, ổn định đường huyết (Low GI).
+- **API:** `/v1/health/sync`, `/v1/health/nutrition-profile`.
+
+### M20 — Creator Kitchen & Community Recipe Hub (Social Food & Tipping)
+- **2 màn hình (`M20-S01` → `M20-S02`):** Mạng xã hội ẩm thực cộng đồng chia sẻ công thức nấu ăn độc quyền, mẹo vặt nhà bếp và video ngắn 30 giây; Tính năng tặng thưởng / Tip tiền trực tiếp cho tác giả công thức qua VietQR Napas 24/7.
+- **API:** `/v1/community/recipes`, `/v1/community/recipes/{id}/tip`.
+
 ---
 
-## 7. Ma trận 93 Màn hình Toàn Ứng Dụng (M1 → M17 & Web Core)
+## 7. Ma trận 99 Màn hình Toàn Ứng Dụng (M1 → M20 & Web Core)
 
 | Nhóm Nền Tảng | Mã Module | Số lượng Màn hình | Ghi chú & Phạm vi |
 | :--- | :--- | :---: | :--- |
@@ -254,7 +269,8 @@ Recommendation Engine (Search Dishes + Search Places + Weather + User Taste Prof
 | **Merchant & Quảng Cáo** | M6 → M7 | **17 Màn hình** | Đăng ký quán, Quản lý thực đơn thủ công & AI Menu OCR, Tạo chiến dịch quảng cáo, Cổng thanh toán VietQR Napas247. |
 | **Quản Trị & Phân Tích** | M9 → M10 | **15 Màn hình** | Admin CMS, Hàng đợi duyệt ghép món OCR, Xử lý quán tự động tạm dừng, Phân quyền RBAC 6 roles, Phễu PostHog & AI Benchmark. |
 | **Tăng Trưởng & Mở Rộng**| M11 → M17 | **16 Màn hình** | Thực đơn tuần & Giỏ đi chợ, Bình chọn nhóm & Đánh giá GPS, Đặt bàn & Voucher, Chuyện văn hóa, Food Trail, Dịch menu AI, B2G Insights. |
-| **TỔNG CỘNG** | **M1 → M17** | **93 Màn hình** | **Hoàn chỉnh 100% trên cả Web Runtime (Live) và Flutter Mobile Screens.** |
+| **Hệ Sinh Thái Giai Đoạn 4**| M18 → M20 | **6 Màn hình** | Tủ lạnh AI & Quét mã vạch (M18), Trợ lý dinh dưỡng & Wearables (M19), Bếp sáng tạo & Tip công thức (M20). |
+| **TỔNG CỘNG** | **M1 → M20** | **99 Màn hình** | **Hoàn chỉnh 100% trên cả Web Runtime (Live) và Flutter Mobile Screens.** |
 
 ### 7.1. Danh mục Chi tiết Mã 93 Màn hình (The 93-Screen Catalog & Route Dictionary)
 
