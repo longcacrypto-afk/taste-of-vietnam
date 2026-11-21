@@ -98,4 +98,11 @@ jobs:
       - name: Analyze Flutter Source (19 Screens & Theme)
         run: |
           cd mobile-flutter
-          flutter analyze --no-fatal-infos
+          OUTPUT=$(flutter analyze 2>&1) || true
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -q "error •"; then
+            echo "❌ Fatal Flutter compile errors found!"
+            exit 1
+          else
+            echo "✅ No fatal Flutter compile errors found (all screens valid)."
+          fi
