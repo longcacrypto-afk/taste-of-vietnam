@@ -272,7 +272,7 @@ Recommendation Engine (Search Dishes + Search Places + Weather + User Taste Prof
 | **Hệ Sinh Thái Giai Đoạn 4**| M18 → M20 | **6 Màn hình** | Tủ lạnh AI & Quét mã vạch (M18), Trợ lý dinh dưỡng & Wearables (M19), Bếp sáng tạo & Tip công thức (M20). |
 | **TỔNG CỘNG** | **M1 → M20** | **99 Màn hình** | **Hoàn chỉnh 100% trên cả Web Runtime (Live) và Flutter Mobile Screens.** |
 
-### 7.1. Danh mục Chi tiết Mã 93 Màn hình (The 93-Screen Catalog & Route Dictionary)
+### 7.1. Danh mục Chi tiết Toàn bộ 99 Màn hình (The 99-Screen Catalog & Route Dictionary)
 
 #### Nhóm Consumer Mobile Core (M1 → M5: 40 Màn hình)
 - **M1 (Tài khoản & Hồ sơ khẩu vị — 10 screens):**
@@ -387,11 +387,22 @@ Recommendation Engine (Search Dishes + Search Places + Weather + User Taste Prof
   - `M17-S01`: Cổng Dữ liệu Phân tích Du lịch Ẩm thực Vĩ mô dành cho Sở Du lịch / BQL Văn hóa.
   - `M17-S02`: Bảng Quản trị Chiến dịch Đồng Tiếp thị dành cho Nhãn hàng FMCG / F&B.
 
+#### Nhóm Hệ Sinh Thái Giai Đoạn 4 / v0.2 (M18 → M20: 6 Màn hình)
+- **M18 (Tủ lạnh thông minh & Quét mã vạch IoT — 2 screens):**
+  - `M18-S01`: Quản lý Kho Tủ Lạnh Gia Đình Thông Minh AI (4 Ngăn & Zero Food Waste).
+  - `M18-S02`: Quét Mã Vạch GS1 EAN-13 & Nhận Diện Nguyên Liệu AI OCR.
+- **M19 (Trợ lý dinh dưỡng & Wearables Sync — 2 screens):**
+  - `M19-S01`: Bảng Chỉ Số Dinh Dưỡng Thể Trạng & Đồng Bộ Apple Health / Wearables.
+  - `M19-S02`: Phân Bổ Tỷ Lệ Macro Đạm/Carb/Béo & Chế Độ Low-GI Ổn Định Đường Huyết.
+- **M20 (Bếp sáng tạo & Mạng xã hội công thức — 2 screens):**
+  - `M20-S01`: Bếp Sáng Tạo & Bảng Tin Chia Sẻ Công Thức Nấu Ăn Cộng Đồng.
+  - `M20-S02`: Tặng Thưởng Đầu Bếp 1-Click VietQR Napas 24/7 & Đăng Công Thức Mới.
+
 #### Nhóm Nền Tảng Consumer Web Core & PWA (Web Core: 5 Màn hình)
 - `WEB-S01`: Trang chủ Responsive PWA (Đồng bộ thời tiết, gợi ý 3 món & decision hub).
 - `WEB-S02`: Cổng Khám phá Ẩm thực & Bản đồ Tương tác Toàn màn hình.
 - `WEB-S03`: Trang Chi tiết Công thức Chuẩn SEO & Dynamic Portion Scaler.
-- `WEB-S04`: Trung tâm Điều phối 17 Live Panels (Studio Dashboard).
+- `WEB-S04`: Trung tâm Điều phối 20 Live Panels (Studio Dashboard).
 - `WEB-S05`: Trang Cài đặt Ứng dụng, Chế độ Ngoại tuyến PWA & Chính sách Bảo mật PDPD.
 
 ---

@@ -438,6 +438,20 @@ test('Giai đoạn 4 / v0.2 (M18, M19, M20): Smart Fridge Scan, Health Wearables
   assert.equal(crecList.status, 200);
   assert.ok(crecList.data.recipes.length >= 2);
 
+  // Create new community recipe
+  const createRecRes = await handleApiRequest(store, 'POST', '/api/v1/community/recipes', new URLSearchParams(), {
+    title: 'Bún Sườn Nấu Sấu Hà Nội',
+    author: 'Bếp Mẹ Bon',
+    prep_time_minutes: 30,
+    difficulty: 'Dễ',
+    calories: 460,
+    zero_waste_tag: 'Tận dụng sấu ngâm & sườn ninh',
+    ingredients: ['Bún tươi 500g', 'Sườn non 400g', 'Sấu tươi 5 quả']
+  });
+  assert.equal(createRecRes.status, 201);
+  assert.equal(createRecRes.data.title, 'Bún Sườn Nấu Sấu Hà Nội');
+  assert.equal(createRecRes.data.author, 'Bếp Mẹ Bon');
+
   // Tip author 20,000 VND
   const tipRes = await handleApiRequest(store, 'POST', '/api/v1/community/recipes/CREC-01/tip', new URLSearchParams(), {
     amount_vnd: 20000
@@ -446,4 +460,93 @@ test('Giai đoạn 4 / v0.2 (M18, M19, M20): Smart Fridge Scan, Health Wearables
   assert.equal(tipRes.data.success, true);
   assert.equal(tipRes.data.tipped_amount_vnd, 20000);
   assert.equal(tipRes.data.total_tips_vnd, 270000);
+});
+
+test('E2E Full Loop (M1 -> M3 -> M2 -> M4 -> M5 -> Cooldown -> M8 -> M18 -> M19 -> M20)', async () => {
+  const store = createInitialStore();
+
+  // Step 1: Onboard User with Shrimp allergy & Spicy tolerance level 1
+  const updateProfileRes = await handleApiRequest(store, 'PUT', '/api/v1/me/profile', new URLSearchParams(), {
+    allergies: ['shrimp', 'peanut'],
+    spiciness_level: 1,
+    budget_level: 'medium',
+    diet_preference: 'balanced'
+  });
+  assert.equal(updateProfileRes.status, 200);
+  assert.deepEqual(updateProfileRes.data.allergies, ['shrimp', 'peanut']);
+
+  // Step 2: Fetch Today's 3 Suggestions (M3-S01)
+  const sugRes = await handleApiRequest(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
+  assert.equal(sugRes.status, 200);
+  assert.equal(sugRes.data.items.length, 3);
+  // Guarantee no allergens in suggestions
+  for (const item of sugRes.data.items) {
+    const dish = store.dishes.find(d => d.id === item.dish_id);
+    assert.ok(dish);
+    const allergens = dish.allergen_tags || [];
+    assert.ok(!allergens.includes('shrimp'));
+    assert.ok(!allergens.includes('peanut'));
+  }
+
+  // Step 3: Scale Portion for Selected Dish (M2-S05 / M2-S06)
+  const chosenDishId = sugRes.data.items[0].dish_id;
+  const scaledRes = await handleApiRequest(store, 'GET', `/api/v1/dishes/${chosenDishId}`, new URLSearchParams('servings=4'));
+  assert.equal(scaledRes.status, 200);
+  assert.equal(scaledRes.data.requested_servings, 4);
+  assert.ok(scaledRes.data.scaled_calories_total > 0);
+
+  // Step 4: Locate verified open places nearby for this dish (M4-S01)
+  const placesRes = await handleApiRequest(store, 'GET', '/api/v1/places', new URLSearchParams({ dish_id: chosenDishId, open_only: 'true' }));
+  assert.equal(placesRes.status, 200);
+  assert.ok(placesRes.data.items.length > 0);
+  const targetPlace = placesRes.data.items[0];
+
+  // Step 5: Order via Partner Hub & Confirm Eaten (M5-S01 / M5-S05)
+  const orderRes = await handleApiRequest(store, 'POST', '/api/v1/orders/redirect', new URLSearchParams(), {
+    place_id: targetPlace.id,
+    dish_id: chosenDishId,
+    partner: 'grabfood'
+  });
+  assert.equal(orderRes.status, 200);
+  assert.ok(orderRes.data.target_deeplink.includes('utm_source=hom_nay_an_gi'));
+
+  const loopbackRes = await handleApiRequest(store, 'POST', `/api/v1/orders/${orderRes.data.id}/confirm-eaten`, new URLSearchParams(), {
+    dish_id: chosenDishId
+  });
+  assert.equal(loopbackRes.status, 200);
+  assert.equal(loopbackRes.data.confirmed, true);
+  assert.equal(loopbackRes.data.cooldown_days_applied, 3);
+
+  // Step 6: Verify 3-Day Non-Repeat Cooldown activates (M3-S06 / M3-S07)
+  const freshSugRes = await handleApiRequest(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
+  assert.equal(freshSugRes.status, 200);
+  const freshIds = freshSugRes.data.items.map(it => it.dish_id);
+  assert.ok(!freshIds.includes(chosenDishId), 'Eaten dish must be excluded by 3-day cooldown');
+
+  // Step 7: Smart Meal Reminder honors <= 2 push/day SLA (M8-S01)
+  const schedRes = await handleApiRequest(store, 'PUT', '/api/v1/me/meal-schedule', new URLSearchParams(), {
+    lunch: '10:30',
+    dinner: '17:00',
+    max_per_day: 2
+  });
+  assert.equal(schedRes.status, 200);
+  assert.equal(schedRes.data.max_per_day, 2);
+
+  // Step 8: Fridge Scanner (M18) + Wearable Sync (M19) + Community Hub (M20)
+  const scanFridge = await handleApiRequest(store, 'POST', '/api/v1/fridge/scan', new URLSearchParams(), {
+    barcode: '8934567890123',
+    item_name: 'Trứng gà ta',
+    expires_in_days: 2,
+    compartment: 'door'
+  });
+  assert.equal(scanFridge.status, 200);
+
+  const syncWearable = await handleApiRequest(store, 'POST', '/api/v1/health/sync', new URLSearchParams(), {
+    wearable: 'Apple Health',
+    daily_steps: 8800,
+    active_calories_burned: 490,
+    goal: 'maintain'
+  });
+  assert.equal(syncWearable.status, 200);
+  assert.equal(syncWearable.data.daily_steps, 8800);
 });
