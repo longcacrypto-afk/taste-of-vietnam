@@ -1,0 +1,23 @@
+{
+  "name": "Hôm nay ăn gì · Taste of Vietnam",
+  "short_name": "Hôm nay ăn gì",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#18181B",
+  "theme_color": "#F59E0B",
+  "description": "Trợ lý AI khám phá món ăn Việt Nam, đồng bộ tủ lạnh IoT, thiết bị đeo & công thức cộng đồng.",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icons/Icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/Icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

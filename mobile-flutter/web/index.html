@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Hôm nay ăn gì · Taste of Vietnam — Khám phá ẩm thực Việt Nam thông minh">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Hôm nay ăn gì">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Hôm nay ăn gì · Taste of Vietnam v0.2</title>
+  <link rel="manifest" href="manifest.json">
+
+  <script>
+    // The value below is injected by flutter build, do not touch.
+    const serviceWorkerVersion = null;
+  </script>
+  <!-- This script adds the flutter initialization JS code -->
+  <script src="flutter.js" defer></script>
+</head>
+<body style="background-color: #18181B; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh;">
+  <div id="loading" style="text-align: center; color: #F59E0B; font-family: sans-serif;">
+    <h2 style="margin-bottom: 8px;">Hôm Nay Ăn Gì · Taste of Vietnam</h2>
+    <p style="color: #94A3B8; font-size: 14px;">Đang tải trợ lý ẩm thực...</p>
+  </div>
+  <script>
+    window.addEventListener('load', function(ev) {
+      // Download main.dart.js
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        },
+        onEntrypointLoaded: function(engineInitializer) {
+          engineInitializer.initializeEngine().then(function(appRunner) {
+            const loading = document.getElementById('loading');
+            if (loading) loading.remove();
+            appRunner.runApp();
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

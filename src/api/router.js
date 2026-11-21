@@ -23,6 +23,8 @@ import {
 import { callGeminiChat, generateDishStory } from '../services/geminiService.js';
 import { generateVietQrInvoice, verifyPaymentWebhookSignature, processSuccessfulPayment } from '../services/paymentService.js';
 import { searchDishesSemantically } from '../services/semanticSearch.js';
+import { suggestionCache } from '../services/cacheService.js';
+import { pushQueue } from '../services/queueService.js';
 
 export async function handleApiRequest(store, method, pathname, searchParams, body = {}) {
   // ===========================================================================
@@ -69,6 +71,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   if (pathname === '/api/v1/me/profile' && (method === 'PUT' || method === 'PATCH')) {
     Object.assign(store.userProfile, body);
+    suggestionCache.invalidateUser(store.userProfile.id || 'default');
     return { status: 200, data: store.userProfile };
   }
 
@@ -198,7 +201,15 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   if (pathname === '/api/v1/suggestions/today' && method === 'GET') {
     store.analyticsEvents.suggestion_shown = (store.analyticsEvents.suggestion_shown || 0) + 1;
     const radiusM = searchParams.get('radius_m') || store.userProfile.radius_m;
-    return { status: 200, data: getTodaySuggestions(store, { radius_m: radiusM }) };
+    const historyLen = (store.suggestionHistory || []).length;
+    const cacheKey = `sugg:${store.userProfile.id || 'default'}:${radiusM}:${store.userProfile.meal_slot}:${(store.userProfile.hard_allergies || []).join(',')}:${historyLen}`;
+    const cached = suggestionCache.get(cacheKey);
+    if (cached) {
+      return { status: 200, data: { ...cached, from_cache: true } };
+    }
+    const fresh = getTodaySuggestions(store, { radius_m: radiusM });
+    suggestionCache.set(cacheKey, fresh, 60);
+    return { status: 200, data: fresh };
   }
 
   if (pathname === '/api/v1/suggestions/spin' && method === 'GET') {
@@ -332,6 +343,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       action: 'eaten',
       created_at: new Date().toISOString()
     });
+    suggestionCache.invalidateUser(store.userProfile.id || 'default');
     return { status: 200, data: { confirmed: true, order: ord, cooldown_days_applied: 3 } };
   }
 
@@ -766,9 +778,29 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
         service: 'taste_of_vietnam_backend',
         version: '0.2.0',
         modules_loaded: 20,
+        cache_stats: suggestionCache.getStats(),
+        queue_stats: pushQueue.getQueueStatus(),
         timestamp: new Date().toISOString()
       }
     };
+  }
+
+  // System Performance: Cache Metrics & Invalidation
+  if (pathname === '/api/v1/system/cache' && method === 'GET') {
+    return { status: 200, data: suggestionCache.getStats() };
+  }
+  if (pathname === '/api/v1/system/cache' && method === 'DELETE') {
+    suggestionCache.clear();
+    return { status: 200, data: { cleared: true, message: 'Bộ đệm đã được xóa sạch.' } };
+  }
+
+  // Batch Push Notification Queue (M8 Anti-fatigue)
+  if (pathname === '/api/v1/notifications/queue-status' && method === 'GET') {
+    return { status: 200, data: pushQueue.getQueueStatus() };
+  }
+  if (pathname === '/api/v1/notifications/batch-dispatch' && method === 'POST') {
+    const result = await pushQueue.processBatch();
+    return { status: 200, data: result };
   }
 
   return { status: 404, data: { error: `Unknown endpoint ${method} ${pathname}` } };
