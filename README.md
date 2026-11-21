@@ -1,24 +1,27 @@
-# 🍲 Hôm Nay Ăn Gì? · Taste of Vietnam v0.1
+# 🍲 Hôm Nay Ăn Gì? · Taste of Vietnam v0.2
 
 [![Render Status](https://img.shields.io/badge/Render-Deployed%20Live-22C55E?style=for-the-badge&logo=render)](https://taste-of-vietnam.onrender.com)
-[![QA Tests](https://img.shields.io/badge/QA%20Tests-24%2F24%20PASS-22C55E?style=for-the-badge&logo=node.js)](https://github.com/longcacrypto-afk/taste-of-vietnam)
-[![Flutter](https://img.shields.io/badge/Flutter-16%20Screens%20(7.3k%20LOC)-02569B?style=for-the-badge&logo=flutter)](mobile-flutter/)
+[![QA Tests](https://img.shields.io/badge/QA%20Tests-27%2F27%20PASS-22C55E?style=for-the-badge&logo=node.js)](https://github.com/longcacrypto-afk/taste-of-vietnam)
+[![Flutter](https://img.shields.io/badge/Flutter-19%20Screens%20(8.5k%20LOC)-02569B?style=for-the-badge&logo=flutter)](mobile-flutter/)
 [![PDPD](https://img.shields.io/badge/Tuân%20thủ-Nghị%20định%2013%2F2023%2FNĐ--CP-FBBF24?style=for-the-badge)](docs/PRODUCT_SPEC_v0.1.md)
 
 > **Hôm nay ăn gì · Taste of Vietnam** là nền tảng khám phá ẩm thực Việt Nam thông minh hỗ trợ bởi AI, cá nhân hóa dựa trên thời tiết địa phương, số lượng người, ngân sách, dị ứng thực phẩm và văn hóa ẩm thực 3 miền Bắc – Trung – Nam.
 
 ---
 
-## 🚀 Trạng Thái Phát Hành & Tính Năng Mới Nhất
+## 🚀 Trạng Thái Phát Hành & Tính Năng Mới Nhất (Giai Đoạn 4 / v0.2)
 
-- 🌐 **Toàn bộ 17/17 Module Hoàn Chỉnh (Live Panels):** Tất cả 17 module theo đặc tả `docs/PRODUCT_SPEC_v0.1.md` đều đã có bảng điều khiển trực tiếp trên web [taste-of-vietnam.onrender.com](https://taste-of-vietnam.onrender.com).
+- 🌐 **Toàn bộ 20/20 Module Hoàn Chỉnh (20 Live Panels):** Tất cả 20 module theo đặc tả `docs/PRODUCT_SPEC_v0.1.md` đều đã có bảng điều khiển trực tiếp trên web [taste-of-vietnam.onrender.com](https://taste-of-vietnam.onrender.com).
+- 🧊 **Tủ Lạnh Thông Minh AI & Quét Mã Vạch IoT (M18):** Quản lý 4 ngăn (mát, đông, cánh tủ, rau quả), cảnh báo nguyên liệu cận hạn (<48h), nhận diện mã vạch GS1 EAN-13 và gợi ý món ăn chuẩn vị *Zero Food Waste*.
+- 🏃 **Trợ Lý Dinh Dưỡng Cá Nhân & Wearables Sync (M19):** Đồng bộ bước chân & calo tiêu hao từ Apple Health / Google Fit, tính TDEE, cân bằng Macro (Đạm/Carb/Béo) và kích hoạt chế độ ăn Low-GI phòng ngừa bệnh mãn tính.
+- 🍳 **Bếp Sáng Tạo & Mạng Xã Hội Công Thức Nấu Ăn (M20):** Bảng tin công thức nấu món Việt, gắn thẻ Zero-Waste, form đăng công thức và tính năng 1-click Tip tiền VietQR Napas 24/7 trực tiếp cho tác giả.
 - 👤 **Hồ sơ Vị Giác & Tuân Thủ PDPD (M1):** Lọc theo 3 miền, chỉnh mức cay (0–3), chế độ ăn (Cân bằng, Ăn chay, Thuần chay, Low-Carb, Eat Clean), bộ lọc cứng dị ứng 100%, xuất dữ liệu JSON cá nhân & xóa tài khoản tức thì theo Nghị định 13/2023/NĐ-CP.
 - 🎲 **3-in-1 Decision Mini-Games Hub (M3):** Vòng quay 3D chuẩn xác tâm ô (+22.5° offset), Rút quẻ thẻ tre cổ truyền dân gian & Xé túi mù (Blind Box) trúng mã voucher `TUIMU-MAM-25K`.
 - 🔔 **Nhắc Nhở Bữa Ăn & Thông Báo Thời Tiết (M8):** Nhắc trưa (10:30) & tối (17:00), giới hạn nghiêm ngặt $\le 2$ push/ngày, tự động tích hợp thời tiết, kèm Simulator bắn thử Web Push & Toast nổi.
 - ⚙️ **Cổng Quản Trị CMS & Kiểm Duyệt Tự Động (M9):** Duyệt ghép món OCR, từ chối OCR kèm lý do cụ thể, tự động tạm dừng khi $\ge 3$ báo cáo lỗi và nút *Mở lại quán* tự phục hồi.
 - 📊 **Phễu Chuyển Đổi & NLU Benchmark (M10):** Phễu 4 bước PostHog (WAMD 18.420 quyết định/tuần) và bộ benchmark NLU 200 câu tiếng Việt đạt 100% SLA (yêu cầu $\ge 90\%$).
-- 🛡️ **Khắc phục triệt để vỡ UI & Offline-First:** Tự lưu trữ Tailwind CSS v3 tại chỗ (`/assets/tailwindcss.min.js`), Service Worker `hnag-v6` không chặn cross-origin, và Critical CSS Reset.
-- 🧪 **23/23 Automated QA Tests PASS:** Đảm bảo toàn vẹn từ hợp đồng dữ liệu, logic nghiệp vụ đến an toàn dị ứng tuyệt đối.
+- 🛡️ **Khắc phục triệt để vỡ UI & Offline-First:** Tự lưu trữ Tailwind CSS v3 tại chỗ (`/assets/tailwindcss.min.js`), Service Worker `hnag-v7` hỗ trợ Pre-caching toàn diện, và Critical CSS Reset.
+- 🧪 **27/27 Automated QA & E2E Tests PASS:** Đảm bảo toàn vẹn từ hợp đồng dữ liệu, logic nghiệp vụ, an toàn dị ứng tuyệt đối đến vòng lặp người dùng khép kín.
 
 ---
 
@@ -32,7 +35,7 @@
 
 ---
 
-## 📱 Hệ Thống 16 Màn Hình Flutter Mobile (6.797 LOC)
+## 📱 Hệ Thống 19 Màn Hình Flutter Mobile (8.5k+ LOC)
 
 Ứng dụng di động Flutter được thiết kế theo chuẩn **AI Chef Benchmark Style** (`#18181B` Charcoal Hero, `#FBBF24` Golden Amber, `#22C55E` Emerald Badge):
 
@@ -45,9 +48,19 @@
 | **M3** | [`mam_ai_chef_screen.dart`](mobile-flutter/lib/screens/mam_ai_chef_screen.dart) | Người dùng | Chatbot AI Chef Măm, bóc tách ngôn ngữ tự nhiên: người, ngân sách, trẻ nhỏ, cay |
 | **M4, M5** | [`map_places_screen.dart`](mobile-flutter/lib/screens/map_places_screen.dart) | Người dùng | Bản đồ quán 3km PostGIS, Deep-link GrabFood/ShopeeFood, Tự động ẩn quán khi có 3 báo cáo |
 | **M6** | [`merchant_portal_screen.dart`](mobile-flutter/lib/screens/merchant_portal_screen.dart) | Chủ quán | Dashboard WebSocket realtime 5s, AI Menu OCR (chuẩn hóa giá 45k ➔ 45.000đ), Quản lý nạp VietQR |
+| **M8** | [`notifications_screen.dart`](mobile-flutter/lib/screens/notifications_screen.dart) | Người dùng | Nhắc nhở bữa trưa/tối, tích hợp thời tiết, giới hạn $\le 2$ push/ngày & simulator |
 | **M9** | [`admin_cms_screen.dart`](mobile-flutter/lib/screens/admin_cms_screen.dart) | Admin | Hàng đợi OCR (<95%), Phê duyệt quán Auto-pause, Immutable Audit Log (6 Roles) |
 | **M11** | [`meal_plan_screen.dart`](mobile-flutter/lib/screens/meal_plan_screen.dart) | Người dùng | Thực đơn 7 ngày cân bằng kcal, Giỏ đi chợ tự động khấu trừ đồ có sẵn trong tủ lạnh |
 | **M12** | [`group_poll_screen.dart`](mobile-flutter/lib/screens/group_poll_screen.dart) | Nhóm | Bình chọn món trưa nhóm realtime, Giao thoa dị ứng, Đánh giá sau bữa ăn xác minh GPS ≤ 500m |
+| **M13** | [`booking_screen.dart`](mobile-flutter/lib/screens/booking_screen.dart) | Người dùng | Đặt bàn xác nhận tức thì, Bộ đếm khách, Trình tạo mã QR Voucher `CustomPainter` tại quầy |
+| **M14** | [`cultural_story_screen.dart`](mobile-flutter/lib/screens/cultural_story_screen.dart) | Người dùng | Podcast kể chuyện ẩm thực di sản, Bản đồ so sánh biến thể 3 Miền (Bắc – Trung – Nam) |
+| **M15** | [`food_trail_screen.dart`](mobile-flutter/lib/screens/food_trail_screen.dart) | Khám phá | Hành trình 4 trạm trong ngày (Sáng, Trưa, Xế, Tối), Hộ chiếu ẩm thực thu thập 4 dấu tem QR |
+| **M16** | [`menu_translator_screen.dart`](mobile-flutter/lib/screens/menu_translator_screen.dart) | Du khách | AI dịch menu sang EN / KO / JA, giữ nguyên tên tiếng Việt, thẻ phát âm audio cho người bán nghe |
+| **M17** | [`b2g_insights_screen.dart`](mobile-flutter/lib/screens/b2g_insights_screen.dart) | B2G & Brand | Báo cáo du lịch chuẩn K-Anonymity ($k \ge 50$), Hiệu suất tài trợ FMCG (Chinsu, Maggi, Knorr) |
+| **M18** | [`fridge_scanner_screen.dart`](mobile-flutter/lib/screens/fridge_scanner_screen.dart) | Người dùng | Quản lý kho tủ lạnh 4 ngăn, quét mã EAN-13, cảnh báo đồ cận hạn & gợi ý món ăn Zero-Waste |
+| **M19** | [`health_dietitian_screen.dart`](mobile-flutter/lib/screens/health_dietitian_screen.dart) | Người dùng | Bác sĩ dinh dưỡng AI, đồng bộ Apple Health, tính TDEE, cân bằng Macro Protein/Carb/Fat, chế độ Low-GI |
+| **M20** | [`community_recipes_screen.dart`](mobile-flutter/lib/screens/community_recipes_screen.dart) | Cộng đồng | Mạng xã hội công thức món Việt, gắn thẻ Zero-Waste, đăng công thức mới & 1-click Tip VietQR Napas 24/7 |
+| **M8, M10** | [`profile_expansion_screen.dart`](mobile-flutter/lib/screens/profile_expansion_screen.dart) | Cá nhân | Cài đặt nhắc nhở thông minh ($\le 2$ push/ngày), Nhắc ăn chay ngày Rằm/Mùng 1 |
 | **M13** | [`booking_screen.dart`](mobile-flutter/lib/screens/booking_screen.dart) | Người dùng | Đặt bàn xác nhận tức thì, Bộ đếm khách, Trình tạo mã QR Voucher `CustomPainter` tại quầy |
 | **M14** | [`cultural_story_screen.dart`](mobile-flutter/lib/screens/cultural_story_screen.dart) | Người dùng | Podcast kể chuyện ẩm thực di sản, Bản đồ so sánh biến thể 3 Miền (Bắc – Trung – Nam) |
 | **M15** | [`food_trail_screen.dart`](mobile-flutter/lib/screens/food_trail_screen.dart) | Khám phá | Hành trình 4 trạm trong ngày (Sáng, Trưa, Xế, Tối), Hộ chiếu ẩm thực thu thập 4 dấu tem QR |
@@ -60,8 +73,8 @@
 ## 🏗️ Kiến Trúc Kỹ Thuật (Architecture)
 
 ```
-[ Mobile Flutter App (15 Screens) ] ──┐
-[ Web / PWA Studio (93 Screens)   ] ──┼──> [ Cloudflare CDN / HTTPS ]
+[ Mobile Flutter App (19 Screens) ] ──┐
+[ Web / PWA Studio (99 Screens)   ] ──┼──> [ Cloudflare CDN / HTTPS ]
                                       │              │
                                       │              ▼
                                       └──> [ Node.js 20 Server (Render Singapore) ]
@@ -69,7 +82,7 @@
                ┌─────────────────────────────────────┼─────────────────────────────────────┐
                ▼                                     ▼                                     ▼
       [ REST API Gateway ]                 [ WebSocket RFC 6455 ]                 [ Gemini 2.0 Flash ]
-   (M1..M17, 50+ Endpoints)             (Live Merchant Stream 5s)             (NLU Chat & Storyteller)
+   (M1..M20, 60+ Endpoints)             (Live Merchant Stream 5s)             (NLU Chat & Storyteller)
                │                                     │                                     │
                ▼                                     ▼                                     ▼
     [ Vietnamese NLU Engine ]              [ AI Menu OCR Parser ]              [ PostGIS Places & GPS ]
@@ -104,7 +117,7 @@ cd taste-of-vietnam
 # Cài đặt thư viện (Zero dependencies cho production!)
 npm install
 
-# Chạy test kiểm thử tự động (16/16 test case)
+# Chạy test kiểm thử tự động (27/27 test suites)
 npm test
 
 # Khởi chạy server local

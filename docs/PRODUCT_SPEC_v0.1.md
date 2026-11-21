@@ -1,6 +1,6 @@
-# Hôm nay ăn gì · Taste of Vietnam (v0.1)
-> **Tài liệu Thiết kế Sản phẩm, Kiến trúc UI/UX & Functional Specification**  
-> Nguồn: Bản thiết kế tổng thể từ `Spec-Hom-nay-an-gi-v0.1.docx` (ChatGPT Share)
+# Hôm nay ăn gì · Taste of Vietnam (v0.1 & v0.2 Giai Đoạn 4)
+> **Tài liệu Thiết kế Sản phẩm, Kiến trúc UI/UX & Functional Specification (20/20 Modules)**  
+> Nguồn: Bản thiết kế tổng thể từ `Spec-Hom-nay-an-gi-v0.1.docx` (ChatGPT Share) & Mở rộng Giai đoạn 4
 
 ---
 
