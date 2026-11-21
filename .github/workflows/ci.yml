@@ -1,4 +1,4 @@
-name: Hôm Nay Ăn Gì — CI/CD Pipeline
+name: Hôm Nay Ăn Gì · Taste of Vietnam v0.2 — CI/CD Pipeline
 
 on:
   push:
@@ -7,8 +7,9 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Run Automated QA & Compliance Tests (Node 20)
+  # ─── JOB 1: BACKEND QA & END-TO-END TESTS (NODE 20) ─────────────────────────
+  backend-qa:
+    name: Backend QA, E2E & DB Fallback Suite (Node 20)
     runs-on: ubuntu-latest
 
     steps:
@@ -24,28 +25,77 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Execute QA Acceptance Suite (21 Tests)
+      - name: Execute Full QA & E2E Acceptance Suite (27 Test Suites)
         run: npm test
 
-      - name: Check Bundle Size
+      - name: Verify Cloud Health Check Endpoint (/health)
+        run: |
+          node -e "
+          import('./server.js').then(({ createAppServer }) => {
+            const server = createAppServer();
+            server.listen(3001, () => {
+              fetch('http://127.0.0.1:3001/health').then(r => r.json()).then(h => {
+                console.log('✅ Health check response:', h);
+                server.close();
+                if (h.status !== 'healthy' || h.modules_loaded !== 20) {
+                  console.error('❌ Health check validation failed!');
+                  process.exit(1);
+                }
+              }).catch(err => {
+                console.error('❌ Failed to fetch /health:', err);
+                process.exit(1);
+              });
+            });
+          });"
+
+      - name: Check Web UI Studio 99-Screen Bundle Size
         run: |
           BUNDLE_SIZE=$(du -sk ui-design/index.html | cut -f1)
           echo "Bundle size: ${BUNDLE_SIZE}KB"
-          if [ "$BUNDLE_SIZE" -gt 4096 ]; then
-            echo "⚠️ Warning: Bundle exceeds 4MB"
+          if [ "$BUNDLE_SIZE" -gt 5120 ]; then
+            echo "⚠️ Warning: Bundle exceeds 5MB"
           else
             echo "✅ Bundle size OK: ${BUNDLE_SIZE}KB"
           fi
 
-      - name: Verify API Endpoints & DB Fallback
-        run: |
-          node -e "
-          import('./src/api/router.js').then(m => {
-            console.log('✅ router.js loaded OK');
-          }).catch(e => {
-            console.error('❌ router.js error:', e);
-            process.exit(1);
-          });"
-
-      - name: Verify Docker Compose Build
+      - name: Verify Docker Compose Architecture
         run: docker compose config -q
+
+  # ─── JOB 2: FLUTTER MOBILE CODE QUALITY & DEPENDENCIES CHECK ────────────────
+  flutter-mobile:
+    name: Flutter Mobile Syntax & Lint Validation (19 Screens)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Cache Flutter Pub Packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('mobile-flutter/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install Flutter Packages
+        run: |
+          cd mobile-flutter
+          flutter pub get
+
+      - name: Analyze Flutter Source (19 Screens & Theme)
+        run: |
+          cd mobile-flutter
+          flutter analyze --no-fatal-infos

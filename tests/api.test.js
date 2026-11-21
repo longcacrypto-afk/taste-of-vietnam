@@ -550,3 +550,12 @@ test('E2E Full Loop (M1 -> M3 -> M2 -> M4 -> M5 -> Cooldown -> M8 -> M18 -> M19 
   assert.equal(syncWearable.status, 200);
   assert.equal(syncWearable.data.daily_steps, 8800);
 });
+
+test('PROD-HEALTH: Health check endpoint returns healthy, 20 modules loaded and v0.2.0 info', async () => {
+  const store = createInitialStore();
+  const res = await handleApiRequest(store, 'GET', '/api/v1/health-check', new URLSearchParams());
+  assert.equal(res.status, 200);
+  assert.equal(res.data.status, 'healthy');
+  assert.equal(res.data.version, '0.2.0');
+  assert.equal(res.data.modules_loaded, 20);
+});

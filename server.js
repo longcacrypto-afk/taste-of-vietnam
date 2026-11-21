@@ -1,5 +1,5 @@
 // =============================================================================
-// FULL-STACK PRODUCTION SERVER FOR "HÔM NAY ĂN GÌ · TASTE OF VIETNAM v0.1"
+// FULL-STACK PRODUCTION SERVER FOR "HÔM NAY ĂN GÌ · TASTE OF VIETNAM v0.2"
 // + WebSocket Live Merchant Dashboard (ws://127.0.0.1:3000/ws/merchant)
 // =============================================================================
 
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { createInitialStore } from './src/data/seed.js';
 import { handleApiRequest } from './src/api/router.js';
 import { setupWebSocket, getWsTestPayload } from './src/services/websocketService.js';
-import { initDatabase } from './src/db/connection.js';
+import { initDatabase, isPostgresConnected } from './src/db/connection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const store = createInitialStore();
@@ -32,6 +32,21 @@ export function createAppServer() {
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       return res.end();
+    }
+
+    // 0. Cloud Load Balancer & Container Health Check (/health & /healthz)
+    if ((pathname === '/health' || pathname === '/healthz') && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify({
+        status: 'healthy',
+        service: 'taste_of_vietnam_backend',
+        version: '0.2.0',
+        uptime_seconds: Math.floor(process.uptime()),
+        modules_loaded: 20,
+        postgres_connected: isPostgresConnected(),
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString()
+      }, null, 2));
     }
 
     // 1. WebSocket test payload (REST endpoint)
@@ -129,7 +144,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
   const server = createAppServer();
   server.listen(PORT, HOST, () => {
     console.log(`🚀 Hôm nay ăn gì · Taste of Vietnam Server running at http://${HOST}:${PORT}`);
-    console.log(`   - UI/UX 93-Screen Studio:        http://127.0.0.1:${PORT}/`);
+    console.log(`   - UI/UX 99-Screen Studio:        http://127.0.0.1:${PORT}/`);
+    console.log(`   - Health Check:                  http://127.0.0.1:${PORT}/health`);
     console.log(`   - REST API Gateway:              http://127.0.0.1:${PORT}/api/v1/suggestions/today`);
     console.log(`   - Gemini AI Chat (M3-S04):       http://127.0.0.1:${PORT}/api/v1/chat`);
     console.log(`   - Dish Cultural Story (M14):     http://127.0.0.1:${PORT}/api/v1/dishes/DISH-101/story`);

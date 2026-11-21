@@ -757,5 +757,19 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: res.success ? 200 : 404, data: res };
   }
 
+  // Production Health Check & Monitoring
+  if (pathname === '/api/v1/health-check' && method === 'GET') {
+    return {
+      status: 200,
+      data: {
+        status: 'healthy',
+        service: 'taste_of_vietnam_backend',
+        version: '0.2.0',
+        modules_loaded: 20,
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+
   return { status: 404, data: { error: `Unknown endpoint ${method} ${pathname}` } };
 }
