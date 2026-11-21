@@ -1025,20 +1025,6 @@ class _WheelPointerPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.goldenAmber,
-                foregroundColor: Colors.black,
-                minimumSize: const Size.fromHeight(54),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ─── CUSTOM PAINTER: LUXURY 8-SEGMENT WHEEL ──────────────────────────────────
 class _LuxuryWheelPainter extends CustomPainter {

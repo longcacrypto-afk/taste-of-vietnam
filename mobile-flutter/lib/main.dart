@@ -317,19 +317,6 @@ class _MainShellScreenState extends State<MainShellScreen> {
       ),
     );
   }
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text('API: https://taste-of-vietnam.onrender.com/api/v1\nWS: wss://taste-of-vietnam.onrender.com/ws/merchant',
-                    style: TextStyle(fontSize: 9, color: AppTheme.slateMuted), textAlign: TextAlign.center),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ─── Bottom Nav Button ────────────────────────────────────────────────────────
