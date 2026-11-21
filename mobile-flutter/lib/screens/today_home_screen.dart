@@ -460,103 +460,107 @@ class _TodayHomeScreenState extends State<TodayHomeScreen> {
         ],
       );
 
-  Widget _buildDishCard(Map<String, dynamic> dish) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceElevated,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF2A2A2E)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppTheme.charcoalHero,
-                borderRadius: BorderRadius.circular(14),
+  Widget _buildDishCard(Map<String, dynamic> dish) => InkWell(
+        onTap: widget.onOpenRecipe,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceElevated,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF2A2A2E)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppTheme.charcoalHero,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(child: Text(dish['emoji'], style: const TextStyle(fontSize: 30))),
               ),
-              child: Center(child: Text(dish['emoji'], style: const TextStyle(fontSize: 30))),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          dish['name'],
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                        ),
-                      ),
-                      if (dish['isSponsored'] == true)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppTheme.goldenAmber.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(4),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            dish['name'],
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
                           ),
-                          child: const Text('Tài trợ', style: TextStyle(color: AppTheme.goldenAmber, fontSize: 9, fontWeight: FontWeight.bold)),
                         ),
-                      const SizedBox(width: 6),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.favorite_border_rounded, size: 16, color: Colors.white54),
-                        onPressed: () => _handleFeedback(dish['id'] ?? 'DISH-101', dish['name'], 'liked'),
-                        tooltip: 'Yêu thích',
-                      ),
-                      const SizedBox(width: 6),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.close_rounded, size: 16, color: Colors.white38),
-                        onPressed: () => _handleFeedback(dish['id'] ?? 'DISH-101', dish['name'], 'skipped'),
-                        tooltip: 'Đổi món khác',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(dish['desc'], style: const TextStyle(fontSize: 11, color: Colors.white60)),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text('⏱ ${dish['time']}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                      const SizedBox(width: 10),
-                      Text('👨‍🍳 ${dish['difficulty']}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                      const Spacer(),
-                      Text(
-                        '${_fmt(dish['price'])}đ',
-                        style: const TextStyle(color: AppTheme.goldenAmber, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.emeraldBadge,
-                          side: const BorderSide(color: AppTheme.emeraldBadge),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        if (dish['isSponsored'] == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.goldenAmber.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('Tài trợ', style: TextStyle(color: AppTheme.goldenAmber, fontSize: 9, fontWeight: FontWeight.bold)),
+                          ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.favorite_border_rounded, size: 16, color: Colors.white54),
+                          onPressed: () => _handleFeedback(dish['id'] ?? 'DISH-101', dish['name'], 'liked'),
+                          tooltip: 'Yêu thích',
                         ),
-                        onPressed: () => _handleFeedback(dish['id'] ?? 'DISH-101', dish['name'], 'eaten'),
-                        icon: const Icon(Icons.check_rounded, size: 13),
-                        label: const Text('Đã ăn (Cooldown 3 ngày)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 6),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.close_rounded, size: 16, color: Colors.white38),
+                          onPressed: () => _handleFeedback(dish['id'] ?? 'DISH-101', dish['name'], 'skipped'),
+                          tooltip: 'Đổi món khác',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(dish['desc'], style: const TextStyle(fontSize: 11, color: Colors.white60)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text('⏱ ${dish['time']}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                        const SizedBox(width: 10),
+                        Text('👨‍🍳 ${dish['difficulty']}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                        const Spacer(),
+                        Text(
+                          '${_fmt(dish['price'])}đ',
+                          style: const TextStyle(color: AppTheme.goldenAmber, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.emeraldBadge,
+                            side: const BorderSide(color: AppTheme.emeraldBadge),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => _handleFeedback(dish['id'] ?? 'DISH-101', dish['name'], 'eaten'),
+                          icon: const Icon(Icons.check_rounded, size: 13),
+                          label: const Text('Đã ăn (Cooldown 3 ngày)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
 

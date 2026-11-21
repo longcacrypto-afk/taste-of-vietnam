@@ -91,7 +91,12 @@ class _MainShellScreenState extends State<MainShellScreen> {
     ];
 
     return Scaffold(
-      body: SafeArea(child: screens[_selectedIndex]),
+      body: SafeArea(
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: screens,
+        ),
+      ),
 
       // ── Golden floating center + (Benchmark Screen 1) ──────────────────────
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
