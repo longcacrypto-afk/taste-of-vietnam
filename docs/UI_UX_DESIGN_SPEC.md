@@ -128,3 +128,18 @@ Sử dụng bộ font **Be Vietnam Pro** (Google Fonts) được thiết kế ch
   - Cột trái: Ảnh thực đơn gốc có đóng khung vùng nhận diện (Bounding boxes).
   - Cột phải: Bảng dữ liệu đã bóc tách tự động (`Tên món trên menu` → `Giá bán` → `Gợi ý ghép với Thư viện món chuẩn M2` + Độ tự tin AI `98%`).
   - Chủ quán chỉ cần bấm `Xác nhận & Đăng thực đơn`.
+
+### 4.5. Màn hình Tủ Lạnh Thông Minh & Quét Mã Vạch IoT (`M18-S01` & `M18-S02`)
+- **Phân loại 4 ngăn trực quan:** Ngăn mát (`chill`), Ngăn đông (`freeze`), Cánh tủ (`door`), Ngăn rau quả (`vegetable`).
+- **Thanh cảnh báo cận hạn (< 48h):** Nổi bật màu đỏ cam với gợi ý món ăn chuẩn vị từ nguyên liệu thừa (VD: Đậu hũ non + Cà chua + Trứng gà ➔ Canh đậu hũ cà chua trứng).
+- **Bộ quét mã vạch AI Camera:** Giao diện quét mã EAN-13 GS1 Việt Nam (893...) kèm tự động nhận diện hạn dùng bằng OCR.
+
+### 4.6. Màn hình Bác Sĩ Dinh Dưỡng & Đồng Bộ Apple Health (`M19-S01` & `M19-S02`)
+- **Bảng điều khiển thể trạng thời gian thực:** Đồng bộ số bước chân (8,420+ steps), calo tiêu hao, tự động tính TDEE và hiển thị thanh tiến trình calo nạp/ngày.
+- **Thẻ phân bổ Macro chuẩn y khoa:** 3 thẻ màu riêng biệt: Đạm 30% (Xanh dương), Tinh bột 50% (Vàng hổ phách), Chất béo 20% (Hồng).
+- **Cờ Low-GI an toàn:** Tự động đề xuất biến thể món ít đường và tinh bột chậm (gạo lứt, bún gạo lứt, tăng rau xanh).
+
+### 4.7. Màn hình Bếp Sáng Tạo & Tặng Thưởng VietQR (`M20-S01` & `M20-S02`)
+- **Bảng tin công thức nấu ăn cộng đồng:** Thẻ công thức có thời gian nấu, độ khó, lượng calo, nhãn Zero-Waste và số tiền tip đã nhận.
+- **Modal Tặng Thưởng 1-Click VietQR:** Chọn mức ủng hộ (10k, 20k, 50k, 100k), hiển thị mã VietQR Napas 24/7 trực tiếp cho tác giả công thức, cam kết 100% về tài khoản đầu bếp.
+

@@ -16,6 +16,13 @@ import {
   fetchDishCulturalStory,
   fetchFoodTrail,
   fetchB2gTourismReport,
+  saveFridgeItem,
+  fetchFridgeInventoryDb,
+  saveHealthMetrics,
+  fetchLatestHealthMetrics,
+  saveCommunityRecipe,
+  fetchCommunityRecipesDb,
+  recordRecipeTip,
 } from '../src/db/repository.js';
 
 test('DB-01: Graceful fallback when DATABASE_URL is not set', () => {
@@ -53,6 +60,27 @@ test('DB-02: Repository methods safely fallback when PostgreSQL is offline', asy
 
   const b2gResult = await fetchB2gTourismReport();
   assert.equal(b2gResult, null, 'fetchB2gTourismReport should return null in fallback mode');
+
+  const fridgeResult = await saveFridgeItem({ name: 'Trứng gà' });
+  assert.equal(fridgeResult, null, 'saveFridgeItem should return null in fallback mode');
+
+  const fridgeInv = await fetchFridgeInventoryDb();
+  assert.equal(fridgeInv, null, 'fetchFridgeInventoryDb should return null in fallback mode');
+
+  const healthResult = await saveHealthMetrics({});
+  assert.equal(healthResult, null, 'saveHealthMetrics should return null in fallback mode');
+
+  const healthMetrics = await fetchLatestHealthMetrics();
+  assert.equal(healthMetrics, null, 'fetchLatestHealthMetrics should return null in fallback mode');
+
+  const recipeResult = await saveCommunityRecipe({ title: 'Món Chay' });
+  assert.equal(recipeResult, null, 'saveCommunityRecipe should return null in fallback mode');
+
+  const recipes = await fetchCommunityRecipesDb();
+  assert.equal(recipes, null, 'fetchCommunityRecipesDb should return null in fallback mode');
+
+  const tipResult = await recordRecipeTip('CREC-01', 20000);
+  assert.equal(tipResult, null, 'recordRecipeTip should return null in fallback mode');
 });
 
 test('DB-03: Close database handles null pool gracefully', async () => {

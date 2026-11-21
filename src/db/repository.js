@@ -196,3 +196,141 @@ export async function fetchB2gTourismReport(period = '30d') {
   );
   return res && res.rows.length > 0 ? res.rows[0] : null;
 }
+
+/**
+ * M18: Lưu hoặc cập nhật nguyên liệu trong tủ lạnh thông minh
+ */
+export async function saveFridgeItem(itemData) {
+  if (!isPostgresConnected()) return null;
+  const sql = `
+    INSERT INTO fridge_items (id, user_id, barcode, name, quantity, compartment, expires_at, is_expiring_soon)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ON CONFLICT (id) DO UPDATE SET
+      quantity = EXCLUDED.quantity,
+      compartment = EXCLUDED.compartment,
+      expires_at = EXCLUDED.expires_at,
+      is_expiring_soon = EXCLUDED.is_expiring_soon
+    RETURNING *;
+  `;
+  const res = await query(sql, [
+    itemData.id || `FRIDGE-${Date.now()}`,
+    itemData.user_id || null,
+    itemData.barcode || null,
+    itemData.name,
+    itemData.quantity || '1',
+    itemData.compartment || 'chill',
+    itemData.expires_at || new Date(Date.now() + 86400000 * 3).toISOString(),
+    itemData.is_expiring_soon || false
+  ]);
+  return res ? res.rows[0] : null;
+}
+
+export async function fetchFridgeInventoryDb(userId = null) {
+  if (!isPostgresConnected()) return null;
+  const sql = `
+    SELECT * FROM fridge_items
+    WHERE ($1::uuid IS NULL OR user_id = $1)
+    ORDER BY expires_at ASC;
+  `;
+  const res = await query(sql, [userId]);
+  return res ? res.rows : null;
+}
+
+/**
+ * M19: Ghi nhận chỉ số thể trạng đồng bộ từ thiết bị đeo sức khỏe
+ */
+export async function saveHealthMetrics(healthData) {
+  if (!isPostgresConnected()) return null;
+  const sql = `
+    INSERT INTO health_metrics (
+      user_id, wearable_source, daily_steps, active_calories_burned,
+      calculated_tdee, target_calories_daily, target_protein_g, target_carbs_g, target_fat_g
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *;
+  `;
+  const res = await query(sql, [
+    healthData.user_id || null,
+    healthData.wearable_source || 'Apple Health',
+    healthData.daily_steps || 0,
+    healthData.active_calories_burned || 0,
+    healthData.calculated_tdee || 2000,
+    healthData.target_calories_daily || 2000,
+    healthData.target_protein_g || 120,
+    healthData.target_carbs_g || 220,
+    healthData.target_fat_g || 50
+  ]);
+  return res ? res.rows[0] : null;
+}
+
+export async function fetchLatestHealthMetrics(userId = null) {
+  if (!isPostgresConnected()) return null;
+  const sql = `
+    SELECT * FROM health_metrics
+    WHERE ($1::uuid IS NULL OR user_id = $1)
+    ORDER BY synced_at DESC LIMIT 1;
+  `;
+  const res = await query(sql, [userId]);
+  return res && res.rows.length > 0 ? res.rows[0] : null;
+}
+
+/**
+ * M20: Tạo mới, truy vấn công thức cộng đồng và ghi nhận tiền tip VietQR
+ */
+export async function saveCommunityRecipe(recipeData) {
+  if (!isPostgresConnected()) return null;
+  const sql = `
+    INSERT INTO community_recipes (
+      id, author_id, author_name, title, prep_time_minutes, difficulty,
+      calories, ingredients, steps, zero_waste_tag, likes_count, total_tips_vnd
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    ON CONFLICT (id) DO UPDATE SET
+      title = EXCLUDED.title,
+      prep_time_minutes = EXCLUDED.prep_time_minutes,
+      difficulty = EXCLUDED.difficulty,
+      calories = EXCLUDED.calories,
+      ingredients = EXCLUDED.ingredients,
+      zero_waste_tag = EXCLUDED.zero_waste_tag
+    RETURNING *;
+  `;
+  const res = await query(sql, [
+    recipeData.id || `CREC-${Date.now()}`,
+    recipeData.author_id || null,
+    recipeData.author_name || 'Chef Sáng Tạo',
+    recipeData.title,
+    recipeData.prep_time_minutes || 20,
+    recipeData.difficulty || 'Dễ',
+    recipeData.calories || 400,
+    JSON.stringify(recipeData.ingredients || []),
+    JSON.stringify(recipeData.steps || []),
+    recipeData.zero_waste_tag || null,
+    recipeData.likes_count || 0,
+    recipeData.total_tips_vnd || 0
+  ]);
+  return res ? res.rows[0] : null;
+}
+
+export async function fetchCommunityRecipesDb({ tag = null, limit = 20 } = {}) {
+  if (!isPostgresConnected()) return null;
+  const sql = `
+    SELECT * FROM community_recipes
+    WHERE ($1::text IS NULL OR zero_waste_tag ILIKE ('%' || $1 || '%'))
+    ORDER BY created_at DESC LIMIT $2;
+  `;
+  const res = await query(sql, [tag, limit]);
+  return res ? res.rows : null;
+}
+
+export async function recordRecipeTip(recipeId, amountVnd) {
+  if (!isPostgresConnected()) return null;
+  const sql = `
+    UPDATE community_recipes
+    SET total_tips_vnd = total_tips_vnd + $1
+    WHERE id = $2
+    RETURNING id, title, author_name, total_tips_vnd;
+  `;
+  const res = await query(sql, [amountVnd, recipeId]);
+  return res && res.rows.length > 0 ? res.rows[0] : null;
+}
+
