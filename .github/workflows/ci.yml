@@ -106,7 +106,9 @@ jobs:
       - name: Build Flutter Web Release Bundle
         run: |
           cd mobile-flutter
-          flutter build web --release --no-pub
+          flutter config --enable-web
+          flutter create --platforms=web,android .
+          flutter build web --release
 
       - name: Upload Web PWA Artifact
         uses: actions/upload-artifact@v4
