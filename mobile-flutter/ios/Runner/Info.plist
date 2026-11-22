@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Hôm Nay Ăn Gì</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.tasteofvietnam.app</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>hom_nay_an_gi_mobile</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.2.0</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+
+	<!-- Apple Privacy Permissions (Tuân thủ Apple App Store & PDPD) -->
+	<key>NSCameraUsageDescription</key>
+	<string>Hôm Nay Ăn Gì cần quyền Camera để quét mã vạch thực phẩm tủ lạnh và chụp ảnh thực đơn bóc tách AI OCR.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ứng dụng cần quyền định vị GPS để tìm quán ăn ngon trong bán kính 3km và xác thực đánh giá tại quán.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Đồng bộ dữ liệu bước chân và năng lượng tiêu hao từ Apple Health để tính toán TDEE và đề xuất bữa ăn phù hợp.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Ghi nhận thông tin năng lượng và khẩu phần ăn dinh dưỡng vào Apple Health.</string>
+</dict>
+</plist>
