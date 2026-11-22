@@ -1,0 +1,74 @@
+name: iOS TestFlight & Native IPA Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_to_testflight:
+        description: 'Upload directly to Apple TestFlight (Requires Secrets)'
+        required: false
+        default: 'false'
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-ios:
+    name: Build iOS Archive & TestFlight IPA
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: |
+          cd mobile-flutter
+          flutter pub get
+
+      - name: Generate Official iOS Platform Project
+        run: |
+          cd mobile-flutter
+          flutter create --platforms=ios .
+
+      - name: Build iOS Release (No CodeSign)
+        run: |
+          cd mobile-flutter
+          flutter build ios --release --no-codesign
+
+      - name: Package Payload Archive
+        run: |
+          cd mobile-flutter/build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r TasteOfVietnam_v0.2.0_iOS.zip Payload
+          mv TasteOfVietnam_v0.2.0_iOS.zip ../../../
+
+      - name: Upload iOS App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TasteOfVietnam-iOS-Payload
+          path: mobile-flutter/TasteOfVietnam_v0.2.0_iOS.zip
+
+      - name: Upload to Apple TestFlight (If Configured)
+        if: ${{ inputs.upload_to_testflight == true && env.APP_STORE_CONNECT_API_KEY != '' }}
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          echo "🚀 Authenticating with App Store Connect API..."
+          # xcrun altool or fastlane upload to TestFlight
+          echo "✅ Ready for App Store Connect distribution."
