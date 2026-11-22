@@ -20,7 +20,7 @@ import {
   getCommunityRecipes,
   tipCommunityRecipe
 } from '../services/expansionServices.js';
-import { callGeminiChat, generateDishStory } from '../services/geminiService.js';
+import { callGeminiChat, generateDishStory, analyzeFoodImageWithGemini } from '../services/geminiService.js';
 import { generateVietQrInvoice, verifyPaymentWebhookSignature, processSuccessfulPayment } from '../services/paymentService.js';
 import { searchDishesSemantically } from '../services/semanticSearch.js';
 import { suggestionCache } from '../services/cacheService.js';
@@ -800,6 +800,13 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   }
   if (pathname === '/api/v1/notifications/batch-dispatch' && method === 'POST') {
     const result = await pushQueue.processBatch();
+    return { status: 200, data: result };
+  }
+
+  // Gemini 2.0 Multimodal Vision (M18 Fridge Scanner & M6 Menu OCR)
+  if (pathname === '/api/v1/vision/analyze' && method === 'POST') {
+    const context = body.context || 'fridge';
+    const result = await analyzeFoodImageWithGemini(body.image_base64 || '', body.mime_type || 'image/jpeg', context);
     return { status: 200, data: result };
   }
 

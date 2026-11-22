@@ -102,3 +102,14 @@ jobs:
           echo "### 📱 Flutter Mobile Analysis Summary (v0.2)" >> $GITHUB_STEP_SUMMARY
           echo "✅ Flutter validation completed across all 19 screens & 20 modules." >> $GITHUB_STEP_SUMMARY
           echo "✅ Flutter validation SUCCESS: zero fatal errors across all 19 screens!"
+
+      - name: Build Flutter Web Release Bundle
+        run: |
+          cd mobile-flutter
+          flutter build web --release --no-pub
+
+      - name: Upload Web PWA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-web-bundle
+          path: mobile-flutter/build/web
