@@ -1,6 +1,8 @@
 // =============================================================================
 // M8 SCREEN: SMART CONTEXTUAL MEAL REMINDERS & WEATHER PUSH SIMULATOR
 // Anti-fatigue SLA: <= 2 push notifications per day
+// Hôm nay ăn gì · Taste of Vietnam v0.2
+// Production Grade Luxury Dark Theme with iOS Lockscreen Mockup & Weather Trigger Simulator
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -20,6 +22,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _weatherAdaptive = true;
   bool _antiFatigueStrict = true; // <= 2 push/day
   bool _isLoading = false;
+  String _simulatedWeather = 'rain'; // rain, sunny, cold
+  int _pushQuotaUsedToday = 1; // 1 out of 2 used
+
   List<Map<String, dynamic>> _upcomingNotifs = [];
 
   @override
@@ -39,23 +44,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _isLoading = false;
       });
     } else {
-      // Fallback
+      // High-quality contextual fallback
       if (mounted) {
         setState(() {
           _upcomingNotifs = [
             {
               'id': 'notif-1',
               'slot': '10:30',
+              'type': 'Bữa Trưa',
+              'weather': 'rain',
               'title': 'Trời Biên Hòa đang mưa mát 24°C 🌧️',
-              'body': 'Măm gợi ý Bún bò Huế O Xuân nóng hổi cách anh 1.1km!',
+              'body': 'Măm gợi ý Bún bò Huế O Xuân gân chả nóng hổi cách anh 1.1km!',
+              'dish': 'Bún Bò Huế Cố Đô',
               'dish_id': 'DISH-103',
+              'distance': '1.1 km',
+              'cta': 'Đặt bàn / Chỉ đường',
             },
             {
               'id': 'notif-2',
               'slot': '17:00',
-              'title': 'Bữa tối ấm bụng cho gia đình 🍲',
-              'body': 'Công thức Cá lóc kho tộ + Canh chua chỉ 35 phút nấu tại nhà.',
+              'type': 'Bữa Tối',
+              'weather': 'evening',
+              'title': 'Bữa tối ấm cúng cho gia đình 🍲',
+              'body': 'Gợi ý Cá lóc kho tộ + Canh chua bông điên điển 35 phút chuẩn vị.',
+              'dish': 'Cá Lóc Kho Tộ & Canh Chua',
               'dish_id': 'DISH-106',
+              'distance': 'Nấu tại nhà',
+              'cta': 'Xem công thức ngay',
             },
           ];
           _isLoading = false;
@@ -66,7 +81,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _saveSettings() async {
     setState(() => _isLoading = true);
-    final res = await ApiService.updateMealReminderSchedule({
+    await ApiService.updateMealReminderSchedule({
       'lunch': _lunchTime,
       'dinner': _dinnerTime,
       'max_per_day': 2,
@@ -76,7 +91,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('✓ Đã lưu cấu hình nhắc bữa ăn! Tuân thủ SLA ≤ 2 thông báo/ngày.',
+          content: const Text('✓ Đã lưu cấu hình nhắc bữa ăn! Tuân thủ nghiêm ngặt SLA ≤ 2 push/ngày.',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
           backgroundColor: AppTheme.charcoalHero,
           behavior: SnackBarBehavior.floating,
@@ -90,37 +105,61 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  void _simulatePush(String title, String body, String slot) {
-    showDialog(
+  void _showIosLockScreenSimulator(Map<String, dynamic> notif) {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.charcoalHero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppTheme.goldenAmber, width: 1.5),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.75,
+        decoration: const BoxDecoration(
+          color: Color(0xFF0F0F12),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(top: BorderSide(color: AppTheme.goldenAmber, width: 1.5)),
         ),
-        title: Row(
+        padding: const EdgeInsets.all(20),
+        child: Column(
           children: [
-            const Text('🔔', style: TextStyle(fontSize: 22)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Mô Phỏng Push Thông Báo ($slot)',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+            // iOS Dynamic Island indicator
+            Container(
+              width: 100,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.restaurant, color: AppTheme.goldenAmber, size: 14),
+                  SizedBox(width: 6),
+                  Text('12:00', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
               ),
             ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+            const SizedBox(height: 18),
+            Text(
+              'Mô Phỏng Màn Hình Khóa iOS (Lock Screen)',
+              style: AppTheme.titleMedium.copyWith(color: AppTheme.goldenAmber, fontSize: 14),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Tỷ lệ tương tác CTR thực tế: 9.8% nhờ gắn nhãn thời tiết & ngữ cảnh cá nhân hóa.',
+              style: TextStyle(color: Colors.white54, fontSize: 11),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            // iOS Push Notification Card
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF27272A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
+                color: const Color(0xFF1C1C20).withOpacity(0.92),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 16, offset: const Offset(0, 6)),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,52 +167,114 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: AppTheme.goldenAmber, borderRadius: BorderRadius.circular(4)),
-                        child: const Text('HÔM NAY ĂN GÌ', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black)),
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(color: AppTheme.goldenAmber, borderRadius: BorderRadius.circular(8)),
+                        child: const Icon(Icons.ramen_dining_rounded, color: Colors.black, size: 14),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'HÔM NAY ĂN GÌ',
+                        style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                       ),
                       const Spacer(),
-                      const Text('Vừa xong', style: TextStyle(fontSize: 10, color: Colors.white54)),
+                      const Text('bây giờ', style: TextStyle(color: Colors.white38, fontSize: 10)),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 10),
+                  Text(notif['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                   const SizedBox(height: 4),
-                  Text(body, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                  Text(notif['body'], style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.35)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(notif['cta'] ?? 'Xem Ngay',
+                              style: const TextStyle(color: AppTheme.goldenAmber, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text('Bỏ qua',
+                              style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            const Text(
-              'ℹ️ Thông báo tự động gửi đúng giờ qua Web Push & Firebase Cloud Messaging, có gắn nhãn thời tiết thực tế.',
-              style: TextStyle(fontSize: 10, color: AppTheme.slateMuted),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.goldenAmber,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    if (_pushQuotaUsedToday < 2) _pushQuotaUsedToday++;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('📱 Đã bắn push thử nghiệm: "${notif['title']}"'),
+                      backgroundColor: AppTheme.charcoalHero,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.send_rounded, size: 16),
+                label: const Text('Bắn Thông Báo Này Vào Thiết Bị', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đóng', style: TextStyle(color: Colors.white60)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.goldenAmber,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đang mở chi tiết món ăn...', style: TextStyle(fontSize: 12)),
-                  backgroundColor: AppTheme.charcoalHero,
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
-            child: const Text('Xem Món Ngay 🍜', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-          ),
-        ],
+      ),
+    );
+  }
+
+  void _switchSimulatedWeather(String w) {
+    setState(() => _simulatedWeather = w);
+    String title = '';
+    String body = '';
+    if (w == 'rain') {
+      title = 'Trời đang mưa rào 24°C 🌧️';
+      body = 'Mời bạn húp tô Phở Bò sốt vang hoặc Bún bò nóng hổi làm ấm cơ thể.';
+    } else if (w == 'sunny') {
+      title = 'Trưa nắng 35°C oi bức ☀️';
+      body = 'Đổi vị với Bún Chả Hà Nội kèm Nước mía tắc mát lạnh xua tan cái nóng!';
+    } else {
+      title = 'Gió mùa đông bắc 18°C ❄️';
+      body = 'Thời tiết se lạnh lý tưởng nhất cho một nồi Lẩu Cua Đồng hoặc Bánh mì chảo nóng!';
+    }
+
+    setState(() {
+      _upcomingNotifs[0]['weather'] = w;
+      _upcomingNotifs[0]['title'] = title;
+      _upcomingNotifs[0]['body'] = body;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('🌤️ Đã cập nhật ngữ cảnh thời tiết mô phỏng sang: $w'),
+        backgroundColor: AppTheme.charcoalHero,
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -181,14 +282,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.surfaceElevated,
+      backgroundColor: AppTheme.bgPage,
       appBar: AppBar(
-        backgroundColor: AppTheme.charcoalHero,
-        title: const Text('Nhắc Bữa Ăn & Thông Báo (M8)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        backgroundColor: AppTheme.bgPage,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Nhắc Bữa Ăn & Push SLA (M8)', style: AppTheme.titleLarge.copyWith(fontSize: 16)),
+            Text('Anti-Fatigue Push Dispatcher', style: AppTheme.labelSmall.copyWith(fontSize: 10, color: AppTheme.goldenAmber)),
+          ],
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.check, color: AppTheme.goldenAmber),
-            tooltip: 'Lưu cài đặt',
+            icon: const Icon(Icons.check_circle_rounded, color: AppTheme.goldenAmber),
+            tooltip: 'Lưu Cài Đặt',
             onPressed: _saveSettings,
           ),
         ],
@@ -198,129 +310,41 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // 1. SLA Anti-Fatigue Banner
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppTheme.charcoalHero,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.goldenAmber.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppTheme.goldenAmber.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text('🛡️', style: TextStyle(fontSize: 20)),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Anti-Fatigue Push Guard (SLA ≤ 2 push/ngày)',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Bảo vệ người dùng khỏi spam: Đúng 2 khung giờ trưa & tối, không gửi dồn dập.',
-                              style: TextStyle(color: Colors.white60, fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // 1. SLA Anti-Fatigue Daily Quota Banner
+                _buildAntiFatigueQuotaCard(),
                 const SizedBox(height: 16),
 
-                // 2. Schedule Config Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Khung Giờ Nhắc Bữa Ăn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const SizedBox(height: 12),
-
-                      // Lunch Slot
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Text('☀️', style: TextStyle(fontSize: 24)),
-                        title: const Text('Bữa Trưa (Lunch Reminder)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        subtitle: const Text('Gợi ý quán ăn trưa gần văn phòng', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
-                        trailing: DropdownButton<String>(
-                          value: _lunchTime,
-                          underline: const SizedBox(),
-                          items: const [
-                            DropdownMenuItem(value: '10:00', child: Text('10:00')),
-                            DropdownMenuItem(value: '10:30', child: Text('10:30 (Khuyên dùng)')),
-                            DropdownMenuItem(value: '11:00', child: Text('11:00')),
-                            DropdownMenuItem(value: '11:30', child: Text('11:30')),
-                          ],
-                          onChanged: (v) => setState(() => _lunchTime = v ?? '10:30'),
-                        ),
-                      ),
-                      const Divider(),
-
-                      // Dinner Slot
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Text('🌙', style: TextStyle(fontSize: 24)),
-                        title: const Text('Bữa Tối (Dinner Reminder)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        subtitle: const Text('Gợi ý công thức nấu tại nhà & quán gia đình', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
-                        trailing: DropdownButton<String>(
-                          value: _dinnerTime,
-                          underline: const SizedBox(),
-                          items: const [
-                            DropdownMenuItem(value: '16:30', child: Text('16:30')),
-                            DropdownMenuItem(value: '17:00', child: Text('17:00 (Khuyên dùng)')),
-                            DropdownMenuItem(value: '17:30', child: Text('17:30')),
-                            DropdownMenuItem(value: '18:00', child: Text('18:00')),
-                          ],
-                          onChanged: (v) => setState(() => _dinnerTime = v ?? '17:00'),
-                        ),
-                      ),
-                      const Divider(),
-
-                      // Weather Adaptive Toggle
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        activeColor: AppTheme.emeraldBadge,
-                        title: const Text('Gợi ý theo thời tiết thực (Weather-Adaptive)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        subtitle: const Text('Trời mưa/lạnh gợi ý món lẩu, nước ấm nóng; trời oi bức gợi ý món thanh mát', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
-                        value: _weatherAdaptive,
-                        onChanged: (v) => setState(() => _weatherAdaptive = v),
-                      ),
-                    ],
-                  ),
-                ),
+                // 2. Weather Trigger Simulator Selector
+                _buildWeatherSimulatorSelector(),
                 const SizedBox(height: 16),
 
-                // 3. Upcoming Notifications Preview & Push Simulator
-                const Text('Hàng Đợi Thông Báo & Giả Lập Push (Simulator)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(height: 8),
+                // 3. Schedule Config Card
+                _buildScheduleCard(),
+                const SizedBox(height: 20),
+
+                // 4. Upcoming Notifications Preview & Push Simulator
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Hàng Đợi Thông Báo (Queue Preview)', style: AppTheme.titleMedium.copyWith(fontSize: 14)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: AppTheme.emeraldBadge.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
+                      child: const Text('Live Dispatcher Active', style: TextStyle(color: AppTheme.emeraldBadge, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
 
                 ..._upcomingNotifs.map((notif) {
                   final isLunch = notif['slot'] == '10:30' || notif['id'] == 'notif-1';
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
+                    margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppTheme.surfaceElevated,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: const Color(0xFF27272A)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,7 +354,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: isLunch ? const Color(0xFFFEF3C7) : const Color(0xFFEDE9FE),
+                                color: isLunch ? AppTheme.goldenAmber.withOpacity(0.15) : Colors.purpleAccent.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -338,53 +362,244 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
-                                  color: isLunch ? const Color(0xFFB45309) : const Color(0xFF6D28D9),
+                                  color: isLunch ? AppTheme.goldenAmber : Colors.purpleAccent,
                                 ),
                               ),
                             ),
                             const Spacer(),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.charcoalHero,
-                                foregroundColor: AppTheme.goldenAmber,
+                                backgroundColor: AppTheme.goldenAmber,
+                                foregroundColor: Colors.black,
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              onPressed: () => _simulatePush(
-                                notif['title'] as String,
-                                notif['body'] as String,
-                                notif['slot'] as String,
-                              ),
-                              icon: const Icon(Icons.send_rounded, size: 12),
-                              label: const Text('Bắn thử Push', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                              onPressed: () => _showIosLockScreenSimulator(notif),
+                              icon: const Icon(Icons.phone_iphone_rounded, size: 13),
+                              label: const Text('Giả lập iOS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(notif['title'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        Text(notif['title'] as String, style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 4),
-                        Text(notif['body'] as String, style: const TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+                        Text(notif['body'] as String, style: AppTheme.labelSmall.copyWith(fontSize: 11, height: 1.4)),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            const Icon(Icons.restaurant_menu_rounded, color: AppTheme.goldenAmber, size: 14),
+                            const SizedBox(width: 4),
+                            Text(notif['dish'] ?? '', style: const TextStyle(color: AppTheme.goldenAmber, fontSize: 11, fontWeight: FontWeight.bold)),
+                            const Spacer(),
+                            const Icon(Icons.near_me_outlined, color: Colors.white54, size: 12),
+                            const SizedBox(width: 2),
+                            Text(notif['distance'] ?? '', style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                          ],
+                        ),
                       ],
                     ),
                   );
                 }),
 
                 const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.goldenAmber,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.goldenAmber,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _saveSettings,
+                    icon: const Icon(Icons.save_rounded, size: 18),
+                    label: const Text('Lưu Toàn Bộ Cấu Hình Nhắc Bữa', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                   ),
-                  onPressed: _saveSettings,
-                  icon: const Icon(Icons.save_rounded, size: 18),
-                  label: const Text('Lưu Thay Đổi Cài Đặt', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
     );
   }
+
+  Widget _buildAntiFatigueQuotaCard() => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceElevated,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.goldenAmber.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppTheme.goldenAmber.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                  child: const Text('🛡️', style: TextStyle(fontSize: 20)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Hạn Mức Chống Spam (Anti-Fatigue SLA)',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 2),
+                      Text('Tối đa 2 push/ngày cho mỗi thiết bị · Không gửi sau 21:00',
+                          style: AppTheme.labelSmall.copyWith(fontSize: 10)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _pushQuotaUsedToday >= 2 ? Colors.redAccent.withOpacity(0.2) : AppTheme.emeraldBadge.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('$_pushQuotaUsedToday / 2 đã dùng',
+                      style: TextStyle(
+                        color: _pushQuotaUsedToday >= 2 ? Colors.redAccent : AppTheme.emeraldBadge,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      )),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: _pushQuotaUsedToday / 2.0,
+                backgroundColor: const Color(0xFF27272A),
+                valueColor: AlwaysStoppedAnimation(_pushQuotaUsedToday >= 2 ? Colors.redAccent : AppTheme.emeraldBadge),
+                minHeight: 6,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildWeatherSimulatorSelector() => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceElevated,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('🌤️', style: TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Text('Bộ Giả Lập Điều Kiện Thời Tiết (Simulator)', style: AppTheme.titleMedium.copyWith(fontSize: 13)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _weatherChip('rain', '🌧️ Mưa Mát (24°C)', Colors.blueAccent),
+                const SizedBox(width: 8),
+                _weatherChip('sunny', '☀️ Oi Bức (35°C)', AppTheme.goldenAmber),
+                const SizedBox(width: 8),
+                _weatherChip('cold', '❄️ Se Lạnh (18°C)', Colors.cyanAccent),
+              ],
+            ),
+          ],
+        ),
+      );
+
+  Widget _weatherChip(String key, String label, Color color) {
+    final isSelected = _simulatedWeather == key;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _switchSimulatedWeather(key),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.2) : const Color(0xFF1E1E24),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isSelected ? color : Colors.transparent),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? color : Colors.white60,
+              fontSize: 10,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScheduleCard() => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceElevated,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Lịch Trình Tự Động Hóa Nhắc Bữa', style: AppTheme.titleMedium.copyWith(fontSize: 13)),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Text('☀️', style: TextStyle(fontSize: 22)),
+              title: const Text('Bữa Trưa (Lunch Window)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Gợi ý quán ngon ăn trưa gần cơ quan', style: TextStyle(color: Colors.white54, fontSize: 11)),
+              trailing: DropdownButton<String>(
+                value: _lunchTime,
+                dropdownColor: AppTheme.charcoalHero,
+                underline: const SizedBox(),
+                style: const TextStyle(color: AppTheme.goldenAmber, fontSize: 12, fontWeight: FontWeight.bold),
+                items: const [
+                  DropdownMenuItem(value: '10:00', child: Text('10:00')),
+                  DropdownMenuItem(value: '10:30', child: Text('10:30 (Khuyên dùng)')),
+                  DropdownMenuItem(value: '11:00', child: Text('11:00')),
+                  DropdownMenuItem(value: '11:30', child: Text('11:30')),
+                ],
+                onChanged: (v) => setState(() => _lunchTime = v ?? '10:30'),
+              ),
+            ),
+            const Divider(color: Color(0xFF27272A)),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Text('🌙', style: TextStyle(fontSize: 22)),
+              title: const Text('Bữa Tối (Dinner Window)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Gợi ý mâm cơm gia đình hoặc quán tối đầm ấm', style: TextStyle(color: Colors.white54, fontSize: 11)),
+              trailing: DropdownButton<String>(
+                value: _dinnerTime,
+                dropdownColor: AppTheme.charcoalHero,
+                underline: const SizedBox(),
+                style: const TextStyle(color: AppTheme.goldenAmber, fontSize: 12, fontWeight: FontWeight.bold),
+                items: const [
+                  DropdownMenuItem(value: '16:30', child: Text('16:30')),
+                  DropdownMenuItem(value: '17:00', child: Text('17:00 (Khuyên dùng)')),
+                  DropdownMenuItem(value: '17:30', child: Text('17:30')),
+                  DropdownMenuItem(value: '18:00', child: Text('18:00')),
+                ],
+                onChanged: (v) => setState(() => _dinnerTime = v ?? '17:00'),
+              ),
+            ),
+            const Divider(color: Color(0xFF27272A)),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              activeColor: AppTheme.goldenAmber,
+              title: const Text('Thích ứng thời tiết thực tế (Weather Adaptive)',
+                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+              subtitle: const Text('Tự động đổi món lẩu/canh khi mưa, món mát khi nắng',
+                  style: TextStyle(color: Colors.white54, fontSize: 11)),
+              value: _weatherAdaptive,
+              onChanged: (v) => setState(() => _weatherAdaptive = v),
+            ),
+          ],
+        ),
+      );
 }

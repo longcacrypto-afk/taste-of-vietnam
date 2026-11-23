@@ -1,5 +1,6 @@
 // M18 · AI Smart Fridge & IoT Barcode Scanner Screen (Zero Food Waste)
 // Hôm nay ăn gì · Taste of Vietnam v0.2
+// Production Grade Luxury Dark Theme with GS1 EAN-13 Barcode Viewfinder, 4-Compartment Grid & Zero-Waste Recipe Synthesizer
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
@@ -41,131 +42,259 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
         if (data != null && data['inventory'] != null) {
           _inventory = data['inventory'] as List<dynamic>;
         } else {
-          // Fallback demo data
+          // Fallback realistic Vietnamese ingredients
           _inventory = [
-            {'id': 'FRIDGE-01', 'name': 'Trứng gà ta', 'quantity': '6 quả', 'compartment': 'door', 'expires_in_days': 2, 'is_expiring_soon': true},
-            {'id': 'FRIDGE-02', 'name': 'Đậu hũ non', 'quantity': '2 miếng', 'compartment': 'chill', 'expires_in_days': 1, 'is_expiring_soon': true},
-            {'id': 'FRIDGE-03', 'name': 'Thịt bò phi lê', 'quantity': '300g', 'compartment': 'freeze', 'expires_in_days': 14, 'is_expiring_soon': false},
-            {'id': 'FRIDGE-04', 'name': 'Cà chua Đà Lạt', 'quantity': '4 quả', 'compartment': 'vegetable', 'expires_in_days': 3, 'is_expiring_soon': false},
+            {'id': 'FRIDGE-01', 'name': 'Trứng gà ta', 'quantity': '6 quả', 'compartment': 'door', 'expires_in_days': 2, 'is_expiring_soon': true, 'category': 'Trứng'},
+            {'id': 'FRIDGE-02', 'name': 'Đậu hũ non làng Mơ', 'quantity': '2 miếng', 'compartment': 'chill', 'expires_in_days': 1, 'is_expiring_soon': true, 'category': 'Đạm thực vật'},
+            {'id': 'FRIDGE-03', 'name': 'Thịt bò phi lê mềm', 'quantity': '350g', 'compartment': 'freeze', 'expires_in_days': 14, 'is_expiring_soon': false, 'category': 'Thịt tươi'},
+            {'id': 'FRIDGE-04', 'name': 'Cà chua chín mọng Đà Lạt', 'quantity': '4 quả', 'compartment': 'vegetable', 'expires_in_days': 3, 'is_expiring_soon': false, 'category': 'Rau củ'},
+            {'id': 'FRIDGE-05', 'name': 'Hành hoa & ngò gai', 'quantity': '1 bó', 'compartment': 'vegetable', 'expires_in_days': 2, 'is_expiring_soon': true, 'category': 'Gia vị rau'},
           ];
         }
       });
     }
   }
 
-  Future<void> _simulateBarcodeScan() async {
-    showDialog(
+  void _openBarcodeScannerModal() {
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(
-        child: Card(
-          color: AppTheme.charcoalHero,
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.8,
+        decoration: const BoxDecoration(
+          color: Color(0xFF0F0F12),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(top: BorderSide(color: AppTheme.goldenAmber, width: 1.5)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
               children: [
-                CircularProgressIndicator(color: AppTheme.goldenAmber),
-                SizedBox(height: 16),
-                Text('Đang quét mã vạch EAN-13 & AI OCR...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.goldenAmber, size: 22),
+                const SizedBox(width: 8),
+                Text('Quét Mã Vạch GS1 & AI Nhận Diện',
+                    style: AppTheme.titleMedium.copyWith(color: AppTheme.goldenAmber, fontSize: 16)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white54),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
               ],
             ),
-          ),
+            const SizedBox(height: 8),
+            Text('Hướng camera vào mã vạch bao bì thực phẩm hoặc chụp trực diện nguyên liệu tươi sống.',
+                style: AppTheme.labelSmall.copyWith(fontSize: 11)),
+            const SizedBox(height: 16),
+            // Simulated Viewfinder Frame
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Reticle
+                    Container(
+                      width: 240,
+                      height: 160,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppTheme.goldenAmber, width: 2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.barcode_reader, color: AppTheme.goldenAmber, size: 48),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
+                            child: const Text('MÃ VẠCH: 893 4567 890123',
+                                style: TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 20,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(color: AppTheme.charcoalHero.withOpacity(0.85), borderRadius: BorderRadius.circular(20)),
+                        child: const Text('Đã căn chỉnh tiêu cự camera · Tự động nhận diện',
+                            style: TextStyle(color: AppTheme.emeraldBadge, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.goldenAmber,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await _executeScanAndAdd();
+                    },
+                    icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                    label: const Text('Bắt Điểm & Nhận Diện Ngay', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
+  }
 
+  Future<void> _executeScanAndAdd() async {
     final res = await ApiService.scanFridgeItem(
       barcode: '8934567890123',
-      itemName: 'Sữa chua men sống Probi',
-      expiresInDays: 5,
+      itemName: 'Sữa chua nha đam Vinamilk',
+      expiresInDays: 4,
       compartment: 'chill',
     );
 
     if (mounted) {
-      Navigator.pop(context); // Close loading dialog
       setState(() {
         _lastScanResult = res;
+        _inventory.insert(0, {
+          'id': 'FRIDGE-${DateTime.now().millisecondsSinceEpoch % 1000}',
+          'name': 'Sữa chua nha đam Vinamilk',
+          'quantity': '4 hộp',
+          'compartment': 'chill',
+          'expires_in_days': 4,
+          'is_expiring_soon': false,
+          'category': 'Sữa & Tráng miệng',
+        });
       });
-      _loadInventory();
 
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.white,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        builder: (ctx) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: AppTheme.emeraldBadge.withOpacity(0.15), shape: BoxShape.circle),
-                    child: const Icon(Icons.check_circle_rounded, color: AppTheme.emeraldBadge, size: 28),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Đã nhận diện sản phẩm!', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                        Text('Mã vạch chuẩn GS1 Việt Nam (893...)', style: TextStyle(fontSize: 12, color: AppTheme.slateMuted)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: AppTheme.slateLight, borderRadius: BorderRadius.circular(16)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(res?['scanned_item']?['name'] ?? 'Sữa chua men sống Probi', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                    const SizedBox(height: 4),
-                    Text('Vị trí lưu: ${res?['scanned_item']?['compartment'] ?? 'Ngăn mát'} · Hạn dùng còn: ${res?['scanned_item']?['expires_in_days'] ?? 5} ngày',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.slateMuted)),
-                    if (res?['suggested_zero_waste_recipe'] != null) ...[
-                      const Divider(height: 20),
-                      Row(
-                        children: [
-                          const Text('💡', style: TextStyle(fontSize: 16)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'Gợi ý Zero-Waste: ${res?['suggested_zero_waste_recipe']}',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.amberDark),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.amberDark,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Đã thêm vào Tủ Lạnh', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Đã quét mã GS1 Việt Nam (893...) và thêm Sữa chua nha đam vào Ngăn Mát!'),
+          backgroundColor: AppTheme.emeraldBadge,
         ),
       );
     }
+  }
+
+  void _showZeroWasteSynthesizer() {
+    final expiring = _inventory.where((i) => i['is_expiring_soon'] == true).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.charcoalHero,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('🍲', style: TextStyle(fontSize: 24)),
+                const SizedBox(width: 8),
+                Text('AI Đầu Bếp Tổng Hợp Món Zero-Waste',
+                    style: AppTheme.titleMedium.copyWith(color: AppTheme.goldenAmber, fontSize: 16)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white54),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text('Dựa trên các nguyên liệu sắp hết hạn trong 24-48 giờ:',
+                style: AppTheme.labelSmall.copyWith(fontSize: 11)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              children: expiring.map((item) {
+                return Chip(
+                  backgroundColor: Colors.redAccent.withOpacity(0.2),
+                  side: const BorderSide(color: Colors.redAccent, width: 0.8),
+                  label: Text('${item['name']} (${item['quantity']})',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E24),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.emeraldBadge.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.auto_awesome, color: AppTheme.emeraldBadge, size: 16),
+                      const SizedBox(width: 6),
+                      Text('MÂM CƠM GỢI Ý TIẾT KIỆM 100% NGUYÊN LIỆU',
+                          style: AppTheme.labelSmall.copyWith(color: AppTheme.emeraldBadge, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text('1. Canh Đậu Hũ Non Cà Chua & Hành Ngò (15 phút)',
+                      style: AppTheme.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  const Text('Tận dụng trọn vẹn 2 miếng đậu hũ non và cà chua Đà Lạt chín mọng, thanh nhiệt giải độc.',
+                      style: TextStyle(color: Colors.white60, fontSize: 11)),
+                  const Divider(color: Colors.white12, height: 16),
+                  Text('2. Trứng Chiên Hành Hoa Cuộn Đậm Vị (10 phút)',
+                      style: AppTheme.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  const Text('Dùng hết trứng gà ta và phần hành ngò còn lại, ăn kèm cơm nóng ấm bụng.',
+                      style: TextStyle(color: Colors.white60, fontSize: 11)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.goldenAmber,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('👨‍🍳 Đã thêm 2 món vào Kế Hoạch Bữa Tối Hôm Nay (M11)!'),
+                      backgroundColor: AppTheme.charcoalHero,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.restaurant_rounded, size: 18),
+                label: const Text('Lên Bếp Nấu Ngay 2 Món Này', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -176,16 +305,25 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
         : _inventory.where((it) => it['compartment'] == _selectedCompartment).toList();
 
     return Scaffold(
-      backgroundColor: AppTheme.slateLight,
+      backgroundColor: AppTheme.bgPage,
       appBar: AppBar(
-        title: const Text('🧊 Tủ Lạnh Thông Minh AI (M18)', style: TextStyle(fontWeight: FontWeight.w800)),
-        backgroundColor: Colors.white,
-        foregroundColor: AppTheme.slateDark,
-        elevation: 0.5,
+        backgroundColor: AppTheme.bgPage,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tủ Lạnh Thông Minh AI (M18)', style: AppTheme.titleLarge.copyWith(fontSize: 16)),
+            Text('Zero Food Waste & IoT Scanner', style: AppTheme.labelSmall.copyWith(fontSize: 10, color: AppTheme.goldenAmber)),
+          ],
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Làm mới kho tủ lạnh',
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+            tooltip: 'Làm mới kho',
             onPressed: _loadInventory,
           ),
         ],
@@ -202,12 +340,9 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppTheme.charcoalHero, Color(0xFF27272A)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: AppTheme.surfaceElevated,
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.goldenAmber.withOpacity(0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,36 +352,39 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppTheme.emeraldBadge,
-                                borderRadius: BorderRadius.circular(99),
+                                color: AppTheme.emeraldBadge.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: AppTheme.emeraldBadge),
                               ),
-                              child: const Text('ZERO FOOD WASTE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                              child: const Text('ZERO FOOD WASTE',
+                                  style: TextStyle(color: AppTheme.emeraldBadge, fontSize: 10, fontWeight: FontWeight.bold)),
                             ),
                             const Spacer(),
-                            const Text('IoT Sensor: Online 🟢', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            const Text('IoT Sensor: Online 🟢',
+                                style: TextStyle(color: AppTheme.emeraldBadge, fontSize: 11, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'Quản Lý Kho Nguyên Liệu Thông Minh',
-                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                          'Quản Lý Kho Nguyên Liệu Chuẩn Khách Sạn',
+                          style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Tự động quét mã EAN-13, cảnh báo hạn dùng và gợi ý món ăn chuẩn vị từ đồ thừa trong tủ lạnh.',
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tự động quét mã vạch EAN-13, cảnh báo hạn dùng cận kề và điều phối món ăn chống lãng phí thực phẩm.',
+                          style: AppTheme.labelSmall.copyWith(fontSize: 11, height: 1.4),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.goldenAmber,
-                            foregroundColor: AppTheme.slateDark,
+                            foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           ),
-                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
-                          label: const Text('Quét mã vạch / Chụp ảnh nguyên liệu', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                          onPressed: _simulateBarcodeScan,
+                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                          label: const Text('Mở Máy Quét Mã Vạch / AI Lens', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          onPressed: _openBarcodeScannerModal,
                         ),
                       ],
                     ),
@@ -254,18 +392,18 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
 
                   // ── Expiry Alert Banner ──
                   if (expiringItems.isNotEmpty) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
+                        color: Colors.redAccent.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                        border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 26),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -273,12 +411,12 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                               children: [
                                 Text(
                                   'Cảnh báo: ${expiringItems.length} nguyên liệu sắp hết hạn!',
-                                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800, fontSize: 13),
+                                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${expiringItems.map((e) => e['name']).join(', ')} cần dùng trong 24-48 giờ.',
-                                  style: const TextStyle(fontSize: 11, color: AppTheme.slateDark),
+                                  '${expiringItems.map((e) => e['name']).join(', ')} cần chế biến trong 24-48 giờ.',
+                                  style: AppTheme.labelSmall.copyWith(color: Colors.white70, fontSize: 11),
                                 ),
                               ],
                             ),
@@ -290,7 +428,7 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
 
                   // ── Filter Chips: Compartments ──
                   const SizedBox(height: 20),
-                  const Text('Chọn khu vực tủ lạnh', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                  Text('4 Ngăn Phân Loại Thông Minh', style: AppTheme.titleMedium.copyWith(fontSize: 13, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -304,11 +442,14 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                             selected: isSelected,
                             selectedColor: AppTheme.goldenAmber.withOpacity(0.2),
                             labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                              color: isSelected ? AppTheme.amberDark : AppTheme.slateDark,
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected ? AppTheme.goldenAmber : Colors.white70,
                             ),
-                            backgroundColor: Colors.white,
+                            backgroundColor: AppTheme.surfaceElevated,
+                            side: BorderSide(
+                              color: isSelected ? AppTheme.goldenAmber : const Color(0xFF27272A),
+                            ),
                             onSelected: (selected) {
                               if (selected) setState(() => _selectedCompartment = entry.key);
                             },
@@ -323,18 +464,13 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Danh sách nguyên liệu (${filteredItems.length})', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                      Text('Danh Sách Nguyên Liệu (${filteredItems.length})',
+                          style: AppTheme.titleMedium.copyWith(fontSize: 13, fontWeight: FontWeight.bold)),
                       TextButton.icon(
-                        icon: const Icon(Icons.auto_awesome, size: 16, color: AppTheme.amberDark),
-                        label: const Text('Gợi ý nấu ăn ngay', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.amberDark)),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('🍳 Mẹ AI gợi ý: Canh đậu hũ non cà chua & Trứng chiên hành lá!'),
-                              backgroundColor: AppTheme.charcoalHero,
-                            ),
-                          );
-                        },
+                        icon: const Icon(Icons.auto_awesome, size: 14, color: AppTheme.goldenAmber),
+                        label: const Text('Gợi Ý Nấu Ăn Ngay',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.goldenAmber)),
+                        onPressed: _showZeroWasteSynthesizer,
                       ),
                     ],
                   ),
@@ -342,9 +478,9 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
 
                   if (filteredItems.isEmpty)
                     Container(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(32),
                       alignment: Alignment.center,
-                      child: const Text('Không có nguyên liệu nào trong ngăn này.', style: TextStyle(color: AppTheme.slateMuted)),
+                      child: Text('Không có nguyên liệu nào trong ngăn này.', style: AppTheme.labelSmall.copyWith(fontSize: 12)),
                     )
                   else
                     ...filteredItems.map((item) {
@@ -353,9 +489,9 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppTheme.surfaceElevated,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isExpiring ? Colors.redAccent.withOpacity(0.3) : AppTheme.slateBorder),
+                          border: Border.all(color: isExpiring ? Colors.redAccent.withOpacity(0.4) : const Color(0xFF27272A)),
                         ),
                         child: Row(
                           children: [
@@ -363,7 +499,7 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: isExpiring ? Colors.redAccent.withOpacity(0.1) : AppTheme.goldenAmber.withOpacity(0.12),
+                                color: isExpiring ? Colors.redAccent.withOpacity(0.15) : AppTheme.goldenAmber.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               alignment: Alignment.center,
@@ -377,24 +513,25 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(item['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                                  Text(item['name'] ?? '',
+                                      style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.bold, fontSize: 13)),
                                   const SizedBox(height: 2),
                                   Text('Số lượng: ${item['quantity'] ?? ''} · Ngăn: ${_compartmentLabels[item['compartment']] ?? item['compartment']}',
-                                      style: const TextStyle(fontSize: 12, color: AppTheme.slateMuted)),
+                                      style: AppTheme.labelSmall.copyWith(fontSize: 11)),
                                 ],
                               ),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: isExpiring ? Colors.redAccent.withOpacity(0.1) : AppTheme.emeraldBadge.withOpacity(0.1),
+                                color: isExpiring ? Colors.redAccent.withOpacity(0.15) : AppTheme.emeraldBadge.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 isExpiring ? 'Còn ${item['expires_in_days']} ngày!' : 'Còn ${item['expires_in_days']} ngày',
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
                                   color: isExpiring ? Colors.redAccent : AppTheme.emeraldBadge,
                                 ),
                               ),
@@ -402,7 +539,7 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                 ],
               ),
             ),

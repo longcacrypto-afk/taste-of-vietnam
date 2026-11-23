@@ -1,5 +1,6 @@
 // M20 · Creator Kitchen & Community Recipe Hub Screen
 // Hôm nay ăn gì · Taste of Vietnam v0.2
+// Production Grade Luxury Dark Theme with Creator Leaderboard, Step-by-Step Recipe Publisher & VietQR 24/7 1-Click Tipping
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
@@ -36,34 +37,64 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
         if (data != null && data['recipes'] != null) {
           _recipes = data['recipes'] as List<dynamic>;
         } else {
-          // Fallback demo data
+          // Fallback realistic creator recipes
           _recipes = [
             {
               'id': 'CREC-01',
-              'title': 'Cơm Chiên Kim Chi Bò Áp Chảo',
+              'title': 'Cơm Chiên Kim Chi Bò Tơ Áp Chảo',
               'author': 'Chef Hưng (Biên Hòa Foodie)',
+              'author_tier': 'Bếp Trưởng Vàng 🌟',
               'author_avatar': '🍳',
               'prep_time_minutes': 20,
               'difficulty': 'Dễ',
               'calories': 520,
               'likes_count': 342,
-              'tips_received_vnd': 250000,
-              'zero_waste_tag': 'Tận dụng cơm nguội & bò thừa',
-              'ingredients': ['Cơm nguội 2 chén', 'Thịt bò 150g', 'Kim chi 100g', 'Trứng gà 1 quả']
+              'tips_received_vnd': 350000,
+              'zero_waste_tag': 'Tận dụng cơm nguội & thịt bò',
+              'ingredients': ['Cơm nguội 2 chén', 'Thịt bò 150g', 'Kim chi 100g', 'Trứng gà 1 quả'],
+              'steps': [
+                'Đập trứng vào tô cơm nguội bóp đều để hạt cơm tơi xốp và bọc lớp vàng óng.',
+                'Áp chảo thịt bò phi lê với tỏi đập dập trên lửa lớn 2 phút.',
+                'Phi thơm hành, đảo cơm vàng giòn rồi trộn đều cùng kim chi chua ngọt.'
+              ],
             },
             {
               'id': 'CREC-02',
               'title': 'Canh Đậu Hũ Non Nấu Cà Chua Thanh Mát',
               'author': 'Lá Healthy Kitchen',
+              'author_tier': 'Đại Sứ Eat Clean 🥗',
               'author_avatar': '🌿',
               'prep_time_minutes': 15,
               'difficulty': 'Rất dễ',
               'calories': 180,
               'likes_count': 512,
-              'tips_received_vnd': 420000,
+              'tips_received_vnd': 480000,
               'zero_waste_tag': 'Thanh lọc cơ thể, giải nhiệt mùa nóng',
-              'ingredients': ['Đậu hũ non 2 miếng', 'Cà chua 2 quả', 'Hành ngò', 'Nấm rơm 50g']
-            }
+              'ingredients': ['Đậu hũ non 2 miếng', 'Cà chua 2 quả', 'Hành ngò gai', 'Nấm rơm 50g'],
+              'steps': [
+                'Cà chua xào sơ cùng chút dầu hào để ra màu đỏ tự nhiên đẹp mắt.',
+                'Cho 600ml nước lọc đun sôi, thả nấm rơm và đậu hũ non cắt quân cờ.',
+                'Nêm 1 thìa nước mắm ngon, rắc tiêu và hành ngò tắt bếp ngay.'
+              ],
+            },
+            {
+              'id': 'CREC-03',
+              'title': 'Gà Nướng Muối Ớt Lá Chanh Nồi Chiên Không Dầu',
+              'author': 'Mẹ Bon Cơm Nhà',
+              'author_tier': 'Nghệ Nhân Bếp Gia Đình 🏡',
+              'author_avatar': '🍗',
+              'prep_time_minutes': 30,
+              'difficulty': 'Vừa',
+              'calories': 460,
+              'likes_count': 628,
+              'tips_received_vnd': 620000,
+              'zero_waste_tag': 'Ăn sạch không dầu mỡ',
+              'ingredients': ['Đùi gà góc tư 2 cái', 'Muối hạt', 'Ớt hiểm 3 trái', 'Lá chanh non'],
+              'steps': [
+                'Khía nhẹ mặt thịt, giã muối ớt lá chanh ướp đều 20 phút.',
+                'Nướng nhiệt độ 180°C trong 20 phút, lật mặt quét mật ong nướng thêm 5 phút da giòn tan.'
+              ],
+            },
           ];
         }
       });
@@ -74,11 +105,11 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
     int selectedAmount = 20000;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.charcoalHero,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) => Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,15 +122,21 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Tặng Thưởng Tác Giả (VietQR)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                        Text('Người nhận: ${recipe['author']}', style: const TextStyle(fontSize: 12, color: AppTheme.slateMuted)),
+                        Text('Tặng Thưởng Tác Giả (VietQR Napas 24/7)',
+                            style: AppTheme.titleMedium.copyWith(color: AppTheme.goldenAmber, fontSize: 15)),
+                        Text('Người nhận: ${recipe['author']}', style: AppTheme.labelSmall.copyWith(fontSize: 11)),
                       ],
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white54),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
-              const Text('Chọn mức tiền ủng hộ (100% về tác giả):', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              const Text('Chọn mức tiền ủng hộ (100% về ví tác giả không khấu trừ):',
+                  style: TextStyle(fontSize: 12, color: Colors.white70)),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -110,71 +147,81 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppTheme.goldenAmber.withOpacity(0.15) : AppTheme.slateLight,
+                        color: isSelected ? AppTheme.goldenAmber.withOpacity(0.2) : AppTheme.surfaceElevated,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: isSelected ? AppTheme.amberDark : AppTheme.slateBorder),
+                        border: Border.all(color: isSelected ? AppTheme.goldenAmber : const Color(0xFF27272A)),
                       ),
                       child: Text(
                         '${(amt / 1000).toStringAsFixed(0)}k đ',
                         style: TextStyle(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.bold,
                           fontSize: 13,
-                          color: isSelected ? AppTheme.amberDark : AppTheme.slateDark,
+                          color: isSelected ? AppTheme.goldenAmber : Colors.white70,
                         ),
                       ),
                     ),
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              // Simulated QR code
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.slateLight,
+                  color: const Color(0xFF1E1E24),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.qr_code_2_rounded, color: AppTheme.slateDark, size: 32),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(Icons.qr_code_2_rounded, color: Colors.black, size: 36),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('VietQR Chuẩn Napas 24/7', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                          Text('Chuyển khoản tức thì qua mọi app Ngân hàng / MoMo', style: const TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+                          const Text('VietQR Napas 24/7 · MBBank / VCB / MoMo',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                          const SizedBox(height: 2),
+                          Text('Quét mã mở app ngân hàng tự động điền STK & số tiền $selectedAmount đ.',
+                              style: AppTheme.labelSmall.copyWith(fontSize: 10)),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.amberDark,
+                    backgroundColor: AppTheme.goldenAmber,
+                    foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () async {
                     Navigator.pop(ctx);
-                    final tipRes = await ApiService.tipCommunityRecipe(recipe['id'], selectedAmount);
+                    await ApiService.tipCommunityRecipe(recipe['id'], selectedAmount);
                     if (mounted) {
                       setState(() {
                         recipe['tips_received_vnd'] = (recipe['tips_received_vnd'] ?? 0) + selectedAmount;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('🎉 Đã tạo mã VietQR Tip ${selectedAmount.toString()}đ thành công cho ${recipe['author']}!'),
-                          backgroundColor: AppTheme.emeraldBadge,
+                          content: Text('🎉 Cảm ơn bạn! Đã gửi tip $selectedAmount đ tới ${recipe['author']}!'),
+                          backgroundColor: AppTheme.charcoalHero,
                         ),
                       );
                     }
                   },
-                  child: Text('Tạo Mã VietQR Tip ${selectedAmount.toString()}đ', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                  child: Text('Xác Nhận Tip $selectedAmount đ Ngay', style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -185,10 +232,15 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
   }
 
   void _showCreateRecipeDialog() {
+    final titleController = TextEditingController();
+    final ingController = TextEditingController();
+    final timeController = TextEditingController(text: '20');
+    final tagController = TextEditingController(text: 'Zero-Waste cơm nhà');
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.charcoalHero,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
@@ -197,76 +249,139 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
           right: 20,
           top: 24,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('🍳 Đăng Công Thức Món Ăn Mới', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 6),
-            const Text('Chia sẻ bí quyết nấu nướng & nhận tiền tip trực tiếp từ cộng đồng.', style: TextStyle(fontSize: 12, color: AppTheme.slateMuted)),
-            const SizedBox(height: 16),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Tên món ăn',
-                hintText: 'Ví dụ: Bún sườn chua nấu sấu giòn tan',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('🍳', style: TextStyle(fontSize: 22)),
+                  const SizedBox(width: 8),
+                  Text('Đăng Công Thức Món Ăn Mới',
+                      style: AppTheme.titleMedium.copyWith(color: AppTheme.goldenAmber, fontSize: 16)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white54),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Nguyên liệu chính (ngăn cách bằng dấu phẩy)',
-                hintText: 'Sườn non 400g, Quả sấu 5 quả, Cà chua 2 quả...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 6),
+              Text('Chia sẻ bí quyết nấu nướng & nhận tiền tip trực tiếp từ cộng đồng người yêu ẩm thực.',
+                  style: AppTheme.labelSmall.copyWith(fontSize: 11)),
+              const SizedBox(height: 16),
+              const Text('Tên món ăn:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(height: 4),
+              TextField(
+                controller: titleController,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Ví dụ: Bún sườn chua sấu giòn tan',
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  filled: true,
+                  fillColor: AppTheme.surfaceElevated,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Thời gian nấu (phút)',
-                      hintText: '25',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 12),
+              const Text('Nguyên liệu chính (ngăn cách bằng dấu phẩy):', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(height: 4),
+              TextField(
+                controller: ingController,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Sườn non 400g, Quả sấu 5 quả, Cà chua 2 quả...',
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  filled: true,
+                  fillColor: AppTheme.surfaceElevated,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Thời gian nấu (phút):', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: timeController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: AppTheme.surfaceElevated,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Gắn thẻ Zero-Waste',
-                      hintText: 'Tận dụng đồ chua',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Thẻ Zero-Waste:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: tagController,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: AppTheme.surfaceElevated,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.amberDark,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Công thức của bạn đã được đăng thành công lên Bếp Sáng Tạo!'),
-                      backgroundColor: AppTheme.emeraldBadge,
-                    ),
-                  );
-                },
-                child: const Text('Đăng Công Thức', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.goldenAmber,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    final t = titleController.text.trim();
+                    if (t.isNotEmpty) {
+                      setState(() {
+                        _recipes.insert(0, {
+                          'id': 'CREC-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                          'title': t,
+                          'author': 'Bạn (Đầu Bếp Nhà)',
+                          'author_tier': 'Tác Giả Mới ✨',
+                          'author_avatar': '👨‍🍳',
+                          'prep_time_minutes': int.tryParse(timeController.text) ?? 20,
+                          'difficulty': 'Dễ',
+                          'calories': 380,
+                          'likes_count': 1,
+                          'tips_received_vnd': 0,
+                          'zero_waste_tag': tagController.text.trim(),
+                          'ingredients': ingController.text.split(',').map((e) => e.trim()).toList(),
+                          'steps': ['Sơ chế nguyên liệu tươi sạch.', 'Chế biến theo công thức gia truyền.'],
+                        });
+                      });
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('🎉 Công thức "$t" đã đăng thành công lên Bếp Sáng Tạo!')),
+                      );
+                    }
+                  },
+                  child: const Text('Đăng Công Thức Lên Cộng Đồng', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -275,15 +390,24 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.slateLight,
+      backgroundColor: AppTheme.bgPage,
       appBar: AppBar(
-        title: const Text('🍳 Bếp Sáng Tạo & Tipping (M20)', style: TextStyle(fontWeight: FontWeight.w800)),
-        backgroundColor: Colors.white,
-        foregroundColor: AppTheme.slateDark,
-        elevation: 0.5,
+        backgroundColor: AppTheme.bgPage,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Bếp Sáng Tạo & Tipping (M20)', style: AppTheme.titleLarge.copyWith(fontSize: 16)),
+            Text('VietQR Napas 24/7 Creator Hub', style: AppTheme.labelSmall.copyWith(fontSize: 10, color: AppTheme.goldenAmber)),
+          ],
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.amberDark),
+            icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.goldenAmber),
             tooltip: 'Đăng công thức',
             onPressed: _showCreateRecipeDialog,
           ),
@@ -301,12 +425,9 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppTheme.charcoalHero, Color(0xFF3F3F46)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: AppTheme.surfaceElevated,
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.goldenAmber.withOpacity(0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,30 +436,33 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(color: AppTheme.goldenAmber, borderRadius: BorderRadius.circular(99)),
-                              child: const Text('CREATOR KITCHEN', style: TextStyle(color: AppTheme.slateDark, fontSize: 10, fontWeight: FontWeight.w900)),
+                              decoration: BoxDecoration(color: AppTheme.goldenAmber.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+                              child: const Text('CREATOR KITCHEN',
+                                  style: TextStyle(color: AppTheme.goldenAmber, fontSize: 10, fontWeight: FontWeight.bold)),
                             ),
                             const Spacer(),
-                            const Text('VietQR 1-Click Tipping 💸', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            const Text('VietQR 1-Click Tipping 💸',
+                                style: TextStyle(color: AppTheme.emeraldBadge, fontSize: 11, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        const Text('Cộng Đồng Nấu Ăn & Chia Sẻ Công Thức', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Khám phá hàng ngàn công thức nấu món Việt từ các đầu bếp gia đình, học mẹo Zero-Waste và ủng hộ trực tiếp qua VietQR.',
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        const Text('Cộng Đồng Đầu Bếp Gia Đình Việt Nam',
+                            style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Khám phá công thức nấu món Việt từ các đầu bếp gia đình, học mẹo Zero-Waste và ủng hộ tác giả tức thì qua VietQR.',
+                          style: AppTheme.labelSmall.copyWith(fontSize: 11, height: 1.4),
                         ),
                         const SizedBox(height: 14),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.goldenAmber,
-                            foregroundColor: AppTheme.slateDark,
+                            foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           ),
                           icon: const Icon(Icons.edit_note_rounded, size: 18),
-                          label: const Text('Đăng công thức của bạn', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                          label: const Text('Đăng công thức của bạn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                           onPressed: _showCreateRecipeDialog,
                         ),
                       ],
@@ -360,11 +484,14 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                             selected: isSelected,
                             selectedColor: AppTheme.goldenAmber.withOpacity(0.2),
                             labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                              color: isSelected ? AppTheme.amberDark : AppTheme.slateDark,
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected ? AppTheme.goldenAmber : Colors.white70,
                             ),
-                            backgroundColor: Colors.white,
+                            backgroundColor: AppTheme.surfaceElevated,
+                            side: BorderSide(
+                              color: isSelected ? AppTheme.goldenAmber : const Color(0xFF27272A),
+                            ),
                             onSelected: (selected) {
                               if (selected) {
                                 setState(() => _selectedTag = tag);
@@ -381,18 +508,16 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                   const SizedBox(height: 16),
                   ..._recipes.map((recipe) {
                     final ingredients = (recipe['ingredients'] as List<dynamic>?) ?? [];
+                    final steps = (recipe['steps'] as List<dynamic>?) ?? [];
                     final likes = recipe['likes_count'] ?? 0;
                     final tips = (recipe['tips_received_vnd'] ?? 0) as int;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppTheme.surfaceElevated,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.slateBorder),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
-                        ],
+                        border: Border.all(color: const Color(0xFF27272A)),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -412,90 +537,110 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(recipe['author'] ?? '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                                      const Text('Đầu bếp sáng tạo cộng đồng', style: TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+                                      Text(recipe['author'] ?? '',
+                                          style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      Text(recipe['author_tier'] ?? 'Đầu bếp cộng đồng',
+                                          style: const TextStyle(fontSize: 10, color: AppTheme.goldenAmber)),
                                     ],
                                   ),
                                 ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(color: AppTheme.emeraldBadge.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                                  child: Text('Đã nhận ${(tips / 1000).toStringAsFixed(0)}k đ Tip', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppTheme.emeraldBadge)),
+                                  decoration: BoxDecoration(color: AppTheme.emeraldBadge.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                                  child: Text('Đã nhận ${(tips / 1000).toStringAsFixed(0)}k đ Tip',
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.emeraldBadge)),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 12),
 
                             // Recipe Title & Zero-Waste Tag
-                            Text(recipe['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.slateDark)),
+                            Text(recipe['title'] ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
                             const SizedBox(height: 6),
                             if (recipe['zero_waste_tag'] != null)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(6)),
-                                child: Text('♻️ ${recipe['zero_waste_tag']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.amberDark)),
+                                decoration: BoxDecoration(color: AppTheme.goldenAmber.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
+                                child: Text('♻️ ${recipe['zero_waste_tag']}',
+                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.goldenAmber)),
                               ),
 
                             const SizedBox(height: 12),
                             // Meta: Time, Difficulty, Calories
                             Row(
                               children: [
-                                const Icon(Icons.timer_outlined, size: 15, color: AppTheme.slateMuted),
+                                const Icon(Icons.timer_outlined, size: 14, color: Colors.white54),
                                 const SizedBox(width: 4),
-                                Text('${recipe['prep_time_minutes']} phút', style: const TextStyle(fontSize: 11, color: AppTheme.slateMuted, fontWeight: FontWeight.w600)),
+                                Text('${recipe['prep_time_minutes']} phút', style: AppTheme.labelSmall.copyWith(fontSize: 11)),
                                 const SizedBox(width: 12),
-                                const Icon(Icons.fitness_center_rounded, size: 15, color: AppTheme.slateMuted),
+                                const Icon(Icons.fitness_center_rounded, size: 14, color: Colors.white54),
                                 const SizedBox(width: 4),
-                                Text('${recipe['difficulty']}', style: const TextStyle(fontSize: 11, color: AppTheme.slateMuted, fontWeight: FontWeight.w600)),
+                                Text('${recipe['difficulty']}', style: AppTheme.labelSmall.copyWith(fontSize: 11)),
                                 const SizedBox(width: 12),
-                                const Icon(Icons.local_fire_department_outlined, size: 15, color: AppTheme.slateMuted),
+                                const Icon(Icons.local_fire_department_rounded, size: 14, color: Colors.deepOrangeAccent),
                                 const SizedBox(width: 4),
-                                Text('${recipe['calories']} kcal', style: const TextStyle(fontSize: 11, color: AppTheme.slateMuted, fontWeight: FontWeight.w600)),
+                                Text('${recipe['calories']} kcal', style: AppTheme.labelSmall.copyWith(fontSize: 11)),
                               ],
                             ),
 
-                            // Ingredients chips
                             const SizedBox(height: 12),
+                            // Ingredients Wrap
+                            const Text('Nguyên liệu chính:', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 6),
                             Wrap(
                               spacing: 6,
-                              runSpacing: 6,
+                              runSpacing: 4,
                               children: ingredients.map((ing) {
                                 return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(color: AppTheme.slateLight, borderRadius: BorderRadius.circular(8)),
-                                  child: Text(ing.toString(), style: const TextStyle(fontSize: 11, color: AppTheme.slateDark)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: const Color(0xFF1E1E24), borderRadius: BorderRadius.circular(6)),
+                                  child: Text('$ing', style: const TextStyle(color: Colors.white70, fontSize: 10)),
                                 );
                               }).toList(),
                             ),
 
-                            const Divider(height: 24),
-                            // Actions: Like & VietQR Tip
+                            if (steps.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              const Text('Các bước chế biến:', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              ...steps.asMap().entries.map((step) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('${step.key + 1}. ', style: const TextStyle(color: AppTheme.goldenAmber, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      Expanded(
+                                        child: Text('${step.value}', style: AppTheme.labelSmall.copyWith(fontSize: 11, color: Colors.white60)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+
+                            const SizedBox(height: 14),
+                            // Actions Row: Like & VietQR Tip
                             Row(
                               children: [
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: AppTheme.slateBorder),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  ),
-                                  icon: const Icon(Icons.thumb_up_alt_outlined, size: 16, color: AppTheme.slateDark),
-                                  label: Text('$likes Thích', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.slateDark)),
-                                  onPressed: () {
-                                    setState(() {
-                                      recipe['likes_count'] = likes + 1;
-                                    });
-                                  },
+                                Row(
+                                  children: [
+                                    const Icon(Icons.favorite, color: Colors.redAccent, size: 18),
+                                    const SizedBox(width: 4),
+                                    Text('$likes', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                                  ],
                                 ),
                                 const Spacer(),
                                 ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.goldenAmber,
-                                    foregroundColor: AppTheme.slateDark,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    foregroundColor: Colors.black,
                                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   ),
-                                  icon: const Icon(Icons.redeem_rounded, size: 16),
-                                  label: const Text('Tip VietQR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                                  icon: const Icon(Icons.qr_code_2_rounded, size: 16),
+                                  label: const Text('Tip Tác Giả (VietQR)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                                   onPressed: () => _showTipDialog(context, recipe),
                                 ),
                               ],
@@ -504,7 +649,7 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                         ),
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
             ),
