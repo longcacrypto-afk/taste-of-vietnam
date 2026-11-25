@@ -33,7 +33,7 @@ test('M4 PostgreSQL hours/verification/null location survive a new connection', 
   try {
     const repo = new PostgresRepository(fresh);
     const p = await repo.getPlace('M4-IN');
-    assert.equal(p.verified_at, '2026-11-25T05:00:00.000Z');
+    assert.equal(p.verified_at, fixtures()[0].verified_at);
     assert.deepEqual(p.opening_hours, fixtures()[0].opening_hours);
     const rows = await repo.findPlacesNear({ lat: 0, lng: 0, radiusM: 3000, now: NOW, requireVerifiedHours: true });
     assert.ok(rows.some(p => p.id === 'M4-IN' && p.is_currently_open));

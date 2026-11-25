@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { handleApiRequest } from '../../src/api/router.js';
 const query = o => new URLSearchParams(o);
-export const NOW = new Date('2026-11-26T12:00:00+07:00');
+export const NOW = new Date();
 const weekly = pair => Object.fromEntries(Array.from({ length: 7 }, (_, d) => [d, pair]));
 // WGS84 equatorial eastward points: PostGIS distances exactly 2990m / 3010m.
 const east = metres => metres / 6378137 * 180 / Math.PI;
 export function fixtures() {
   const common = { name: 'Quán thử', address: 'Fixture only', is_verified: true, is_open_override: true,
-    closed_report_count: 0, lat: 0, lng: 0, verified_at: '2026-11-25T05:00:00Z',
+    closed_report_count: 0, lat: 0, lng: 0, verified_at: new Date(NOW.getTime() - 86400000).toISOString(),
     opening_hours: { weekly: weekly([['00:00', '24:00']]) },
     menu: [{ dish_id: 'DISH-101', name: 'Phở', price: 50000, available: true }] };
   return [
@@ -16,7 +16,7 @@ export function fixtures() {
     { ...common, id: 'M4-ZERO' },
     { ...common, id: 'M4-UNKNOWN', lat: null, lng: null },
     { ...common, id: 'M4-NOHOURS', opening_hours: null },
-    { ...common, id: 'M4-STALE', verified_at: '2026-01-01T00:00:00Z' },
+    { ...common, id: 'M4-STALE', verified_at: new Date(NOW.getTime() - 91 * 86400000).toISOString() },
     { ...common, id: 'M4-CLOSED', opening_hours: { weekly: weekly([]) } },
     { ...common, id: 'M4-PAUSED', is_open_override: false },
     { ...common, id: 'M4-UNVERIFIED', is_verified: false },
