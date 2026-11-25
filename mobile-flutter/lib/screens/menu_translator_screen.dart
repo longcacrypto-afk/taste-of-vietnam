@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class MenuTranslatorScreen extends StatefulWidget {
   const MenuTranslatorScreen({super.key});
@@ -449,7 +450,10 @@ class _MenuTranslatorScreenState extends State<MenuTranslatorScreen> {
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: GestureDetector(
-                onTap: () => setState(() => _selectedLang = e.key),
+                onTap: () {
+                  setState(() => _selectedLang = e.key);
+                  ApiService.translateMenu(e.key);
+                },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

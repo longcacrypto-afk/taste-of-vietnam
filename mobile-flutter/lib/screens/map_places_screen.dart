@@ -3,6 +3,7 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 
@@ -18,6 +19,8 @@ class _MapPlacesScreenState extends State<MapPlacesScreen> {
   String _selectedFilter = 'all'; // 'all', 'ac', 'kids', 'high_rating'
   bool _isLoading = false;
   String? _activeOrderBanner;
+  String? _lastOrderId;
+  String? _lastPlaceId;
 
   @override
   void initState() {
@@ -139,10 +142,25 @@ class _MapPlacesScreenState extends State<MapPlacesScreen> {
     },
   ];
 
-  void _triggerDeepLink(String placeName, String partner) {
+  Future<void> _triggerDeepLink(String placeName, String partner, {String placeId = 'PLACE-401', String? targetUrl}) async {
     setState(() {
+      _lastPlaceId = placeId;
       _activeOrderBanner = 'Đã mở $partner cho "$placeName" (UTM Tracked). Bấm xác nhận nếu anh đã đặt món!';
     });
+    if (targetUrl != null) {
+      final uri = Uri.tryParse(targetUrl);
+      if (uri != null) {
+        launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) => false);
+      }
+    }
+    final res = await ApiService.redirectOrder(
+      placeId: placeId,
+      dishId: 'DISH-101',
+      platform: partner,
+    );
+    if (mounted && res != null && res['id'] is String) {
+      setState(() => _lastOrderId = res['id'] as String);
+    }
   }
 
   void _showActionToast(String message) {
@@ -250,7 +268,13 @@ class _MapPlacesScreenState extends State<MapPlacesScreen> {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     ),
-                    onPressed: () => setState(() => _activeOrderBanner = null),
+                    onPressed: () async {
+                      final orderId = _lastOrderId ?? 'ORD-${DateTime.now().millisecondsSinceEpoch}';
+                      await ApiService.confirmOrderEaten(orderId, 'DISH-101');
+                      if (!mounted) return;
+                      setState(() => _activeOrderBanner = null);
+                      _showActionToast('Đã xác nhận đã ăn · Kích hoạt Cooldown 3 ngày!');
+                    },
                     child: const Text('Đã ăn (Cooldown)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
                 ],
@@ -403,7 +427,12 @@ class _MapPlacesScreenState extends State<MapPlacesScreen> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: () => _triggerDeepLink(p['name'] as String, 'GrabFood'),
+                onPressed: () => _triggerDeepLink(
+                  p['name'] as String,
+                  'GrabFood',
+                  placeId: (p['id'] as String?) ?? 'PLACE-401',
+                  targetUrl: p['grabfood'] as String?,
+                ),
                 icon: const Icon(Icons.delivery_dining, size: 14),
                 label: const Text('GrabFood ↗', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
               ),
@@ -417,7 +446,12 @@ class _MapPlacesScreenState extends State<MapPlacesScreen> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: () => _triggerDeepLink(p['name'] as String, 'ShopeeFood'),
+                onPressed: () => _triggerDeepLink(
+                  p['name'] as String,
+                  'ShopeeFood',
+                  placeId: (p['id'] as String?) ?? 'PLACE-401',
+                  targetUrl: p['shopeefood'] as String?,
+                ),
                 icon: const Icon(Icons.shopping_bag_outlined, size: 14),
                 label: const Text('ShopeeFood ↗', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
               ),
@@ -429,7 +463,14 @@ class _MapPlacesScreenState extends State<MapPlacesScreen> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: () => _showActionToast('Đang mở Google Maps chỉ đường đến "${p['name']}"...'),
+                onPressed: () {
+                  final mapsUrl = p['maps'] as String?;
+                  if (mapsUrl != null) {
+                    final uri = Uri.tryParse(mapsUrl);
+                    if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) => false);
+                  }
+                  _showActionToast('Đang mở Google Maps chỉ đường đến "${p['name']}"...');
+                },
                 icon: const Icon(Icons.map_outlined, size: 13),
                 label: const Text('Chỉ đường', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
               ),
@@ -441,7 +482,14 @@ class _MapPlacesScreenState extends State<MapPlacesScreen> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: () => _showActionToast('Gọi hotline: ${p['phone']}'),
+                onPressed: () {
+                  final phone = (p['phone'] as String? ?? '').replaceAll(' ', '');
+                  if (phone.isNotEmpty) {
+                    final uri = Uri.tryParse('tel:$phone');
+                    if (uri != null) launchUrl(uri).catchError((_) => false);
+                  }
+                  _showActionToast('Gọi hotline: ${p['phone']}');
+                },
                 icon: const Icon(Icons.call_outlined, size: 13),
                 label: const Text('Gọi điện', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
               ),

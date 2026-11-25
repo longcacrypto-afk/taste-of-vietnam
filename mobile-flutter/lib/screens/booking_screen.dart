@@ -50,6 +50,7 @@ class _BookingScreenState extends State<BookingScreen>
     _successAnim = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 600));
     _scaleAnim = CurvedAnimation(parent: _successAnim, curve: Curves.elasticOut);
+    ApiService.fetchVouchers();
   }
 
   @override

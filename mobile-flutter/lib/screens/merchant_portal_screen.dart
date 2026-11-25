@@ -38,6 +38,22 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
     await ApiService.fetchFraudLogs();
   }
 
+  Future<void> _triggerOcrScan() async {
+    setState(() {
+      _isOcrScanning = true;
+      _ocrSuccess = false;
+    });
+    await ApiService.scanMenuOcr(
+      'PLACE-401',
+      'Phở Bò Tái Nạm - 55k\nPhở Gà Ta Lá Chanh - 50,000\nQuẩy Giòn - 10k',
+    );
+    if (!mounted) return;
+    setState(() {
+      _isOcrScanning = false;
+      _ocrSuccess = true;
+    });
+  }
+
   @override
   void dispose() {
     _tab.dispose();

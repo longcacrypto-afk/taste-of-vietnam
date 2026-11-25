@@ -395,6 +395,7 @@ class _AdminCmsScreenState extends State<AdminCmsScreen>
                         final newDish = dishController.text.trim();
                         final newPrice = int.tryParse(priceController.text.trim()) ?? item['suggestedPrice'];
                         Navigator.pop(ctx);
+                        ApiService.reviewOcrQueue(ocrId: item['id'] as String, decision: 'approved');
                         setState(() {
                           _ocrQueue.removeWhere((q) => q['id'] == item['id']);
                         });
@@ -457,6 +458,11 @@ class _AdminCmsScreenState extends State<AdminCmsScreen>
             ),
             onPressed: () {
               Navigator.pop(ctx);
+              ApiService.reviewOcrQueue(
+                ocrId: item['id'] as String,
+                decision: 'rejected',
+                reason: reasonController.text.trim(),
+              );
               setState(() {
                 _ocrQueue.removeWhere((q) => q['id'] == item['id']);
               });
@@ -516,6 +522,7 @@ class _AdminCmsScreenState extends State<AdminCmsScreen>
             ),
             onPressed: () {
               Navigator.pop(ctx);
+              ApiService.unpausePlace(place['id'] as String);
               setState(() {
                 _pausedPlaces.removeWhere((p) => p['id'] == place['id']);
                 _auditLogs.insert(0, {

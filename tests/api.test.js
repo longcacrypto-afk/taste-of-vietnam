@@ -603,3 +603,35 @@ test('AUDIT-GAPS: M1 PDPD export, M6 daily-special, M7 fraud-logs, M9 RBAC & M10
   assert.ok(abRes.data.active_experiments.length >= 3);
   assert.ok(abRes.data.nlu_accuracy.score >= 90);
 });
+
+test('PHASE-D: Collections (M2-S07), Spin (M3-S03), Vouchers (M13-S02) & Community Recipe POST (M20-S02)', async () => {
+  const store = createInitialStore();
+
+  // M2-S07: Save dish to favorite collections
+  const colRes = await handleApiRequest(store, 'POST', '/api/v1/me/collections', new URLSearchParams(), {
+    dish_id: 'DISH-105'
+  });
+  assert.equal(colRes.status, 200);
+  assert.ok(colRes.data.collections[0].dish_ids.includes('DISH-105'));
+
+  // M3-S03: Spin suggestion
+  const spinRes = await handleApiRequest(store, 'GET', '/api/v1/suggestions/spin', new URLSearchParams());
+  assert.equal(spinRes.status, 200);
+  assert.ok(spinRes.data.picked_dish && spinRes.data.total_safe_candidates > 0);
+
+  // M13-S02: Vouchers list
+  const voucherRes = await handleApiRequest(store, 'GET', '/api/v1/vouchers', new URLSearchParams());
+  assert.equal(voucherRes.status, 200);
+  assert.ok(Array.isArray(voucherRes.data.vouchers || voucherRes.data.items));
+
+  // M20-S02: Create community recipe
+  const createRecRes = await handleApiRequest(store, 'POST', '/api/v1/community/recipes', new URLSearchParams(), {
+    title: 'Canh Chua Cá Lóc Miền Tây',
+    author: 'Đầu Bếp Test',
+    prep_time_minutes: 30,
+    calories: 390,
+    zero_waste_tag: 'Tận dụng rau thơm'
+  });
+  assert.equal(createRecRes.status, 201);
+  assert.equal(createRecRes.data.title, 'Canh Chua Cá Lóc Miền Tây');
+});

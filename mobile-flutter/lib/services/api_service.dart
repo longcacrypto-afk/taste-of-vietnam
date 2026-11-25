@@ -601,4 +601,239 @@ class ApiService {
     } catch (e) {}
     return null;
   }
+
+  // ─── 25. M1: AUTH OTP & GUEST MODE ──────────────────────────────────────────
+  static Future<Map<String, dynamic>?> verifyOtp(String phone, String otp) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/auth/otp/verify'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': phone, 'otp': otp}),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> loginGuest() async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/auth/guest'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 26. M2: CHI TIẾT MÓN, BỘ SƯU TẬP & MÓN TƯƠNG TỰ ───────────────────────
+  static Future<Map<String, dynamic>?> fetchDishDetail(String dishId, {int servings = 2}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/dishes/$dishId').replace(queryParameters: {'servings': servings.toString()});
+      final res = await http.get(uri).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> saveToCollection(String dishId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/me/collections'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'dish_id': dishId}),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> fetchSimilarDishes(String dishId) async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/dishes/$dishId/similar')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 27. M3: VÒNG QUAY GỢI Ý (SPIN) ─────────────────────────────────────────
+  static Future<Map<String, dynamic>?> spinSuggestion() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/suggestions/spin')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 28. M5: ĐẶT MÓN DEEP-LINK & LOOPBACK COOLDOWN 3 NGÀY ───────────────────
+  static Future<Map<String, dynamic>?> redirectOrder({
+    required String placeId,
+    required String dishId,
+    required String platform,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/orders/redirect'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'place_id': placeId, 'dish_id': dishId, 'platform': platform}),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> confirmOrderEaten(String orderId, String dishId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/orders/$orderId/confirm-eaten'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'dish_id': dishId}),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 29. M6 & M7: MERCHANT OCR & CHIẾN DỊCH QUẢNG CÁO ──────────────────────
+  static Future<Map<String, dynamic>?> scanMenuOcr(String placeId, String rawText) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/merchant/menu/ocr'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'place_id': placeId, 'raw_text': rawText}),
+      ).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> createAdCampaign({
+    required String placeId,
+    required String dishId,
+    required int budgetVnd,
+    int radiusM = 3000,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/ads/campaigns'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'place_id': placeId,
+          'dish_id': dishId,
+          'budget_vnd': budgetVnd,
+          'radius_m': radiusM,
+        }),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 30. M9: ADMIN OCR REVIEW & MỞ LẠI QUÁN ────────────────────────────────
+  static Future<Map<String, dynamic>?> reviewOcrQueue({
+    required String ocrId,
+    required String decision,
+    String? reason,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/admin/ocr-review'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'ocr_id': ocrId, 'decision': decision, if (reason != null) 'reason': reason}),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> unpausePlace(String placeId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/admin/places/$placeId/unpause'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 31. M13: DANH SÁCH VOUCHER ─────────────────────────────────────────────
+  static Future<Map<String, dynamic>?> fetchVouchers() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/vouchers')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 32. M18: GEMINI VISION PHÂN TÍCH ẢNH TỦ LẠNH / MENU ───────────────────
+  static Future<Map<String, dynamic>?> analyzeVisionImage({
+    String context = 'fridge',
+    String imageBase64 = '',
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/vision/analyze'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'context': context, 'image_base64': imageBase64}),
+      ).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 33. M20: ĐĂNG CÔNG THỨC CỘNG ĐỒNG MỚI ────────────────────────────────
+  static Future<Map<String, dynamic>?> createCommunityRecipe({
+    required String title,
+    String author = 'Đầu Bếp Gia Đình',
+    int prepTimeMinutes = 25,
+    int calories = 450,
+    String? zeroWasteTag,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/community/recipes'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'title': title,
+          'author': author,
+          'prep_time_minutes': prepTimeMinutes,
+          'calories': calories,
+          if (zeroWasteTag != null) 'zero_waste_tag': zeroWasteTag,
+        }),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
 }

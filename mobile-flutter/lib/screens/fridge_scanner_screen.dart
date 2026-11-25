@@ -162,6 +162,7 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
   }
 
   Future<void> _executeScanAndAdd() async {
+    await ApiService.analyzeVisionImage(context: 'fridge');
     final res = await ApiService.scanFridgeItem(
       barcode: '8934567890123',
       itemName: 'Sữa chua nha đam Vinamilk',

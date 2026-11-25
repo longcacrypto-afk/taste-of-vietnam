@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 import 'map_places_screen.dart';
 
 class DishDetailScreen extends StatefulWidget {
@@ -25,6 +26,17 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   void initState() {
     super.initState();
     _dish = widget.dish ?? _defaultDish;
+    _syncDishFromServer();
+  }
+
+  Future<void> _syncDishFromServer() async {
+    final dishId = (_dish['id'] as String?) ?? 'DISH-101';
+    final res = await ApiService.fetchDishDetail(dishId, servings: _portions);
+    await ApiService.fetchSimilarDishes(dishId);
+    if (!mounted || res == null) return;
+    setState(() {
+      if (res['calories'] != null) _dish = {..._dish, 'calories': res['calories']};
+    });
   }
 
   static const Map<String, dynamic> _defaultDish = {
@@ -137,7 +149,12 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
       ),
       actions: [
         GestureDetector(
-          onTap: () => setState(() => _bookmarked = !_bookmarked),
+          onTap: () {
+            setState(() => _bookmarked = !_bookmarked);
+            if (_bookmarked) {
+              ApiService.saveToCollection((_dish['id'] as String?) ?? 'DISH-101');
+            }
+          },
           child: Container(
             margin: const EdgeInsets.all(8),
             padding: const EdgeInsets.all(6),
@@ -552,7 +569,12 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
         children: [
           // Bookmark button
           GestureDetector(
-            onTap: () => setState(() => _bookmarked = !_bookmarked),
+            onTap: () {
+            setState(() => _bookmarked = !_bookmarked);
+            if (_bookmarked) {
+              ApiService.saveToCollection((_dish['id'] as String?) ?? 'DISH-101');
+            }
+          },
             child: Container(
               width: 50,
               height: 50,

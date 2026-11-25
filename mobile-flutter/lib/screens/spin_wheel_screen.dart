@@ -183,6 +183,7 @@ class _SpinWheelScreenState extends State<SpinWheelScreen>
       _isSpinning = true;
       _selectedDish = null;
     });
+    ApiService.spinSuggestion();
 
     final randomTargetIndex = math.Random().nextInt(_wheelItems.length);
     final segmentAngle = (2 * math.pi) / _wheelItems.length;

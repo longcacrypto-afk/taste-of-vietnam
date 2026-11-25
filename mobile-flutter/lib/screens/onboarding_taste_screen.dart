@@ -13,6 +13,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class OnboardingTasteScreen extends StatefulWidget {
   final VoidCallback onComplete;
@@ -40,6 +41,14 @@ class _OnboardingTasteScreenState extends State<OnboardingTasteScreen> {
       _ctrl.nextPage(duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
       setState(() => _step++);
     } else {
+      final budgetVnd = [35000, 70000, 100000, 150000][_budgetLevel.clamp(0, 3)];
+      ApiService.updateUserProfile({
+        'regions': _regions.toList(),
+        'spice_level': _spice,
+        'diet_mode': _diet,
+        'hard_allergies': _allergies.toList(),
+        'budget_max_vnd': budgetVnd,
+      });
       widget.onComplete();
     }
   }

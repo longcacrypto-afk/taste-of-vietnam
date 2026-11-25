@@ -354,6 +354,15 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                   onPressed: () {
                     final t = titleController.text.trim();
                     if (t.isNotEmpty) {
+                      final prepMins = int.tryParse(timeController.text) ?? 20;
+                      final tagText = tagController.text.trim();
+                      ApiService.createCommunityRecipe(
+                        title: t,
+                        author: 'Bạn (Đầu Bếp Nhà)',
+                        prepTimeMinutes: prepMins,
+                        calories: 380,
+                        zeroWasteTag: tagText.isNotEmpty ? tagText : null,
+                      );
                       setState(() {
                         _recipes.insert(0, {
                           'id': 'CREC-${DateTime.now().millisecondsSinceEpoch % 1000}',
@@ -361,12 +370,12 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                           'author': 'Bạn (Đầu Bếp Nhà)',
                           'author_tier': 'Tác Giả Mới ✨',
                           'author_avatar': '👨‍🍳',
-                          'prep_time_minutes': int.tryParse(timeController.text) ?? 20,
+                          'prep_time_minutes': prepMins,
                           'difficulty': 'Dễ',
                           'calories': 380,
                           'likes_count': 1,
                           'tips_received_vnd': 0,
-                          'zero_waste_tag': tagController.text.trim(),
+                          'zero_waste_tag': tagText,
                           'ingredients': ingController.text.split(',').map((e) => e.trim()).toList(),
                           'steps': ['Sơ chế nguyên liệu tươi sạch.', 'Chế biến theo công thức gia truyền.'],
                         });
