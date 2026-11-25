@@ -256,7 +256,7 @@ CREATE TABLE external_order_redirects (
 - **Database DDL (Bảng 20):** `community_recipes` (id, author_id, author_name, title, prep_time_minutes, difficulty, calories, ingredients, steps, zero_waste_tag, likes_count, total_tips_vnd, created_at).
 
 ### 6.4. Ma trận Toàn Bộ 20 Bảng DDL PostgreSQL + PostGIS
-Toàn bộ 20 bảng DDL được duy trì và kiểm thử trong `src/db/schema.sql`:
+Schema nằm trong các migration có thứ tự `src/db/migrations/NNN_*.sql` (chạy bằng `npm run db:migrate`; trước P1 là `src/db/schema.sql`). Danh sách dưới đây là thiết kế ban đầu; bảng thực tế xem trong migrations:
 1. `users` (M1) · 2. `dishes` (M2) · 3. `places` (M4, M6) · 4. `place_menu_items` (M4, M6) · 5. `suggestion_logs` (M3) · 6. `user_taste_profiles` (M1) · 7. `decision_spins` (M3) · 8. `external_order_redirects` (M5) · 9. `sponsored_campaigns` (M7) · 10. `merchant_invoices` (M7) · 11. `meal_reminder_schedules` (M8) · 12. `crowdsourced_reports` (M4, M9) · 13. `analytics_events` (M10) · 14. `meal_plans` (M11) · 15. `group_polls` & `group_poll_votes` (M12) · 16. `place_reviews` (M12) · 17. `table_bookings` (M13) · 18. `fridge_items` (M18) · 19. `health_metrics` (M19) · 20. `community_recipes` (M20).
 
 ### 6.5. SLA Bộ Kiểm Thử Tự Động (27/27 Test Suites)

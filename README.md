@@ -125,6 +125,21 @@ npm start
 # Server chạy tại: http://127.0.0.1:3000
 ```
 
+### 2b. Chạy với PostgreSQL + PostGIS (dữ liệu được lưu lại sau khi khởi động lại)
+Không đặt `DATABASE_URL` thì server dùng bộ nhớ tạm (chỉ để dev/test, mất dữ liệu khi tắt).
+Khi đặt `DATABASE_URL`, tài khoản, hồ sơ, lịch sử, món ăn, quán, chiến dịch, thanh toán, công thức đều lưu trong Postgres.
+```bash
+# Postgres cần PostGIS (vd. docker: postgis/postgis:16-3.4)
+export DATABASE_URL=postgresql://user:pass@localhost:5432/taste_of_vietnam
+npm run db:migrate          # chạy các file src/db/migrations/NNN_*.sql theo thứ tự (mỗi file một lần)
+npm run db:migrate:status   # xem migration nào đã chạy / còn thiếu
+npm run db:seed             # nạp 12 món + 8 quán mẫu (không ghi đè dữ liệu đã có)
+JWT_SECRET=$(openssl rand -hex 32) npm start
+```
+- Server **không khởi động** nếu còn migration chưa chạy (tránh lặng lẽ quay về bộ nhớ tạm và mất dữ liệu). `DB_AUTO_MIGRATE=true` cho phép tự chạy migration khi khởi động (docker-compose dùng cách này).
+- Thêm thay đổi schema: tạo file mới `src/db/migrations/003_ten_thay_doi.sql`; không sửa file đã chạy.
+- Kiểm thử với Postgres thật: `TEST_DATABASE_URL=postgresql://... npm run test:db` (xóa sạch schema `public` của DB đó mỗi lần chạy — chỉ dùng DB thử).
+
 ### 3. Chạy Flutter Mobile App
 ```bash
 cd mobile-flutter
