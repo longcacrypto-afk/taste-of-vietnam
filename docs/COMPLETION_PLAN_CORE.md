@@ -190,3 +190,101 @@ Grab có hướng dẫn link bán hàng rút gọn của quán, nhưng bài hư�
 | M5-3 M **P2 phần UI** | S05 | Return/resume chỉ hỏi “Bạn đã ăn món này chưa?” theo redirect đang pending; xác nhận server idempotent/transaction; bỏ fallback id tùy ý, self-report riêng qua feedback | Reload/xác nhận 2 lần/concurrent chỉ 1 history; người B không xác nhận đơn A; đóng app rồi mở vẫn đúng món; không khẳng định đơn giao thành công |
 | M5-4 M | S01–S05 | Test hợp đồng với fixture + thử link thực Android/iOS/desktop có/không app; thiếu app → web fallback; link chết → báo lỗi, có gọi/chỉ đường thay | Mỗi đối tác ít nhất một link quán thật mở đúng trên ma trận máy; không test đặt/mua thật khi chưa xin phép; thiếu link thì ẩn/khóa nút có giải thích |
 | M5-5 S | S01–S05 + M9-S01 | Sự kiện tối thiểu của luồng từ redirect row, có action_type/clicked_at/confirmed_at và chống trùng; chỉ báo click và self-report, không doanh thu/đơn đối tác | Restart không mất số liệu, 3 hành động không lẫn; không gửi phone/GPS thô sang UTM; M10 đầy đủ vẫn đóng băng |
+
+## 6. M9 — Quản trị và chất lượng dữ liệu (30%)
+
+### Ý định và màn giữ lại
+
+`screens_m9_m10_expansion.js`: S01 dashboard; S02 món/allergen; S03 công thức/scale; S04 xác minh quán; S05 ghép OCR; S06 reports/mở lại; S07 duyệt ads; S08 người dùng/quyền; S09 audit/cấu hình. Giữ adminShell và `lpanel-admin`. Không kích hoạt lại merchant/OCR ingestion/quảng cáo chỉ để lấp đủ chín màn: khả năng duyệt nội dung nhập tay vẫn cần.
+
+### Hiện chạy được và còn giả
+
+- `/admin/dashboard` lấy counts món/quán, OCR queue, reports, campaigns từ DB; phần events RAM. Live App có đăng nhập admin, xem dashboard/duyệt cơ bản, nhưng chưa CMS đầy đủ.
+- POST `/admin/dishes`, PATCH/PUT/DELETE `/admin/dishes/:id` thật, audit thật. Fields được whitelist nhưng chưa CRUD nguyên liệu/steps/macros/ảnh/diet/meal đầy đủ. GET `/admin/dishes` mà mockup ghi chưa có riêng; có thể tái dùng `/dishes` nhưng cần xem cả draft trong admin.
+- POST `/admin/ocr-review` hiện sửa status/rejection_reason; **không xuất bản menu mapping/revision** sau duyệt. Không route có path `ocr-review/:id` như mockup. Chấp thuận thiếu decision tự thành approved; lý do từ chối chưa bắt buộc.
+- POST `/admin/places/:id/approve|unpause` cùng gọi `unpausePlace`: vừa đặt verified vừa clear pause vừa xóa reports. Xác minh quán mới và mở lại quán vi phạm chưa tách nghiệp vụ.
+- `/admin/audit-logs` đọc DB; chưa filter/pagination đầy đủ, event và thay đổi chưa cùng transaction. API `/admin/rbac/roles` trả sáu vai trò mẫu; `/admin/rbac/users` trả người mẫu, POST chỉ echo “updated” không lưu. **Quyền thực tế chỉ user/merchant/admin, cấp bằng env số điện thoại**, không phải RBAC 6 vai trò.
+- Chưa API quản lý công thức chuẩn/quán mới/menu/giá đầy đủ; `/admin/reports` và `/admin/config` trong mockup chưa có. Không tính PUT community recipes M20 là CMS công thức M2.
+- Audit có thật không có nghĩa bất biến: chưa chứng minh DB role/retention/chống sửa; log chứa IP cần chính sách. M9-S07 ads có API moderation nhưng nằm ngoài phạm vi mở kinh doanh.
+
+### Nghiên cứu dùng để hoàn thiện
+
+OWASP khuyến nghị mặc định từ chối và kiểm quyền trên mọi request [R10]; danh sách role vẽ trên UI không phải hệ thống quyền. Áp dụng deny-by-default, kiểm test theo vai trò và giữ audit quyết định. Cookpad Community Guidelines là ví dụ chính sách nội dung nêu rõ nội dung được phép [R2]; kho của ta cần quy tắc nguồn/ảnh/an toàn/dị ứng và trạng thái duyệt trước xuất bản, không chỉ nút approve.
+
+### Việc theo thứ tự
+
+| ID / cỡ | Màn có sẵn | Logic/API + dữ liệu phải làm | Nghiệm thu / phụ thuộc |
+| --- | --- | --- | --- |
+| M9-1 M **P2 phần UI** | S01–S02, S05–S06, S09 | Nối dashboard thật, role denied/login, mutation lỗi không báo thành công; bỏ KPI/chart giả; ẩn S07 và cấu hình chưa hỗ trợ | Guest/user 401/403; admin có số 0 thật khi DB rỗng; loading/rỗng/lỗi/thử lại; không gọi module đóng băng |
+| M9-2 L | S02–S03 | CRUD món/công thức chuẩn: draft/published/archived, ingredient/unit/allergen/diet/macro, ảnh nguồn/license; thêm API đề xuất `/admin/recipes/:id` hoặc nested dish recipe nhất quán | Tạo → preview → duyệt → xuất hiện M2/M3; chưa xác minh allergen không publish; rollback version; API và UI dùng cùng schema M2 |
+| M9-3 L | S04 | CRUD quán/menu/giờ/availability (API admin đề xuất), nhập CSV có dry-run/dedupe; workflow pending→verified, evidence/link/license/verified_at; tách approve/unpause | Quán mới chưa duyệt không có M4; duyệt đúng vị trí/menu; chỉnh giá cập nhật M3/M5; import lỗi không ghi dở. **Cần nguồn quán và người được quyền xác minh** |
+| M9-4 M | S05 | Review chọn dishId chuẩn, price, reason bắt buộc khi reject; optimistic concurrency/version; transaction status+mapping+menu_revision+audit; M6 ingestion vẫn tắt | Hai admin duyệt cùng bản chỉ một thành công; reject không publish; approved vào menu đúng quán và giữ giá cũ trong revision; fixture được, chưa cần AI key |
+| M9-5 M | S06 | Hàng đợi reports filter/status, bằng chứng, resolve/reject/unpause có reason; không xóa reports; tích hợp anti-abuse M4-5 | Báo cáo đã xử lý còn tìm/audit được; mở lại không đổi nhầm verification; quán đủ điều kiện trở lại M4 sau refresh |
+| M9-6 M | S08 | Bản đầu dùng admin đơn giản thật, không giả sáu role; danh sách admin được duyệt qua env; nếu cần nhiều người, phase riêng quyền granular + API user/role lưu DB, phòng tự khóa admin cuối | Tất cả admin routes test user/guest/merchant/admin; role đổi có hiệu lực, không chỉ echo. **Cần chủ sở hữu chọn người quản trị; đề xuất chưa xây 6 role** |
+| M9-7 M | S09 | Audit cùng transaction thay đổi, actor/target/before-after/reason/requestId, lọc/phân trang; quyền DB hạn chế app xóa log, backup/retention; cấu hình có whitelist/version | Ghi lỗi rollback cả dữ liệu và audit; không sửa/xóa log qua API; export không lộ secret; drill restore DB. **Cần chính sách lưu IP/log và backup được duyệt** |
+
+## 7. Thứ tự bàn giao và cổng nghiệm thu chung
+
+1. **Chốt hợp đồng màn/API và bảo vệ đầu vào:** M1-2, M2-2/3, M3-1/2, M4-5, M5-2/3. Đây là lỗi đúng/sai dữ liệu, không chờ nhập kho lớn.
+2. **P2 hoàn tất giao diện cũ:** tiếp nhận các dòng đánh dấu P2, đối chiếu head mới của PR #3. PR này chỉ chịu phần wiring/UI; không tự nhận đã sửa backend của dòng đó. Một control phải có một handler, không có product shell thứ hai.
+3. **M9 nhập/duyệt và M1 vị trí/đăng nhập:** làm nền cho dữ liệu có quyền tại thành phố đã chọn; M2/M4 sau đó mới có nội dung vận hành.
+4. **M3 hoàn thiện lựa chọn/AI/thời tiết**, tiếp theo **M5 thử mở đối tác và quay lại**. Không cần SMS/payment để kiểm phần lớn logic bằng fixture.
+5. **Trước mở công khai:** test trình duyệt + PostgreSQL qua control thực, dữ liệu chuẩn nhỏ; giới hạn tần suất, CORS allowlist, giới hạn payload, session/cache riêng tư; kiểm đường WebSocket merchant chưa xác thực — tắt trong MVP hoặc xác thực, không mở lại M6. Có backup/restore, giám sát lỗi, chính sách dữ liệu; đổi DB trước hạn miễn phí **21/12/2026**. Render/prod/thay gói trả phí đều xin duyệt riêng.
+
+### Bộ kiểm không được bỏ
+
+| Cổng | Cách kiểm | Điều kiện qua |
+| --- | --- | --- |
+| M1 → M2 | Trình duyệt + DB: khách → onboarding → lưu món → login → reload/restart → export/delete | Không mất/trộn hồ sơ; đồng ý do người dùng chọn; token/cache bị thu hồi đúng |
+| M2 → M4 | Bấm món → scale → quán đúng món; GPS cho/từ chối | ID giữ đúng; khoảng cách thật; không bịa quán gần, count, ảnh hay giờ |
+| M3 | Cùng dataset cho Today/chat/3 game, thiếu ứng viên, dị ứng/chay/đã ăn/slot tài trợ | Không lách an toàn; ít món nói rõ; cache đổi ngay sau feedback/admin |
+| M4 → M9 | 1 người spam, 3 người hợp lệ, sai giá, mở lại | Guard đúng lý do/cửa sổ; lịch sử còn; không xuất bản quán ngoài giờ |
+| M5 | Redirect→external→resume→confirm 2 lần/concurrent, tài khoản khác | Link đúng; một record/history; chỉ “tự xác nhận đã ăn”, không giả trạng thái giao hàng |
+| M9 | Tạo/sửa/duyệt/gỡ món và quán, 2 admin cùng sửa | DB+audit atomic; nội dung chưa duyệt không hiện; denied không đụng dữ liệu |
+| UI/PWA | 360/768/1440; keyboard; slow/offline; 401/403/404/429/500; giảm chuyển động | Không tràn, có nhãn/focus/lỗi rõ và retry; không cache API cá nhân; không tự replay ghi |
+| Độ bền | `npm test`, `npm run test:db`, `npm run build:ui`, restart/restore | 0 fail/0 skip DB suite; bundle cùng source; test mới cho từng hành vi thay đổi |
+
+## 8. Các quyết định còn mở và đề xuất
+
+| Khi cần | Quyết định | Đề xuất mặc định, chưa phải phê duyệt |
+| --- | --- | --- |
+| Trước M1-4/M4-2 | Thành phố mở đầu | Một thành phố; Biên Hòa chỉ vì kho mẫu ở đó, không coi đã được chọn |
+| Trước M2-4/M9-3 | Nguồn món/quán/ảnh và quyền dùng | Tự nhập/được chủ nguồn cho phép; thử kho nhỏ có bằng chứng; không scrape Grab/ShopeeFood/Cookpad để đủ số |
+| Trước M1-3 | SMS OTP hay Google/Zalo; chi phí/provider | Chọn một; giữ OTP nếu đã có eSMS Brandname/template hợp lệ; khách tiếp tục dùng phần công khai |
+| Trước mở admin | Số điện thoại/người quản trị, chính sách duyệt | Admin đơn giản, tối thiểu quyền; chưa hứa 6 role/2FA cho đến khi làm thật |
+| Trước bật guard mới | Báo đóng cửa: thời gian và điều kiện tài khoản | 3 tài khoản đủ điều kiện khác nhau/24h; chống guest spam; không tăng đếm khi sai giá |
+| Trước AI/weather/map thật | Provider/model, quyền thương mại, hạn mức | Model được hỗ trợ theo docs tại lúc triển khai; adapter/fallback; xin duyệt mọi phát sinh tiền |
+| Trước M5 link thật | Link từng quán/đối tác, có hợp đồng affiliate không | Chỉ link đã thử; chưa tuyên bố affiliate, đồng bộ menu hay đơn đối tác |
+| Trước bật thanh toán | Chủ thể nhận tiền + tài khoản VietQR + keys/hợp đồng | **Chưa bật**; số Vietcombank mẫu không được dùng. Thanh toán M7 không phải điều kiện hoàn tất M5 |
+| Trước ra mắt | Chính sách đồng ý/xuất/xóa/retention; DB và backup sau 21/12 | Xác nhận chủ thể chịu trách nhiệm; backup/restore trước nâng gói/chuyển DB; không tuyên bố pháp lý từ nhãn code |
+
+### Key và truy cập: tên thôi, không đưa giá trị vào GitHub/chat
+
+- `GEMINI_API_KEY`: xác minh AI thật; thêm biến model theo implementation. Không cần key để chạy fallback/tests fixture.
+- `SMS_API_KEY`, `SMS_SECRET_KEY`, `SMS_BRANDNAME`: thử OTP thật sau duyệt template và phí; `JWT_SECRET`: khóa phiên ổn định; `ADMIN_PHONES`: cấp admin theo phương án hiện tại.
+- `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`: **chỉ khi mở lại M7 được phê duyệt**; không chặn core handoff.
+- `DATABASE_URL` cho môi trường app; `TEST_DATABASE_URL` **chỉ DB test rỗng dùng riêng** vì suite xóa schema; `DB_AUTO_MIGRATE=true` theo kế hoạch deploy được duyệt. Có thể tạo key giả cục bộ cho JWT/checksum fixture, không gọi dịch vụ thật.
+
+## 9. Bằng chứng kiểm lại và giới hạn
+
+- Worker riêng nhánh docs từ main 9adf9e0; setup `npm ci`. Baseline `npm test`: **69 pass, 0 fail, 0 skip**; `npm run build:ui` thành công (99 màn, 2.89 MB). Không có lint/typecheck script.
+- PostgreSQL 15 + PostGIS 3, DB dùng một lần `tov_core_review`: `TEST_DATABASE_URL=postgres://tov:tov@127.0.0.1:5432/tov_core_review npm run test:db` → **13 pass, 0 fail, 0 skip**, bao gồm migrations, SQL thật, restart, scope từng người, reports/unpause, audit. Thông tin đăng nhập này là fixture local trong test repo, không phải prod.
+- Các suite DB gọi router và có bài restart server; **không phải kiểm trình duyệt qua toàn bộ các màn**. Những chỗ “UI → DB” nêu trên dựa vào đọc handler + kiểm route/repository, không gắn nhãn đã nghiệm thu E2E.
+- Đã đọc PR #3 để phân ranh trách nhiệm; evidence cũ 160 browser checks thuộc product shell bị loại, không chuyển thành bằng chứng cho Live App sắp sửa.
+- Không ghi dữ liệu prod, không deploy, không mua dịch vụ, không gửi SMS/đặt món/thanh toán thật; chưa kiểm khóa AI/đối tác, thiết bị thật/Firefox/WebKit, screen reader, performance tải thật hoặc chính sách pháp lý hiện hành.
+- Thay đổi của PR tài liệu này chỉ là `docs/COMPLETION_PLAN_CORE.md`. Các lỗi và API đề xuất phía trên là **kế hoạch**, không có nghĩa mã đã được sửa.
+
+## 10. Nguồn nghiên cứu bên ngoài
+
+Tra cứu ngày 25–26/11/2026; dùng hướng dẫn chính thức, không dùng số quảng cáo làm bằng chứng hiệu năng của ứng dụng.
+
+- **[R1] eSMS:** [OTP/CSKH](https://developers.esms.vn/esms-api/ham-gui-tin/tin-nhan-sms-otp-cskh) và [GENCODE](https://developers.esms.vn/esms-api/ham-gui-tin/tin-gencode-tu-dong-sms). Brandname phải đăng ký; GENCODE có yêu cầu template. Áp dụng M1.
+- **[R2] Cookpad:** [Terms](https://cookpad.com/us/terms), [Community guidelines](https://cookpad.com/us/community). Nội dung có thể sai/không an toàn, có quy tắc nội dung và quyền tác giả; đây là tham khảo quản trị, không phải giấy phép lấy công thức. Áp dụng M2/M9.
+- **[R3] Cookpad:** [Privacy](https://cookpad.com/us/privacy). Xử lý thông tin dị ứng trong nhóm thông tin cần thận trọng; không thay tư vấn pháp luật Việt Nam. Áp dụng M1.
+- **[R4] Google AI:** [Deprecations](https://ai.google.dev/gemini-api/docs/deprecations), [Models](https://ai.google.dev/gemini-api/docs/models). Dòng 2.0 Flash đã được liệt kê ngừng cung cấp; phải kiểm model còn hỗ trợ khi cấu hình, không chốt một alias mới chỉ từ search snippet. Áp dụng M3.
+- **[R5] Open-Meteo:** [Terms](https://open-meteo.com/en/terms), [Pricing](https://open-meteo.com/en/pricing), [Data license](https://open-meteo.com/en/license). Dữ liệu CC BY 4.0 và quyền hosted API thương mại là hai vấn đề khác nhau. Áp dụng M3.
+- **[R6] Grab:** [GrabFood Việt Nam](https://www.grab.com/vn/food/). Địa chỉ người dùng quyết định danh sách quán có thể giao; “gần 3km” không bằng “có giao”. Áp dụng M4.
+- **[R7] Google Maps:** [Maps URLs](https://developers.google.com/maps/documentation/urls/get-started). URL đa nền tảng, `api=1`, destination, không cần API key cho Maps URLs; không nhầm với Maps Embed/Places có mô hình tính phí riêng. Áp dụng M4/M5.
+- **[R8] Grab:** [Rút gọn đường dẫn bán hàng](https://www.grab.com/vn/merchant-blog/rutgonlink/) (24/03/2022). Bằng chứng có link quán do đối tác hỗ trợ, **không xác minh chương trình đó còn mở hoặc cấp quyền affiliate hôm nay**. Áp dụng M5.
+- **[R9] ShopeeFood:** [Điều khoản merchant](https://resource.foody.vn/web/merchant-private-policy.html). Không suy ra quyền tái phân phối dữ liệu hoặc API đặt hàng từ trang công khai; tìm kiếm này chưa xác minh được hợp đồng deep-link/affiliate public hiện hành. Áp dụng M4/M5.
+- **[R10] OWASP:** [Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html). Deny by default, validate permissions on every request; áp dụng M9 và mọi route ghi.
