@@ -8,6 +8,8 @@ import { haversineDistanceMeters } from '../services/textUtils.js';
 import { recordCampaignClick } from '../services/expansionServices.js';
 import { processSuccessfulPayment } from '../services/paymentService.js';
 
+import { applyCollectionOperation } from '../services/collectionOps.js';
+
 const MAX_GUESTS = 10000; // cap in-memory guest accounts
 
 export class MemoryRepository {
@@ -109,6 +111,16 @@ export class MemoryRepository {
     return u ? u.savedCollections : [];
   }
 
+  // No await inside this read-modify-write: atomic within the single Node process.
+  async mutateCollection(userId, op) {
+    const user = (this.store.users || {})[userId];
+    if (!user) return null;
+    if (['add', 'save_default'].includes(op.type) && !this.store.dishes.some(d => d.id === op.dishId)) return null;
+    const result = applyCollectionOperation(user.savedCollections || [], op);
+    if (result) user.savedCollections = result.collections;
+    return result;
+  }
+
   async saveCollections(userId, collections) {
     const u = await this.getUser(userId);
     if (u) u.savedCollections = collections;
@@ -135,6 +147,10 @@ export class MemoryRepository {
   async deleteDish(id) {
     const before = this.store.dishes.length;
     this.store.dishes = this.store.dishes.filter(d => d.id !== id);
+    for (const u of Object.values(this.store.users || {})) {
+      for (const col of u.savedCollections || []) col.dish_ids = col.dish_ids.filter(d => d !== id);
+    }
+    for (const col of this.store.savedCollections || []) col.dish_ids = col.dish_ids.filter(d => d !== id);
     return this.store.dishes.length < before;
   }
 

@@ -7,6 +7,8 @@
 
 import { removeVietnameseTones } from '../services/textUtils.js';
 
+import { applyCollectionOperation } from '../services/collectionOps.js';
+
 const GUEST_TTL_DAYS = Number(process.env.GUEST_TTL_DAYS || 30);
 const PRUNE_EVERY_MS = 60 * 60 * 1000;
 const CLICK_DEDUP_SECONDS = 60;
@@ -303,8 +305,34 @@ export class PostgresRepository {
     return r.rows.map(x => ({ id: x.id, name: x.name, dish_ids: x.dish_ids }));
   }
 
+  async mutateCollection(userId, op) {
+    return this.tx(async c => {
+      // Saves share the catalogue barrier; deletes take it exclusively. This also
+      // prevents a save of dish B copying an old reference to concurrently deleted A.
+      await c.query("SELECT pg_advisory_xact_lock_shared(hashtext('m2-collections-catalogue'))");
+      // Lock the account even for its first save (there may be no collection row).
+      if (!(await c.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId])).rowCount) return null;
+      // Share lock keeps deletion from racing validation/insert.
+      if (['add', 'save_default'].includes(op.type) &&
+          !(await c.query('SELECT id FROM dishes WHERE id = $1 FOR SHARE', [op.dishId])).rowCount) return null;
+      const rows = (await c.query('SELECT id, name, dish_ids FROM saved_collections WHERE user_id = $1 ORDER BY position, id', [userId])).rows;
+      const result = applyCollectionOperation(rows, op);
+      if (!result) return null;
+      await c.query('DELETE FROM saved_collections WHERE user_id = $1', [userId]);
+      for (const [pos, col] of result.collections.entries()) {
+        await c.query('INSERT INTO saved_collections (user_id, id, name, dish_ids, position) VALUES ($1, $2, $3, $4, $5)',
+          [userId, col.id, col.name, col.dish_ids, pos]);
+      }
+      return result;
+    });
+  }
+
   async saveCollections(userId, collections) {
     await this.tx(async (c) => {
+      await c.query("SELECT pg_advisory_xact_lock_shared(hashtext('m2-collections-catalogue'))");
+      if (!(await c.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId])).rowCount) return;
+      const valid = new Set((await c.query('SELECT id FROM dishes')).rows.map(d => d.id));
+      collections = collections.map(col => ({ ...col, dish_ids: (col.dish_ids || []).filter(id => valid.has(id)) }));
       await c.query('DELETE FROM saved_collections WHERE user_id = $1', [userId]);
       let pos = 0;
       for (const col of collections) {
@@ -347,7 +375,12 @@ export class PostgresRepository {
   }
 
   async deleteDish(id) {
-    return (await this.q('DELETE FROM dishes WHERE id = $1', [id])).rowCount > 0;
+    return this.tx(async c => {
+      await c.query("SELECT pg_advisory_xact_lock(hashtext('m2-collections-catalogue'))");
+      const removed = (await c.query('DELETE FROM dishes WHERE id = $1', [id])).rowCount > 0;
+      await c.query('UPDATE saved_collections SET dish_ids = array_remove(dish_ids, $1) WHERE $1 = ANY(dish_ids)', [id]);
+      return removed;
+    });
   }
 
   // ── places (PostGIS) ───────────────────────────────────────────────────────
