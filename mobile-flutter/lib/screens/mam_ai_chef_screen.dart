@@ -16,7 +16,7 @@ class MamAiChefScreen extends StatefulWidget {
 
 class _MamAiChefScreenState extends State<MamAiChefScreen> {
   final TextEditingController _msgCtrl = TextEditingController();
-  final ScrollController _scrollCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
   bool _isLoading = false;
 
   final List<Map<String, dynamic>> _messages = [

@@ -453,4 +453,152 @@ class ApiService {
     } catch (e) {}
     return null;
   }
+
+  // ─── 16. M1-S09: XUẤT DỮ LIỆU PDPD (Nghị định 13/2023/NĐ-CP) ─────────────
+  static Future<Map<String, dynamic>?> exportPersonalData() async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/me/export'),
+      ).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 17. M2: TÌM KIẾM NGỮ NGHĨA SEMANTIC DISH SEARCH ───────────────────────
+  static Future<Map<String, dynamic>?> semanticSearchDishes(String query) async {
+    try {
+      final uri = Uri.parse('$baseUrl/dishes/semantic-search').replace(queryParameters: {'q': query});
+      final res = await http.get(uri).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 18. M14: CÂU CHUYỆN MÓN ĂN & BIẾN THỂ VÙNG MIỀN ──────────────────────
+  static Future<Map<String, dynamic>?> fetchDishStory(String dishId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/dishes/$dishId/story'),
+      ).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> fetchRegionalVariants(String dishId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/dishes/$dishId/regional-variants'),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 19. M15: FOOD TRAIL & HỘ CHIẾU ẨM THỰC ────────────────────────────────
+  static Future<Map<String, dynamic>?> fetchFoodTrails() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/tourism/trails')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> stampFoodPassport(String trailId, String stationId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/tourism/passport/checkin'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'trail_id': trailId, 'station_id': stationId}),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 20. M17: B2G ENTERPRISE INSIGHTS ──────────────────────────────────────
+  static Future<Map<String, dynamic>?> fetchEnterpriseInsights() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/enterprise/tourism-insights')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 21. M7-S07: GIÁM SÁT CHỐNG CLICK TẶC ──────────────────────────────────
+  static Future<Map<String, dynamic>?> fetchFraudLogs() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/ads/fraud-logs')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 22. M9: RBAC QUẢN LÝ PHÂN QUYỀN ───────────────────────────────────────
+  static Future<Map<String, dynamic>?> fetchRbacRoles() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/admin/rbac/roles')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 23. M6-S07: MÓN ĐẶC BIỆT HÔM NAY ─────────────────────────────────────
+  static Future<Map<String, dynamic>?> fetchDailySpecial() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/merchant/daily-special')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> tagDailySpecial({
+    required String dishId,
+    String? label,
+    int? specialPrice,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/merchant/daily-special'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'dish_id': dishId, if (label != null) 'label': label, if (specialPrice != null) 'special_price': specialPrice}),
+      ).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ─── 24. M10: A/B TESTING ANALYTICS ─────────────────────────────────────────
+  static Future<Map<String, dynamic>?> fetchAbTestResults() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/analytics/ab-test')).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {}
+    return null;
+  }
 }

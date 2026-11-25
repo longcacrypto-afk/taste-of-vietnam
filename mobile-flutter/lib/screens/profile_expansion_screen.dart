@@ -81,8 +81,9 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
     }
   }
 
-  void _exportPdpdJson() {
-    final exportData = _userProfile ?? {
+  Future<void> _exportPdpdJson() async {
+    final serverExport = await ApiService.exportPersonalData();
+    final exportData = serverExport ?? _userProfile ?? {
       'hard_allergies': _hardAllergies.toList(),
       'regions': _selectedRegions.toList(),
       'spice_level': _spiceLevel,
@@ -90,6 +91,7 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
       'pdpd_compliance': 'Nghị định 13/2023/NĐ-CP',
     };
 
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

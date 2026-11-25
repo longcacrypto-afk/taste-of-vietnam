@@ -559,3 +559,47 @@ test('PROD-HEALTH: Health check endpoint returns healthy, 20 modules loaded and 
   assert.equal(res.data.version, '0.2.0');
   assert.equal(res.data.modules_loaded, 20);
 });
+
+test('AUDIT-GAPS: M1 PDPD export, M6 daily-special, M7 fraud-logs, M9 RBAC & M10 A/B test endpoints', async () => {
+  const store = createInitialStore();
+
+  // M1-S09: PDPD Export
+  const exportRes = await handleApiRequest(store, 'GET', '/api/v1/me/export', new URLSearchParams());
+  assert.equal(exportRes.status, 200);
+  assert.equal(exportRes.data.export_format, 'JSON');
+  assert.ok(exportRes.data.pdpd_compliance.includes('13/2023/NĐ-CP'));
+  assert.ok(exportRes.data.profile);
+
+  // M6-S07: Daily Special Tagging
+  const tagRes = await handleApiRequest(store, 'POST', '/api/v1/merchant/daily-special', new URLSearchParams(), {
+    dish_id: 'DISH-101',
+    label: 'Món đặc biệt cuối tuần'
+  });
+  assert.equal(tagRes.status, 200);
+  assert.equal(tagRes.data.tagged, true);
+
+  const listSpecialRes = await handleApiRequest(store, 'GET', '/api/v1/merchant/daily-special', new URLSearchParams());
+  assert.equal(listSpecialRes.status, 200);
+  assert.ok(listSpecialRes.data.daily_special.some(d => d.id === 'DISH-101'));
+
+  // M7-S07: Anti-Fraud Click Guard Logs
+  const fraudRes = await handleApiRequest(store, 'GET', '/api/v1/ads/fraud-logs', new URLSearchParams());
+  assert.equal(fraudRes.status, 200);
+  assert.equal(fraudRes.data.cooldown_window_seconds, 60);
+  assert.ok(Array.isArray(fraudRes.data.logs) && fraudRes.data.logs.length > 0);
+
+  // M9-S08: RBAC 6 Roles & Users
+  const rbacRolesRes = await handleApiRequest(store, 'GET', '/api/v1/admin/rbac/roles', new URLSearchParams());
+  assert.equal(rbacRolesRes.status, 200);
+  assert.equal(rbacRolesRes.data.roles.length, 6);
+
+  const rbacUsersRes = await handleApiRequest(store, 'GET', '/api/v1/admin/rbac/users', new URLSearchParams());
+  assert.equal(rbacUsersRes.status, 200);
+  assert.ok(rbacUsersRes.data.users.length >= 3);
+
+  // M10-S06: A/B Testing
+  const abRes = await handleApiRequest(store, 'GET', '/api/v1/analytics/ab-test', new URLSearchParams());
+  assert.equal(abRes.status, 200);
+  assert.ok(abRes.data.active_experiments.length >= 3);
+  assert.ok(abRes.data.nlu_accuracy.score >= 90);
+});

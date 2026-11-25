@@ -68,11 +68,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
   int _selectedIndex = 0;
 
   static const _navItems = [
-    (Icons.home_rounded, 'Home'),
-    (Icons.explore_outlined, 'Explore'),
+    (Icons.home_rounded, 'Hôm nay'),
+    (Icons.explore_outlined, 'Khám phá'),
     (Icons.add_circle_outline, ''), // FAB placeholder
-    (Icons.place_outlined, 'Quán 3km'),
-    (Icons.person_outline_rounded, 'Profile'),
+    (Icons.place_outlined, 'Bản đồ'),
+    (Icons.person_outline_rounded, 'Cá nhân'),
   ];
 
   @override
@@ -122,11 +122,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _NavBtn(icon: Icons.home_rounded, label: 'Home', idx: 0, cur: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i)),
-            _NavBtn(icon: Icons.explore_outlined, label: 'Explore', idx: 1, cur: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i)),
+            _NavBtn(icon: Icons.home_rounded, label: 'Hôm nay', idx: 0, cur: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i)),
+            _NavBtn(icon: Icons.explore_outlined, label: 'Khám phá', idx: 1, cur: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i)),
             const SizedBox(width: 56), // Golden FAB space
-            _NavBtn(icon: Icons.place_outlined, label: 'Quán 3km', idx: 3, cur: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i)),
-            _NavBtn(icon: Icons.person_outline_rounded, label: 'Profile', idx: 4, cur: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i)),
+            _NavBtn(icon: Icons.place_outlined, label: 'Bản đồ', idx: 3, cur: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i)),
+            _NavBtn(icon: Icons.person_outline_rounded, label: 'Cá nhân', idx: 4, cur: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i)),
           ],
         ),
       ),

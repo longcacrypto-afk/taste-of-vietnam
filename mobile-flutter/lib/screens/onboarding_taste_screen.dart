@@ -1,13 +1,14 @@
 // =============================================================================
-// M1-S01..S06: ONBOARDING & TASTE PROFILE SCREEN — FLUTTER (AI Chef Benchmark Style)
+// M1-S01..S07: ONBOARDING & TASTE PROFILE SCREEN — FLUTTER (AI Chef Benchmark Style)
 // =============================================================================
-// Màn hình Onboarding 6 bước:
+// Màn hình Onboarding 7 bước (100% spec M1-S01..S07):
 //   S01: Splash + Mascot Măm chào đón
 //   S02: Đăng nhập Zalo/Apple/SĐT + Guest Mode
 //   S03: Chọn vùng ẩm thực (Bắc/Trung/Nam/Tất cả)
 //   S04: Chọn khẩu vị & mức cay (0–3)
 //   S05: Chọn chế độ ăn (Thường / Ăn sạch / Chay Lunar / High Protein)
 //   S06: Bộ Lọc Dị Ứng Cứng (shrimp, peanut, dairy, gluten, egg)
+//   S07: Ngân sách bữa ăn trung bình (35k – 120k+)
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -30,8 +31,9 @@ class _OnboardingTasteScreenState extends State<OnboardingTasteScreen> {
   int _spice = 1;
   String _diet = 'balanced';
   final Set<String> _allergies = {};
+  int _budgetLevel = 1; // 0=35k, 1=70k, 2=100k, 3=120k+
 
-  static const int _totalSteps = 6;
+  static const int _totalSteps = 7;
 
   void _next() {
     if (_step < _totalSteps - 1) {
@@ -99,6 +101,7 @@ class _OnboardingTasteScreenState extends State<OnboardingTasteScreen> {
                   _buildSpiceStep(),
                   _buildDietStep(),
                   _buildAllergyStep(),
+                  _buildBudgetStep(),
                 ],
               ),
             ),
@@ -436,6 +439,92 @@ class _OnboardingTasteScreenState extends State<OnboardingTasteScreen> {
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFBE123C))),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  // ─── STEP 6: Ngân sách bữa ăn trung bình (M1-S07) ─────────────────────────
+  Widget _buildBudgetStep() {
+    final budgets = [
+      {'label': '< 35.000 ₫', 'sub': 'Bình dân · Hàng rong, bún phở vỉa hè', 'icon': '🏮', 'value': 0},
+      {'label': '35k – 70k ₫', 'sub': 'Phổ thông · Cơm bình dân, bún bò, phở', 'icon': '🍜', 'value': 1},
+      {'label': '70k – 100k ₫', 'sub': 'Thoải mái · Nhà hàng bình dân, lẩu bình dân', 'icon': '🍱', 'value': 2},
+      {'label': '100k – 120k+ ₫', 'sub': 'Premium · Nhà hàng, lẩu cao cấp', 'icon': '🥩', 'value': 3},
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('💰 Ngân sách bữa ăn', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 6),
+          const Text('Mỗi người / mỗi bữa — Măm sẽ gợi ý phù hợp túi tiền của bạn',
+              style: TextStyle(fontSize: 13, color: AppTheme.slateMuted)),
+          const SizedBox(height: 24),
+          ...budgets.map((b) {
+            final active = _budgetLevel == b['value'] as int;
+            return GestureDetector(
+              onTap: () => setState(() => _budgetLevel = b['value'] as int),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  color: active ? AppTheme.goldenAmber.withOpacity(0.12) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: active ? AppTheme.goldenAmber : const Color(0xFFE2E8F0),
+                    width: active ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(b['icon'] as String, style: const TextStyle(fontSize: 28)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(b['label'] as String,
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                                  color: active ? AppTheme.amberDark : AppTheme.slateDark)),
+                          Text(b['sub'] as String,
+                              style: const TextStyle(fontSize: 11, color: AppTheme.slateMuted)),
+                        ],
+                      ),
+                    ),
+                    if (active)
+                      Container(
+                        width: 24, height: 24,
+                        decoration: const BoxDecoration(color: AppTheme.goldenAmber, shape: BoxShape.circle),
+                        child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.amberDark),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Bạn có thể thay đổi ngân sách bất cứ lúc nào trong Hồ sơ cá nhân.',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.amberDark),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
