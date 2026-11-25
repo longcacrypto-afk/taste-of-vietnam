@@ -28,6 +28,25 @@ import { pushQueue } from '../services/queueService.js';
 import { checkAccess } from './accessPolicy.js';
 import { requestOtp, verifyOtp, createGuest, authenticate, deleteUser, scopeStoreToUser } from '../services/authService.js';
 
+// User-supplied text: drop HTML tags and stray angle brackets / control chars, trim, cap length.
+// (The UI also escapes on output; this keeps stored data clean for other clients like Flutter.)
+export function cleanText(value, maxLen = 200) {
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value)
+    .replace(/<\/?[a-zA-Z!][^>]*>?/g, '')
+    .replace(/[<>]/g, '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
+function cleanNumber(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
 const UNAUTHORIZED = { status: 401, data: { error: 'Cần đăng nhập (Authorization: Bearer <token>)' } };
 
 export async function handleApiRequest(store, method, pathname, searchParams, body = {}, headers = {}) {
@@ -1089,18 +1108,22 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 200, data: getCommunityRecipes(store, Object.fromEntries(searchParams)) };
   }
   if (pathname === '/api/v1/community/recipes' && method === 'POST') {
+    const title = cleanText(body.title, 120);
+    if (title.length < 2) {
+      return { status: 400, data: { error: 'Tiêu đề công thức không hợp lệ (2–120 ký tự, không chứa HTML)' } };
+    }
     const newRecipe = {
       id: `CREC-${Date.now()}`,
-      title: body.title || 'Món Ngon Gia Đình',
-      author: body.author || 'Đầu Bếp Nghiệp Dư',
+      title,
+      author: cleanText(body.author, 60) || cleanText(store.userProfile && store.userProfile.name, 60) || 'Đầu Bếp Nghiệp Dư',
       author_avatar: '👨‍🍳',
-      prep_time_minutes: body.prep_time_minutes || 25,
-      difficulty: body.difficulty || 'Dễ',
-      calories: body.calories || 450,
+      prep_time_minutes: cleanNumber(body.prep_time_minutes, 1, 1440, 25),
+      difficulty: cleanText(body.difficulty, 20) || 'Dễ',
+      calories: cleanNumber(body.calories, 0, 10000, 450),
       likes_count: 1,
       tips_received_vnd: 0,
-      zero_waste_tag: body.zero_waste_tag || null,
-      ingredients: body.ingredients || []
+      zero_waste_tag: cleanText(body.zero_waste_tag, 40) || null,
+      ingredients: (Array.isArray(body.ingredients) ? body.ingredients : []).slice(0, 30).map(i => cleanText(i, 60)).filter(Boolean)
     };
     store.communityRecipes = store.communityRecipes || [];
     store.communityRecipes.unshift(newRecipe);
@@ -1127,10 +1150,14 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     store.communityRecipes = store.communityRecipes || [];
     const rec = store.communityRecipes.find(r => r.id === recipeCrudMatch[1]);
     if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
-    if (body.title !== undefined) rec.title = body.title;
-    if (body.prep_time_minutes !== undefined) rec.prep_time_minutes = Number(body.prep_time_minutes);
-    if (body.calories !== undefined) rec.calories = Number(body.calories);
-    if (body.zero_waste_tag !== undefined) rec.zero_waste_tag = body.zero_waste_tag;
+    if (body.title !== undefined) {
+      const title = cleanText(body.title, 120);
+      if (title.length < 2) return { status: 400, data: { error: 'Tiêu đề công thức không hợp lệ' } };
+      rec.title = title;
+    }
+    if (body.prep_time_minutes !== undefined) rec.prep_time_minutes = cleanNumber(body.prep_time_minutes, 1, 1440, rec.prep_time_minutes);
+    if (body.calories !== undefined) rec.calories = cleanNumber(body.calories, 0, 10000, rec.calories);
+    if (body.zero_waste_tag !== undefined) rec.zero_waste_tag = cleanText(body.zero_waste_tag, 40) || null;
     return { status: 200, data: rec };
   }
 
