@@ -95,10 +95,6 @@ async function buildView(repo, store, authUser) {
   });
 }
 
-function clientIp(headers) {
-  return String(headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown').split(',')[0].trim();
-}
-
 export async function handleApiRequest(store, method, pathname, searchParams, body = {}, headers = {}) {
   const repo = getRepository(store);
   // Who is calling? (null = anonymous)
@@ -114,9 +110,6 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   const userId = authUser ? authUser.id : null;
   // The caller's taste profile; anonymous reads use the shared default profile.
   const profile = authUser ? authUser.profile : store.userProfile;
-  const audit = (action, target) => repo.addAudit({
-    actor: authUser.phone || authUser.id, actor_id: authUser.id, role: authUser.role, action, target, ip: clientIp(headers)
-  });
 
   // ===========================================================================
   // MODULE M1: ACCOUNT, AUTH, ONBOARDING & TASTE PROFILE (M1-S01 .. M1-S10)
@@ -424,7 +417,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     catch(e) { if(e instanceof PolicyError) return {status:e.status,data:{error:e.message}};throw e; }
     if (!rep) return { status: 404, data: { error: 'Place not found' } };
     bump(store, 'report_issue');
-    return { status: 200, data: rep };
+    const {reporter_key,...publicReport}=rep;
+    return { status: 200, data: publicReport };
   }
 
   // ===========================================================================
@@ -728,9 +722,21 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     if (!authUser || (authUser.role !== 'super_admin' && rec.author_id !== authUser.id)) {
       return { status: 403, data: { error: 'Chỉ tác giả hoặc quản trị viên được sửa/xóa công thức này' } };
     }
+    const mutate = async patch => {
+      if (rec.author_id === authUser.id) return patch === null ? repo.deleteRecipe(rec.id) : repo.updateRecipe(rec.id,patch);
+      return repo.atomic(async tx => {
+        const actor=await tx.getUser(authUser.id);
+        if (actor?.role !== 'super_admin') return null;
+        const before=structuredClone(await tx.getRecipe(rec.id));
+        const after=patch === null ? await tx.deleteRecipe(rec.id) : await tx.updateRecipe(rec.id,patch);
+        await tx.addAudit({actor:actor.id,actor_id:actor.id,role:actor.role,
+          action:patch === null ? 'DELETE_RECIPE' : 'UPDATE_RECIPE',target:rec.id,
+          before,after:patch === null ? null : after,reason:cleanText(body.reason,1000) || 'Community moderation'});
+        return after;
+      });
+    };
     if (method === 'DELETE') {
-      await repo.deleteRecipe(rec.id);
-      if (authUser.role === 'admin' && rec.author_id !== authUser.id) await audit('DELETE_RECIPE', rec.id);
+      if (!await mutate(null)) return {status:403,data:{error:'Quyền quản trị đã thay đổi'}};
       return { status: 200, data: { deleted: true, id: rec.id } };
     }
     const patch = {};
@@ -742,7 +748,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     if (body.prep_time_minutes !== undefined) patch.prep_time_minutes = cleanNumber(body.prep_time_minutes, 1, 1440, rec.prep_time_minutes);
     if (body.calories !== undefined) patch.calories = cleanNumber(body.calories, 0, 10000, rec.calories);
     if (body.zero_waste_tag !== undefined) patch.zero_waste_tag = cleanText(body.zero_waste_tag, 40) || null;
-    return { status: 200, data: await repo.updateRecipe(rec.id, patch) };
+    const updated=await mutate(patch);
+    if (!updated) return {status:403,data:{error:'Quyền quản trị đã thay đổi'}};
+    return { status: 200, data: updated };
   }
 
   // ===========================================================================

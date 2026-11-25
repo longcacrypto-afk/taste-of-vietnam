@@ -11,7 +11,8 @@ export function reportInput(user, body) {
   const reason = aliases[body.reason] || body.reason;
   if (!REPORT_REASONS.includes(reason)) throw new PolicyError(400, 'Lý do báo sai không hợp lệ');
   // Stable per verified identity, even if the user deletes/recreates the account.
-  const identity = user.phone || user.google_sub || user.id;
-  const reporterKey = crypto.createHmac('sha256', getJwtSecret()).update(`report:${identity}`).digest('hex');
+  const identity = user.phone ? `phone:${user.phone}` : user.google_sub ? `google:${user.google_sub}` : null;
+  if (!identity) throw new PolicyError(403, 'Tài khoản chưa có danh tính đã xác minh ổn định');
+  const reporterKey = crypto.createHmac('sha256', process.env.REPORT_IDENTITY_KEY || getJwtSecret()).update(`report:${identity}`).digest('hex');
   return { reason, reporterKey, userId: user.id, evidence: String(body.evidence || '').slice(0, 2000) };
 }

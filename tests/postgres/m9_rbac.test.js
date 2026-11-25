@@ -4,6 +4,7 @@ import { contracts } from '../contracts/adminContract.js';
 import { createInitialStore } from '../../src/data/seed.js';
 import { initRepository } from '../../src/db/repository.js';
 import { PostgresRepository } from '../../src/db/postgresRepository.js';
+import { createPool } from '../../src/db/connection.js';
 import { handleApiRequest } from '../../src/api/router.js';
 import { signToken } from '../../src/services/authService.js';
 import { skip, resetDatabase, TEST_DATABASE_URL } from './helpers.js';
@@ -25,6 +26,7 @@ test('M9 PostgreSQL: audit failure rolls back each admin mutation and automatic 
     guest:false,phone:`+8490000000${id==='admin'?0:id.slice(-1)}`,profile:store.userProfile});
   const api=(method,path,who,body)=>handleApiRequest(store,method,path,new URLSearchParams(),body,{authorization:`Bearer ${signToken({sub:who})}`});
   const before=await repo.getDish('DISH-101');
+  await repo.createRecipe({id:'REC-M9-AUDIT',author_id:'user1',author:'Tác giả',title:'Món cũ',ingredients:[],prep_time_minutes:25,difficulty:'Dễ',calories:450,zero_waste_tag:null});
   await repo.q(`CREATE FUNCTION fail_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'audit unavailable'; END $$`);
   await repo.q(`CREATE TRIGGER fail_audit BEFORE INSERT ON rbac_audit_logs FOR EACH ROW EXECUTE FUNCTION fail_audit()`);
   for(const [method,path,body] of [
@@ -35,9 +37,12 @@ test('M9 PostgreSQL: audit failure rolls back each admin mutation and automatic 
     ['POST','/api/v1/admin/places/PLACE-405/unpause',{reason:'Thử rollback'}],
     ['POST','/api/v1/admin/places/PLACE-405/approve',{reason:'Thử rollback'}],
     ['POST','/api/v1/admin/ocr-review',{ocr_id:'ocr-901',decision:'rejected',reason:'Thử rollback'}],
-    ['POST','/api/v1/admin/ads/CMP-701/moderate',{decision:'paused',reason:'Thử rollback'}]
+    ['POST','/api/v1/admin/ads/CMP-701/moderate',{decision:'paused',reason:'Thử rollback'}],
+    ['PATCH','/api/v1/community/recipes/REC-M9-AUDIT',{title:'Không được sửa',reason:'Thử rollback'}],
+    ['DELETE','/api/v1/community/recipes/REC-M9-AUDIT',{reason:'Thử rollback'}]
   ]) await assert.rejects(api(method,path,'admin',body),/audit unavailable/);
   assert.equal((await repo.getDish('DISH-101')).name,before.name);
+  assert.equal((await repo.getRecipe('REC-M9-AUDIT')).title,'Món cũ');
   assert.equal((await repo.listDishes()).length,12);
   assert.equal((await repo.getUser('user1')).role,'consumer');
   assert.equal((await repo.getPlace('PLACE-405')).is_open_override,false);
@@ -63,7 +68,9 @@ test('M9 PostgreSQL: audit rejects UPDATE/DELETE; role grant survives a new repo
     await tx.assignRole('a','ops_admin');
     await tx.addAudit({actor:'test',role:'super_admin',action:'ASSIGN_ROLE',target:'a',before:{role:'consumer'},after:{role:'ops_admin'},reason:'Test restart'});
   });
-  const fresh=new PostgresRepository(repo.pool);
+  const pool=createPool(TEST_DATABASE_URL,{max:2});
+  t.after(()=>pool.end());
+  const fresh=new PostgresRepository(pool);
   assert.equal((await fresh.getUser('a')).role,'ops_admin');
   await assert.rejects(repo.q("UPDATE rbac_audit_logs SET reason='tampered'"),/append-only/);
   await assert.rejects(repo.q('DELETE FROM rbac_audit_logs'),/append-only/);

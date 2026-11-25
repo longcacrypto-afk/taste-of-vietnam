@@ -164,6 +164,20 @@ export function contracts(make,options={}) {
     assert.equal((await repo.listUserReports()).filter(r=>r.place_id==='PLACE-404').length,4);
   });
 
+  test('M4 exactly 24h-old and rejected reports are not active closure votes',options,async t=>{
+    const {api,repo,ageReports}=await setup(t);
+    const path='/api/v1/places/PLACE-404/reports';
+    await api('POST',path,'user',{reason:'closed'});
+    await ageReports('PLACE-404',24);
+    await api('POST',path,'consumer',{reason:'closed'});
+    const r=(await repo.listUserReports()).find(r=>r.user_id==='test-consumer');
+    await api('PATCH',`/api/v1/admin/reports/${r.id}`,'content_moderator',{status:'rejected',reason:'Báo sai'});
+    await api('POST',path,'merchant_owner',{reason:'closed'});
+    await api('POST',path,'merchant_staff',{reason:'closed'});
+    assert.equal((await repo.getPlace('PLACE-404')).closed_report_count,2);
+    assert.equal((await repo.getPlace('PLACE-404')).is_open_override,true);
+  });
+
   test('M4 deleting/recreating the same verified phone does not create a different voter',options,async t=>{
     const {api,repo}=await setup(t);
     const path='/api/v1/places/PLACE-404/reports';
