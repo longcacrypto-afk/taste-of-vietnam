@@ -1,3 +1,4 @@
+import { parsePlaceQuery, placeWithStatus, placeDistance } from '../services/placeQuery.js';
 // =============================================================================
 // REST API GATEWAY ROUTER (/api/v1/*) — HÔM NAY ĂN GÌ · TASTE OF VIETNAM
 // Core launch modules (M1–M5, M7 campaigns/payments, M9 admin, M20 recipes)
@@ -398,14 +399,19 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // MODULE M4: PLACES, POSTGIS 3KM SEARCH & CROWDSOURCED REPORTS (M4-S01 .. M4-S06)
   // ===========================================================================
   if (pathname === '/api/v1/places' && method === 'GET') {
-    const items = await repo.findPlacesNear({
-      lat: profile.lat,
-      lng: profile.lng,
-      radiusM: profile.radius_m || 3000,
-      dishId: searchParams.get('dish_id') || null,
-      openOnly: searchParams.get('open_only') !== 'false'
-    });
+    const query = parsePlaceQuery(searchParams, profile);
+    if (query.error) return { status: 400, data: { error: query.error } };
+    const items = await repo.findPlacesNear(query);
     return { status: 200, data: { total: items.length, items } };
+  }
+
+  const placeMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)$/);
+  if (placeMatch && method === 'GET') {
+    const query = parsePlaceQuery(searchParams, profile);
+    if (query.error) return { status: 400, data: { error: query.error } };
+    const place = await repo.getPlace(placeMatch[1]);
+    if (!place) return { status: 404, data: { error: 'Place not found' } };
+    return { status: 200, data: { ...placeWithStatus(place), distance_m: placeDistance(place, query.lat, query.lng) } };
   }
 
   const reportMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)\/reports$/);
