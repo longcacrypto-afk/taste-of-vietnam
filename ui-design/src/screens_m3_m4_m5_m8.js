@@ -203,8 +203,8 @@ window.SCREENS_M3_M4_M5_M8 = {
             <div class="grid grid-cols-2 gap-3 text-xs">
               ${(() => {
                 const liveItems = (window.appState.liveToday && window.appState.liveToday.items) || [];
-                const c1 = liveItems[0] || { dish_id: 'DISH-101', dish_name: 'Phở Bò Tái Nạm', ref_price: 45000, calories: 480 };
-                const c2 = liveItems[1] || { dish_id: 'DISH-102', dish_name: 'Cơm Tấm Sườn Bì', ref_price: 40000, calories: 580 };
+                const c1 = window.toTodayCard(liveItems[0]) || { dish_id: 'DISH-101', dish_name: 'Phở Bò Tái Nạm', ref_price: 45000, calories: 480 };
+                const c2 = window.toTodayCard(liveItems[1]) || { dish_id: 'DISH-102', dish_name: 'Cơm Tấm Sườn Bì', ref_price: 40000, calories: 580 };
                 return `
                   <!-- Card 1 -->
                   <div class="bg-white rounded-2xl p-2 border border-[#F1F5F9] shadow-sm space-y-2 group">
@@ -248,7 +248,7 @@ window.SCREENS_M3_M4_M5_M8 = {
             <!-- Card 3: Sponsored 1/3 Slot Horizontal Card -->
             ${(() => {
               const liveItems = (window.appState.liveToday && window.appState.liveToday.items) || [];
-              const c3 = liveItems[2] || { dish_id: 'DISH-103', dish_name: 'Bún Bò Huế O Xuân', ref_price: 50000, is_sponsored: true, reason: 'Cách 650m · Đang mở · Hợp khẩu vị cay nhẹ' };
+              const c3 = window.toTodayCard(liveItems[2]) || { dish_id: 'DISH-103', dish_name: 'Bún Bò Huế O Xuân', ref_price: 50000, is_sponsored: true, reason: 'Cách 650m · Đang mở · Hợp khẩu vị cay nhẹ' };
               return `
                 <div onclick="goScreen('M4-S03')" class="bg-[#F8FAFC] rounded-2xl p-2.5 border border-[#E2E8F0] flex items-center gap-3 cursor-pointer hover:border-[#FBBF24] transition">
                   <img data-img="310" class="w-14 h-14 rounded-xl object-cover shrink-0" />

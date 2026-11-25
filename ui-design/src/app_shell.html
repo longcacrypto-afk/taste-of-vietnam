@@ -1276,6 +1276,16 @@
       m3State: 'success',
       searchQuery: ''
     };
+    // GET /suggestions/today returns { name, price_vnd }; the M3-S01 cards read
+    // { dish_name, ref_price }. Map once here (null when there is no item).
+    window.toTodayCard = function (item) {
+      if (!item) return null;
+      return Object.assign({}, item, {
+        dish_name: item.name ?? item.dish_name,
+        ref_price: item.price_vnd ?? item.ref_price
+      });
+    };
+
     // ===== Auth client (P0) =====
     // Every same-origin /api/v1 call carries a token. Without a login the app
     // silently gets its own guest token (own profile, history, collections).
@@ -4461,7 +4471,7 @@ export async function load${activeScr.id.replace('-','')}() {
             body: JSON.stringify({ query: q })
           });
           const d = await r.json();
-          window.appState.liveChatReply = d.reply || 'Măm gợi ý cho anh các lựa chọn phù hợp nhất:';
+          window.appState.liveChatReply = d.assistant_message || d.reply || 'Măm gợi ý cho anh các lựa chọn phù hợp nhất:';
           window.appState.liveChatOptions = d.options || [];
           renderStage(); hydrateImages();
         } catch (_) {}
