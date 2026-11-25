@@ -6,6 +6,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialStore } from '../src/data/seed.js';
 import { handleApiRequest } from '../src/api/router.js';
+import { signPayosData } from '../src/services/paymentService.js';
+
+const TEST_PAYOS_KEY = 'test-checksum-key';
+process.env.PAYOS_CHECKSUM_KEY = TEST_PAYOS_KEY;
 
 test('M1 (Auth & PDPD Compliance): OTP verify, Guest Mode, and Instant Account Deletion (Nghị định 13/2023/NĐ-CP)', async () => {
   const store = createInitialStore();
@@ -260,12 +264,10 @@ test('M7 (VietQR & PayOS Webhook): Invoice generation, EMVCo payload, webhook to
   const campaignsList = store.campaigns || store.ad_campaigns;
   const initialBalance = campaignsList.find(c => c.id === 'CMP-701').budget_monthly_vnd || 0;
 
-  // 2. Webhook triggers successful payment
-  const webhookRes = await handleApiRequest(store, 'POST', '/api/v1/payments/webhook', new URLSearchParams(), {
-    orderId,
-    campaignId: 'CMP-701',
-    amountVnd: 200000
-  });
+  // 2. Signed PayOS webhook triggers successful payment
+  const payosData = { orderCode: invRes.data.order_code, amount: 200000, description: invRes.data.transfer_memo, code: '00', desc: 'Thành công', reference: 'FT123', counterAccountName: null };
+  const signedBody = { code: '00', desc: 'success', success: true, data: payosData, signature: signPayosData(payosData, TEST_PAYOS_KEY) };
+  const webhookRes = await handleApiRequest(store, 'POST', '/api/v1/payments/webhook', new URLSearchParams(), signedBody);
   assert.equal(webhookRes.status, 200);
   assert.equal(webhookRes.data.success, true);
   assert.equal(webhookRes.data.already_processed, false);
@@ -274,11 +276,7 @@ test('M7 (VietQR & PayOS Webhook): Invoice generation, EMVCo payload, webhook to
   assert.equal(updatedBalance, initialBalance + 200000);
 
   // 3. Webhook idempotency test (duplicate delivery doesn't double-charge)
-  const dupWebhookRes = await handleApiRequest(store, 'POST', '/api/v1/payments/webhook', new URLSearchParams(), {
-    orderId,
-    campaignId: 'CMP-701',
-    amountVnd: 200000
-  });
+  const dupWebhookRes = await handleApiRequest(store, 'POST', '/api/v1/payments/webhook', new URLSearchParams(), signedBody);
   assert.equal(dupWebhookRes.status, 200);
   assert.equal(dupWebhookRes.data.already_processed, true);
   assert.equal(campaignsList.find(c => c.id === 'CMP-701').balance_vnd, updatedBalance);

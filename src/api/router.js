@@ -570,17 +570,48 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       merchantName: body.merchant_name || 'Quán Ngon',
       description: body.description,
     });
+    // Ghi đơn chờ thanh toán: webhook chỉ nạp tiền cho đơn đã tạo ở đây
+    store.paymentOrders = store.paymentOrders || {};
+    store.paymentOrders[invoice.order_id] = {
+      order_id: invoice.order_id,
+      order_code: invoice.order_code,
+      campaign_id: invoice.campaign_id,
+      amount_vnd: Number(invoice.amount_vnd),
+      status: 'PENDING_PAYMENT',
+      created_at: invoice.created_at,
+    };
     return { status: 200, data: invoice };
   }
 
-  // Webhook từ cổng thanh toán PayOS / Ngân hàng NAPAS
+  // Webhook từ cổng thanh toán PayOS: { code, desc, success, data: {...}, signature }
+  // Chữ ký HMAC-SHA256 trên `data` bằng PAYOS_CHECKSUM_KEY. Không có key => từ chối (fail closed).
   if (pathname === '/api/v1/payments/webhook' && method === 'POST') {
-    const { orderId, campaignId, amountVnd } = body;
-    if (!orderId || !campaignId || !amountVnd) {
-      return { status: 400, data: { error: 'Missing required webhook fields' } };
+    const checksumKey = process.env.PAYOS_CHECKSUM_KEY;
+    if (!checksumKey) {
+      return { status: 503, data: { error: 'Payment webhook not configured (PAYOS_CHECKSUM_KEY missing)' } };
     }
-    const result = processSuccessfulPayment(store, { orderId, campaignId, amountVnd });
-    return { status: 200, data: result };
+    const data = body && typeof body.data === 'object' && body.data !== null ? body.data : null;
+    if (!data || !verifyPaymentWebhookSignature(data, body.signature, checksumKey)) {
+      return { status: 401, data: { error: 'Invalid webhook signature' } };
+    }
+    if (String(data.code) !== '00' || body.success === false) {
+      return { status: 200, data: { success: true, credited: false, reason: 'payment_not_successful' } };
+    }
+    store.paymentOrders = store.paymentOrders || {};
+    const pending = Object.values(store.paymentOrders).find(o => String(o.order_code) === String(data.orderCode));
+    if (!pending) {
+      // Đơn không do hệ thống tạo (vd. webhook thử của PayOS): xác nhận nhận, không nạp tiền
+      return { status: 200, data: { success: true, credited: false, reason: 'unknown_order' } };
+    }
+    if (Number(data.amount) !== Number(pending.amount_vnd)) {
+      return { status: 409, data: { error: 'Amount mismatch', expected: pending.amount_vnd, received: Number(data.amount) } };
+    }
+    const result = processSuccessfulPayment(store, {
+      orderId: pending.order_id,
+      campaignId: pending.campaign_id,
+      amountVnd: Number(data.amount)
+    });
+    return { status: 200, data: { ...result, credited: !result.already_processed } };
   }
 
   const paymentOrderMatch = pathname.match(/^\/api\/v1\/payments\/orders\/([^/]+)$/);
