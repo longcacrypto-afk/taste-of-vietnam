@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { createInitialStore } from './src/data/seed.js';
 import { handleApiRequest } from './src/api/router.js';
 import { setupWebSocket, getWsTestPayload } from './src/services/websocketService.js';
-import { initDatabase, isPostgresConnected } from './src/db/connection.js';
+import { initRepository } from './src/db/repository.js';
 import { getJwtSecret } from './src/services/authService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -44,7 +44,8 @@ export function createAppServer() {
         version: '0.2.0',
         uptime_seconds: Math.floor(process.uptime()),
         modules_loaded: 20,
-        postgres_connected: isPostgresConnected(),
+        postgres_connected: Boolean(store.repo),
+        storage: store.repo ? 'postgres' : 'memory',
         gemini_active: Boolean(process.env.GEMINI_API_KEY),
         environment: process.env.NODE_ENV || 'development',
         timestamp: new Date().toISOString()
@@ -133,9 +134,8 @@ export function createAppServer() {
   // Wire up WebSocket on the same HTTP server
   setupWebSocket(server, store);
 
-  // Initialize Database (Postgres with In-Memory fallback)
-  initDatabase();
-
+  // Storage: call initRepository(store) before listening (done below when run directly).
+  // Without it the API uses the in-memory store.
   return server;
 }
 
@@ -143,7 +143,24 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
   const PORT = process.env.PORT || 3000;
   // Bind 0.0.0.0 for Render.com / production; 127.0.0.1 locally
   const HOST = process.env.HOST || '0.0.0.0';
-  const server = createAppServer();
+  let server;
+  try {
+    // PostgreSQL when DATABASE_URL is set (refuses to start if migrations are pending), else memory
+    await initRepository(store);
+  } catch (err) {
+    console.error(`❌ Storage init failed: ${err.message}`);
+    process.exit(1);
+  }
+  server = createAppServer();
+  const shutdown = (signal) => {
+    console.log(`${signal} received, closing…`);
+    server.close(() => {
+      Promise.resolve(store.repo && store.repo.pool.end()).finally(() => process.exit(0));
+    });
+    setTimeout(() => process.exit(0), 5000).unref();
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
   server.listen(PORT, HOST, () => {
     console.log(`🚀 Hôm nay ăn gì · Taste of Vietnam Server running at http://${HOST}:${PORT}`);
     console.log(`   - UI/UX 99-Screen Studio:        http://127.0.0.1:${PORT}/`);

@@ -1,32 +1,23 @@
 // =============================================================================
-// REST API GATEWAY ROUTER (/api/v1/*) FOR HÔM NAY ĂN GÌ v0.1 (ALL 17 MODULES M1..M17)
+// REST API GATEWAY ROUTER (/api/v1/*) — HÔM NAY ĂN GÌ · TASTE OF VIETNAM
+// Core launch modules (M1–M5, M7 campaigns/payments, M9 admin, M20 recipes)
+// read and write through the repository (src/db/repository.js): PostgreSQL in
+// production, the in-memory store in tests/dev. Frozen modules live in
+// ./frozenRoutes.js.
 // =============================================================================
 
-import { matchesVietnameseQuery, haversineDistanceMeters } from '../services/textUtils.js';
-import { getTodaySuggestions, isDishSafeForUser, findOpenPlacesForDish } from '../services/recommender.js';
+import { matchesVietnameseQuery } from '../services/textUtils.js';
+import { getTodaySuggestions, isDishSafeForUser } from '../services/recommender.js';
 import { runAiFoodChat } from '../services/intentParser.js';
-import { parseMenuOcrText } from '../services/ocrEngine.js';
-import {
-  createOrderRedirect,
-  recordCampaignClick,
-  updateMealReminderSchedule,
-  runVietnameseIntentBenchmark,
-  generateWeeklyMealPlanAndGroceries,
-  createOrVoteGroupPoll,
-  submitGpsVerifiedReview,
-  translateVietnameseMenu,
-  scanFridgeBarcodeOrPhoto,
-  syncHealthWearables,
-  getCommunityRecipes,
-  tipCommunityRecipe
-} from '../services/expansionServices.js';
-import { callGeminiChat, generateDishStory, analyzeFoodImageWithGemini } from '../services/geminiService.js';
-import { generateVietQrInvoice, verifyPaymentWebhookSignature, processSuccessfulPayment } from '../services/paymentService.js';
+import { updateMealReminderSchedule } from '../services/expansionServices.js';
+import { callGeminiChat, generateDishStory } from '../services/geminiService.js';
+import { generateVietQrInvoice, verifyPaymentWebhookSignature } from '../services/paymentService.js';
 import { searchDishesSemantically } from '../services/semanticSearch.js';
 import { suggestionCache } from '../services/cacheService.js';
-import { pushQueue } from '../services/queueService.js';
 import { checkAccess } from './accessPolicy.js';
 import { requestOtp, verifyOtp, createGuest, authenticate, deleteUser, scopeStoreToUser } from '../services/authService.js';
+import { getRepository } from '../db/repository.js';
+import { handleFrozenRoute } from './frozenRoutes.js';
 
 // User-supplied text: drop HTML tags and stray angle brackets / control chars, trim, cap length.
 // (The UI also escapes on output; this keeps stored data clean for other clients like Flutter.)
@@ -47,37 +38,97 @@ function cleanNumber(value, min, max, fallback) {
   return Math.min(max, Math.max(min, n));
 }
 
+const cleanList = (value, maxItems = 20, maxLen = 40) =>
+  (Array.isArray(value) ? value : []).slice(0, maxItems).map(v => cleanText(v, maxLen)).filter(Boolean);
+
 const UNAUTHORIZED = { status: 401, data: { error: 'Cần đăng nhập (Authorization: Bearer <token>)' } };
+const MAX_PROFILE_BYTES = 16 * 1024;
+
+const bump = (store, ev) => { store.analyticsEvents[ev] = (store.analyticsEvents[ev] || 0) + 1; };
+
+/** Open places within the radius that sell this dish, nearest first (PostGIS in Postgres mode). */
+async function openPlacesForDish(repo, dishId, profile, radiusM) {
+  const places = await repo.findPlacesNear({ lat: profile.lat, lng: profile.lng, radiusM: Number(radiusM || 3000), dishId, openOnly: true });
+  return places.map(p => {
+    const item = (p.menu || []).find(m => m.dish_id === dishId && m.available);
+    return {
+      place_id: p.id,
+      place_name: p.name,
+      address: p.address,
+      distance_m: p.distance_m,
+      price_vnd: item ? item.price : null,
+      rating: p.rating,
+      has_ac: p.has_ac,
+      has_kids_seat: p.has_kids_seat,
+      phone: p.phone,
+      links: p.links
+    };
+  });
+}
+
+/**
+ * A store-shaped object for the recommendation/chat services and frozen routes.
+ * Memory mode: the store itself (scoped to the caller). Postgres mode: dishes, places,
+ * campaigns, the caller's profile and history loaded from the database; everything
+ * else falls through to the in-process store.
+ */
+async function buildView(repo, store, authUser) {
+  if (repo.kind === 'memory') return authUser ? scopeStoreToUser(store, authUser) : store;
+  const [dishes, places, campaigns, suggestionHistory, savedCollections] = await Promise.all([
+    repo.listDishes(),
+    repo.listPlaces(),
+    repo.listCampaigns(),
+    repo.listHistory(authUser ? authUser.id : null),
+    repo.listCollections(authUser ? authUser.id : null)
+  ]);
+  return scopeStoreToUser(store, null, {
+    dishes,
+    places,
+    campaigns,
+    suggestionHistory,
+    savedCollections,
+    userProfile: authUser ? authUser.profile : store.userProfile,
+    currentUser: authUser
+  });
+}
+
+function clientIp(headers) {
+  return String(headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown').split(',')[0].trim();
+}
 
 export async function handleApiRequest(store, method, pathname, searchParams, body = {}, headers = {}) {
-  // Who is calling? (null = anonymous). With a token, userProfile / history /
-  // collections in `store` resolve to that user's own data.
-  const authUser = authenticate(store, headers);
+  const repo = getRepository(store);
+  // Who is calling? (null = anonymous)
+  const authUser = await authenticate(repo, headers);
   const denied = checkAccess(method, pathname, authUser);
   if (denied) return denied;
-  const sharedStore = store;
-  if (authUser) store = scopeStoreToUser(store, authUser);
+  body = body && typeof body === 'object' ? body : {};
+
+  const userId = authUser ? authUser.id : null;
+  // The caller's taste profile; anonymous reads use the shared default profile.
+  const profile = authUser ? authUser.profile : store.userProfile;
+  const audit = (action, target) => repo.addAudit({
+    actor: authUser.phone || authUser.id, actor_id: authUser.id, role: authUser.role, action, target, ip: clientIp(headers)
+  });
 
   // ===========================================================================
   // MODULE M1: ACCOUNT, AUTH, ONBOARDING & TASTE PROFILE (M1-S01 .. M1-S10)
   // ===========================================================================
   // Request an OTP for a phone number (/auth/login kept as an alias)
   if ((pathname === '/api/v1/auth/otp/request' || pathname === '/api/v1/auth/login') && method === 'POST') {
-    const res = await requestOtp(sharedStore, body.phone);
+    const res = await requestOtp(repo, body.phone);
     if (res.status === 200) res.data.provider = body.provider || 'phone_otp';
     return res;
   }
 
   if (pathname === '/api/v1/auth/otp/verify' && method === 'POST') {
-    const res = verifyOtp(sharedStore, body.phone, body.code ?? body.otp);
-    if (res.status === 200) {
-      sharedStore.analyticsEvents.onboarding_complete = (sharedStore.analyticsEvents.onboarding_complete || 0) + 1;
-    }
+    const res = await verifyOtp(repo, body.phone, body.code ?? body.otp, store.userProfile);
+    if (res.status === 200) bump(store, 'onboarding_complete');
     return res;
   }
 
   if (pathname === '/api/v1/auth/guest' && method === 'POST') {
-    return createGuest(sharedStore);
+    return createGuest(repo, store.userProfile);
   }
 
   if (pathname === '/api/v1/auth/me' && method === 'GET') {
@@ -87,21 +138,26 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   if (pathname === '/api/v1/me/profile' && method === 'GET') {
     if (!authUser) return UNAUTHORIZED;
-    return { status: 200, data: store.userProfile };
+    return { status: 200, data: profile };
   }
 
   if (pathname === '/api/v1/me/profile' && (method === 'PUT' || method === 'PATCH')) {
     if (!authUser) return UNAUTHORIZED;
-    const { id: _id, phone: _phone, role: _role, ...changes } = body || {};
-    Object.assign(store.userProfile, changes);
-    suggestionCache.invalidateUser(store.userProfile.id);
-    return { status: 200, data: store.userProfile };
+    const { id: _id, phone: _phone, role: _role, ...changes } = body;
+    const next = { ...profile, ...changes };
+    if (Buffer.byteLength(JSON.stringify(next)) > MAX_PROFILE_BYTES) {
+      return { status: 413, data: { error: 'Hồ sơ quá lớn' } };
+    }
+    Object.assign(profile, changes);
+    await repo.saveProfile(authUser.id, profile);
+    suggestionCache.invalidateUser(profile.id);
+    return { status: 200, data: profile };
   }
 
   if (pathname === '/api/v1/me' && method === 'DELETE') {
     if (!authUser) return UNAUTHORIZED;
     suggestionCache.invalidateUser(authUser.id);
-    const deleted = deleteUser(sharedStore, authUser.id);
+    const deleted = await deleteUser(repo, authUser.id);
     return {
       status: 200,
       data: {
@@ -115,15 +171,17 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // M1-S09: PDPD Data Export (Nghị định 13/2023/NĐ-CP — Right to Data Portability)
   if (pathname === '/api/v1/me/export' && method === 'GET') {
     if (!authUser) return UNAUTHORIZED;
+    const [history, collections] = await Promise.all([repo.listHistory(userId), repo.listCollections(userId)]);
     return {
       status: 200,
       data: {
         export_format: 'JSON',
         pdpd_compliance: 'Nghị định 13/2023/NĐ-CP',
         exported_at: new Date().toISOString(),
-        profile: store.userProfile,
-        suggestion_history: (store.userProfile.suggestion_history || []).slice(0, 50),
-        saved_collections: store.savedCollections || [],
+        account: { id: authUser.id, role: authUser.role, phone: authUser.phone, guest: authUser.guest, created_at: authUser.created_at },
+        profile,
+        suggestion_history: history.slice(0, 50),
+        saved_collections: collections,
         analytics_summary: {
           total_dish_views: store.analyticsEvents.dish_view || 0,
           total_order_clicks: store.analyticsEvents.order_click || 0,
@@ -157,8 +215,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     const q = searchParams.get('q') || '';
     const region = searchParams.get('region') || '';
     const safeOnly = searchParams.get('safe_only') !== 'false';
-    const items = store.dishes.filter(d => {
-      if (safeOnly && !isDishSafeForUser(d, store.userProfile)) return false;
+    const items = (await repo.listDishes()).filter(d => {
+      if (safeOnly && !isDishSafeForUser(d, profile)) return false;
       if (region && d.region !== region) return false;
       if (q && !matchesVietnameseQuery(`${d.name} ${d.description} ${(d.tags || []).join(' ')}`, q)) return false;
       return true;
@@ -168,22 +226,24 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   if (pathname === '/api/v1/dishes/semantic-search' && method === 'GET') {
     const q = searchParams.get('q') || '';
-    const results = searchDishesSemantically(q, store.dishes, store.userProfile);
+    const results = searchDishesSemantically(q, await repo.listDishes(), profile);
     return { status: 200, data: results };
   }
 
   const storyMatch = pathname.match(/^\/api\/v1\/(?:dishes\/([^/]+)\/story|stories\/([^/]+))$/);
   if (storyMatch && method === 'GET') {
     const targetId = storyMatch[1] || storyMatch[2];
-    const dish = store.dishes.find(d => d.id === targetId) || store.dishes[0];
+    const dish = (await repo.getDish(targetId)) || (await repo.listDishes())[0];
+    if (!dish) return { status: 404, data: { error: 'Dish not found' } };
     return { status: 200, data: await generateDishStory(dish) };
   }
 
   const similarMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)\/similar$/);
   if (similarMatch && method === 'GET') {
-    const dishId = similarMatch[1];
-    const current = store.dishes.find(d => d.id === dishId) || store.dishes[0];
-    const items = store.dishes.filter(d => d.id !== current.id && isDishSafeForUser(d, store.userProfile)).slice(0, 3);
+    const dishes = await repo.listDishes();
+    const current = dishes.find(d => d.id === similarMatch[1]) || dishes[0];
+    if (!current) return { status: 404, data: { error: 'Dish not found' } };
+    const items = dishes.filter(d => d.id !== current.id && isDishSafeForUser(d, profile)).slice(0, 3);
     return { status: 200, data: { base_dish: current.name, items } };
   }
 
@@ -204,8 +264,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   const dishMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)$/);
   if (dishMatch && method === 'GET') {
-    const dishId = dishMatch[1];
-    const dish = store.dishes.find(d => d.id === dishId) || store.dishes[0];
+    const dish = (await repo.getDish(dishMatch[1])) || (await repo.listDishes())[0];
+    if (!dish) return { status: 404, data: { error: 'Dish not found' } };
     const servings = Math.max(1, parseInt(searchParams.get('servings') || dish.base_servings || 2, 10));
     const scaleFactor = servings / (dish.base_servings || 2);
 
@@ -216,8 +276,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
         : Math.round(ing.amount * scaleFactor)
     }));
 
-    const places = findOpenPlacesForDish(store, dish.id, store.userProfile.lat, store.userProfile.lng, store.userProfile.radius_m);
-    store.analyticsEvents.dish_view = (store.analyticsEvents.dish_view || 0) + 1;
+    const places = await openPlacesForDish(repo, dish.id, profile, profile.radius_m);
+    bump(store, 'dish_view');
 
     return {
       status: 200,
@@ -233,51 +293,55 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   }
 
   if (pathname === '/api/v1/me/collections' && (method === 'GET' || method === 'POST')) {
-    store.savedCollections = store.savedCollections || [
-      { id: 'col-1', name: 'Món nước buổi sáng', dish_ids: ['DISH-101', 'DISH-103'] },
-      { id: 'col-2', name: 'Thực đơn cuối tuần cho gia đình', dish_ids: ['DISH-102', 'DISH-106'] }
-    ];
+    const collections = await repo.listCollections(userId);
     if (method === 'POST' && body.dish_id) {
-      if (!store.savedCollections[0].dish_ids.includes(body.dish_id)) {
-        store.savedCollections[0].dish_ids.push(body.dish_id);
+      const dishId = cleanText(body.dish_id, 32);
+      if (!collections.length) collections.push({ id: 'col-1', name: 'Món yêu thích', dish_ids: [] });
+      if (dishId && !collections[0].dish_ids.includes(dishId)) {
+        collections[0].dish_ids.push(dishId);
+        await repo.saveCollections(userId, collections);
       }
-      store.analyticsEvents.save_dish = (store.analyticsEvents.save_dish || 0) + 1;
+      bump(store, 'save_dish');
     }
-    return { status: 200, data: { collections: store.savedCollections } };
+    return { status: 200, data: { collections } };
   }
 
   const delColMatch = pathname.match(/^\/api\/v1\/me\/collections\/([^/]+)$/);
   if (delColMatch && method === 'DELETE') {
     const dishId = delColMatch[1];
-    store.savedCollections = store.savedCollections || [];
-    for (const col of store.savedCollections) {
+    const collections = await repo.listCollections(userId);
+    for (const col of collections) {
       col.dish_ids = (col.dish_ids || []).filter(id => id !== dishId);
     }
-    return { status: 200, data: { removed: dishId, collections: store.savedCollections } };
+    await repo.saveCollections(userId, collections);
+    return { status: 200, data: { removed: dishId, collections } };
   }
 
   // ===========================================================================
   // MODULE M3: AI RECOMMENDATION ENGINE, SPIN & AI FOOD CHAT (M3-S01 .. M3-S07)
   // ===========================================================================
   if (pathname === '/api/v1/suggestions/today' && method === 'GET') {
-    store.analyticsEvents.suggestion_shown = (store.analyticsEvents.suggestion_shown || 0) + 1;
-    const radiusM = searchParams.get('radius_m') || store.userProfile.radius_m;
-    const historyLen = (store.suggestionHistory || []).length;
-    const cacheKey = `sugg:${store.userProfile.id || 'default'}:${radiusM}:${store.userProfile.meal_slot}:${(store.userProfile.hard_allergies || []).join(',')}:${historyLen}`;
+    bump(store, 'suggestion_shown');
+    const view = await buildView(repo, store, authUser);
+    const radiusM = searchParams.get('radius_m') || profile.radius_m;
+    const historyLen = (view.suggestionHistory || []).length;
+    const cacheKey = `sugg:${profile.id || 'default'}:${radiusM}:${profile.meal_slot}:${(profile.hard_allergies || []).join(',')}:${historyLen}`;
     const cached = suggestionCache.get(cacheKey);
     if (cached) {
       return { status: 200, data: { ...cached, from_cache: true } };
     }
-    const fresh = getTodaySuggestions(store, { radius_m: radiusM });
+    const fresh = getTodaySuggestions(view, { radius_m: radiusM });
     suggestionCache.set(cacheKey, fresh, 60);
     return { status: 200, data: fresh };
   }
 
   if (pathname === '/api/v1/suggestions/spin' && method === 'GET') {
-    const today = getTodaySuggestions(store);
-    const candidates = store.dishes.filter(d => isDishSafeForUser(d, store.userProfile));
+    const view = await buildView(repo, store, authUser);
+    const today = getTodaySuggestions(view);
+    const candidates = view.dishes.filter(d => isDishSafeForUser(d, profile));
     const pick = candidates[Math.floor(Math.random() * candidates.length)] || today.items[0];
-    const places = findOpenPlacesForDish(store, pick.id, store.userProfile.lat, store.userProfile.lng, store.userProfile.radius_m);
+    if (!pick) return { status: 404, data: { error: 'Chưa có món nào phù hợp' } };
+    const places = await openPlacesForDish(repo, pick.id || pick.dish_id, profile, profile.radius_m);
     return {
       status: 200,
       data: {
@@ -289,34 +353,36 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   }
 
   if (pathname === '/api/v1/suggestions/feedback' && method === 'POST') {
-    const dish = store.dishes.find(d => d.id === body.dish_id) || store.dishes[0];
+    if (!authUser) return UNAUTHORIZED;
+    const dish = (await repo.getDish(body.dish_id)) || (await repo.listDishes())[0];
+    if (!dish) return { status: 404, data: { error: 'Dish not found' } };
+    const action = ['eaten', 'liked', 'skipped'].includes(body.action) ? body.action : 'eaten';
     const entry = {
-      id: `hist-${Date.now()}`,
+      id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       dish_id: dish.id,
       dish_name: dish.name,
-      place_id: body.place_id || 'PLACE-401',
-      place_name: body.place_name || 'Phở Gia Truyền Phát Tài',
+      place_id: cleanText(body.place_id, 32) || 'PLACE-401',
+      place_name: cleanText(body.place_name, 120) || 'Phở Gia Truyền Phát Tài',
       price_vnd: dish.ref_price,
-      action: body.action || 'eaten',
-      skip_reason: body.skip_reason || null,
+      action,
+      skip_reason: cleanText(body.skip_reason, 200) || null,
       created_at: new Date().toISOString()
     };
-    store.suggestionHistory.unshift(entry);
-    if (body.action === 'liked') {
-      store.analyticsEvents.save_dish = (store.analyticsEvents.save_dish || 0) + 1;
-    }
-    return { status: 200, data: { recorded: entry, history_count: store.suggestionHistory.length } };
+    const historyCount = await repo.addHistory(userId, entry);
+    if (action === 'liked') bump(store, 'save_dish');
+    return { status: 200, data: { recorded: entry, history_count: historyCount } };
   }
 
   if (pathname === '/api/v1/suggestions/history' && method === 'GET') {
-    return { status: 200, data: { items: store.suggestionHistory, next_cursor: null } };
+    return { status: 200, data: { items: await repo.listHistory(userId), next_cursor: null } };
   }
 
   if (pathname === '/api/v1/chat' && method === 'POST') {
-    store.analyticsEvents.chat_query = (store.analyticsEvents.chat_query || 0) + 1;
+    bump(store, 'chat_query');
+    const view = await buildView(repo, store, authUser);
     // Try Gemini first, fall back to local engine
-    const aiResult = await callGeminiChat(body.query || 'Hôm nay ăn gì ngon?', store.userProfile);
-    const localResult = runAiFoodChat(store, body.query || 'Tối nay 4 người, ngân sách 300k, có trẻ nhỏ, muốn ăn gần nhà');
+    const aiResult = await callGeminiChat(body.query || 'Hôm nay ăn gì ngon?', profile);
+    const localResult = runAiFoodChat(view, body.query || 'Tối nay 4 người, ngân sách 300k, có trẻ nhỏ, muốn ăn gần nhà');
     return {
       status: 200,
       data: {
@@ -332,46 +398,21 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // MODULE M4: PLACES, POSTGIS 3KM SEARCH & CROWDSOURCED REPORTS (M4-S01 .. M4-S06)
   // ===========================================================================
   if (pathname === '/api/v1/places' && method === 'GET') {
-    const dishId = searchParams.get('dish_id');
-    const openOnly = searchParams.get('open_only') !== 'false';
-    const user = store.userProfile;
-    const list = store.places
-      .map(p => ({
-        ...p,
-        distance_m: haversineDistanceMeters(user.lat, user.lng, p.lat, p.lng),
-        is_currently_open: Boolean(p.is_verified && p.is_open_override && p.closed_report_count < 3)
-      }))
-      .filter(p => {
-        if (openOnly && !p.is_currently_open) return false;
-        if (dishId && !(p.menu || []).some(m => m.dish_id === dishId && m.available)) return false;
-        return p.distance_m <= (user.radius_m || 3000);
-      })
-      .sort((a, b) => a.distance_m - b.distance_m);
-
-    return { status: 200, data: { total: list.length, items: list } };
+    const items = await repo.findPlacesNear({
+      lat: profile.lat,
+      lng: profile.lng,
+      radiusM: profile.radius_m || 3000,
+      dishId: searchParams.get('dish_id') || null,
+      openOnly: searchParams.get('open_only') !== 'false'
+    });
+    return { status: 200, data: { total: items.length, items } };
   }
 
   const reportMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)\/reports$/);
   if (reportMatch && method === 'POST') {
-    const placeId = reportMatch[1];
-    const place = store.places.find(p => p.id === placeId);
-    if (!place) return { status: 404, data: { error: 'Place not found' } };
-
-    place.closed_report_count = (place.closed_report_count || 0) + 1;
-    if (place.closed_report_count >= 3) {
-      place.is_open_override = false; // Auto-paused!
-    }
-    const rep = {
-      id: `rep-${Date.now()}`,
-      place_id: place.id,
-      place_name: place.name,
-      reason: body.reason || 'Quán đóng cửa',
-      report_count: place.closed_report_count,
-      status: place.closed_report_count >= 3 ? 'auto_paused' : 'pending_review',
-      created_at: new Date().toISOString()
-    };
-    store.userReports.unshift(rep);
-    store.analyticsEvents.report_issue = (store.analyticsEvents.report_issue || 0) + 1;
+    const rep = await repo.reportPlace(reportMatch[1], { reason: cleanText(body.reason, 300) || 'Quán đóng cửa', userId });
+    if (!rep) return { status: 404, data: { error: 'Place not found' } };
+    bump(store, 'report_issue');
     return { status: 200, data: rep };
   }
 
@@ -379,152 +420,66 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // MODULE M5: EXTERNAL ORDER DEEP-LINK & LOOPBACK CONFIRMATION (M5-S01 .. M5-S05)
   // ===========================================================================
   if (pathname === '/api/v1/orders/redirect' && method === 'POST') {
-    const record = createOrderRedirect(store, body);
+    const place = (await repo.getPlace(body.place_id)) || (await repo.listPlaces())[0];
+    const dish = (await repo.getDish(body.dish_id)) || (await repo.listDishes())[0];
+    if (!place || !dish) return { status: 404, data: { error: 'Place or dish not found' } };
+    const partner = /^[a-z_]{2,20}$/.test(body.partner || '') ? body.partner : 'grabfood';
+    const utm = 'utm_source=hom_nay_an_gi&utm_medium=app_mvp';
+    const baseLink = (place.links && place.links[partner]) || `https://maps.google.com/?q=${place.lat},${place.lng}`;
+    const record = await repo.createOrderRedirect({
+      id: `redir-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      user_id: userId,
+      place_id: place.id,
+      place_name: place.name,
+      dish_id: dish.id,
+      dish_name: dish.name,
+      partner,
+      target_deeplink: `${baseLink}${baseLink.includes('?') ? '&' : '?'}${utm}`,
+      fallback_web_url: baseLink,
+      loopback_confirmed_eaten: false,
+      created_at: new Date().toISOString()
+    });
+    bump(store, partner === 'maps' ? 'direction_click' : partner === 'phone' ? 'call_click' : 'order_click');
     return { status: 200, data: record };
   }
 
   const confirmOrderMatch = pathname.match(/^\/api\/v1\/orders\/([^/]+)\/confirm-eaten$/);
   if (confirmOrderMatch && method === 'POST') {
-    const orderId = confirmOrderMatch[1];
-    const ord = (store.orderRedirects || []).find(o => o.id === orderId) || {
-      id: orderId,
-      dish_id: body.dish_id || 'DISH-101',
-      dish_name: 'Phở Bò Tái Nạm Hà Nội',
-      place_id: body.place_id || 'PLACE-401',
-      place_name: 'Phở Gia Truyền Phát Tài'
-    };
-    ord.loopback_confirmed_eaten = true;
-    store.suggestionHistory.unshift({
-      id: `hist-loopback-${Date.now()}`,
+    if (!authUser) return UNAUTHORIZED;
+    const existing = await repo.getOrderRedirect(confirmOrderMatch[1]);
+    if (existing && existing.user_id && existing.user_id !== userId) {
+      return { status: 404, data: { error: 'Order not found' } };
+    }
+    let ord;
+    if (existing) {
+      ord = await repo.confirmOrderEaten(existing.id);
+    } else {
+      // No redirect on record (e.g. ate there without ordering through the app): log the dish named in the body
+      const dish = (await repo.getDish(body.dish_id || 'DISH-101')) || (await repo.listDishes())[0];
+      const place = (await repo.getPlace(body.place_id || 'PLACE-401')) || (await repo.listPlaces())[0];
+      if (!dish) return { status: 404, data: { error: 'Dish not found' } };
+      ord = {
+        id: confirmOrderMatch[1],
+        dish_id: dish.id,
+        dish_name: dish.name,
+        place_id: place ? place.id : null,
+        place_name: place ? place.name : null,
+        loopback_confirmed_eaten: true
+      };
+    }
+    const dish = await repo.getDish(ord.dish_id);
+    await repo.addHistory(userId, {
+      id: `hist-loopback-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       dish_id: ord.dish_id,
       dish_name: ord.dish_name,
       place_id: ord.place_id,
       place_name: ord.place_name,
-      price_vnd: 45000,
+      price_vnd: dish ? dish.ref_price : null,
       action: 'eaten',
       created_at: new Date().toISOString()
     });
-    suggestionCache.invalidateUser(store.userProfile.id || 'default');
+    suggestionCache.invalidateUser(profile.id || 'default');
     return { status: 200, data: { confirmed: true, order: ord, cooldown_days_applied: 3 } };
-  }
-
-  // ===========================================================================
-  // MODULE M6: MERCHANT PORTAL & AI MENU OCR (M6-S01 .. M6-S09)
-  // ===========================================================================
-  // M6-S07: Món đặc biệt hôm nay (Daily Special Tagging)
-  if (pathname === '/api/v1/merchant/daily-special' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        daily_special: store.dishes.filter(d => d.is_special_today || false).slice(0, 3),
-        message: 'Danh sách món đặc biệt hôm nay'
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/merchant/daily-special' && method === 'POST') {
-    const dish = store.dishes.find(d => d.id === body.dish_id);
-    if (dish) {
-      dish.is_special_today = true;
-      dish.special_price = body.special_price || dish.price;
-      dish.special_label = body.label || 'Món đặc biệt hôm nay';
-    }
-    return { status: 200, data: { tagged: true, dish_id: body.dish_id, label: body.label || 'Món đặc biệt hôm nay' } };
-  }
-
-  if (pathname === '/api/v1/merchant/overview' && method === 'GET') {
-    const place = store.places[0];
-    return {
-      status: 200,
-      data: {
-        place,
-        kpis: {
-          impressions_7d: 3420,
-          direction_clicks_7d: 215,
-          order_clicks_7d: 184,
-          ctr_pct: 11.6
-        }
-      }
-    };
-  }
-
-  // M6-S04: Quản lý Thực đơn thủ công (GET / POST / PUT / DELETE)
-  if (pathname === '/api/v1/merchant/menu' && method === 'GET') {
-    store.merchantMenu = store.merchantMenu || [
-      { id: 'MENU-01', name: 'Phở Bò Tái Nạm', price_vnd: 55000, available: true, category: 'Món nước' },
-      { id: 'MENU-02', name: 'Phở Gà Ta Lá Chanh', price_vnd: 50000, available: true, category: 'Món nước' },
-      { id: 'MENU-03', name: 'Quẩy Giòn', price_vnd: 10000, available: true, category: 'Món thêm' }
-    ];
-    return { status: 200, data: { items: store.merchantMenu } };
-  }
-
-  if (pathname === '/api/v1/merchant/menu' && method === 'POST') {
-    store.merchantMenu = store.merchantMenu || [];
-    const newItem = {
-      id: `MENU-${Date.now()}`,
-      name: body.name || 'Món mới',
-      price_vnd: Number(body.price_vnd || 45000),
-      available: body.available !== false,
-      category: body.category || 'Món chính'
-    };
-    store.merchantMenu.unshift(newItem);
-    return { status: 201, data: newItem };
-  }
-
-  const merchantMenuItemMatch = pathname.match(/^\/api\/v1\/merchant\/menu\/([^/]+)$/);
-  if (merchantMenuItemMatch && (method === 'PUT' || method === 'PATCH')) {
-    store.merchantMenu = store.merchantMenu || [];
-    const item = store.merchantMenu.find(i => i.id === merchantMenuItemMatch[1]);
-    if (!item) return { status: 404, data: { error: 'Menu item not found' } };
-    if (body.name !== undefined) item.name = body.name;
-    if (body.price_vnd !== undefined) item.price_vnd = Number(body.price_vnd);
-    if (body.available !== undefined) item.available = Boolean(body.available);
-    if (body.category !== undefined) item.category = body.category;
-    return { status: 200, data: item };
-  }
-
-  if (merchantMenuItemMatch && method === 'DELETE') {
-    store.merchantMenu = (store.merchantMenu || []).filter(i => i.id !== merchantMenuItemMatch[1]);
-    return { status: 200, data: { deleted: true, id: merchantMenuItemMatch[1] } };
-  }
-
-  if (pathname === '/api/v1/merchant/menu/ocr' && method === 'POST') {
-    const res = parseMenuOcrText(store, body.place_id || 'PLACE-401', body.raw_text || '1. Phở bò tái nạm - 45k\n2. Bún bò Huế đặc biệt - 50k');
-    return { status: 200, data: res };
-  }
-
-  if (pathname === '/api/v1/merchant/promotions' && method === 'GET') {
-    store.merchantPromotions = store.merchantPromotions || [
-      { id: 'PROMO-101', place_id: 'PLACE-401', title: 'Combo Sáng: Phở Bò + Quẩy + Trà Đá', discount_pct: 15, status: 'active' }
-    ];
-    return { status: 200, data: { promotions: store.merchantPromotions } };
-  }
-
-  if (pathname === '/api/v1/merchant/promotions' && method === 'POST') {
-    store.merchantPromotions = store.merchantPromotions || [];
-    const promo = {
-      id: `PROMO-${Date.now()}`,
-      place_id: body.place_id || 'PLACE-401',
-      title: body.title || 'Combo Sáng: Phở Bò + Quẩy Giòn + Trà Đá chỉ 49.000đ',
-      discount_pct: Number(body.discount_pct || 15),
-      status: 'active'
-    };
-    store.merchantPromotions.unshift(promo);
-    return { status: 200, data: promo };
-  }
-
-  if (pathname === '/api/v1/merchant/branches' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        branches: store.places.slice(0, 3).map(p => ({
-          id: p.id,
-          name: p.name,
-          address: p.address,
-          is_open: p.is_open_override
-        }))
-      }
-    };
   }
 
   // ===========================================================================
@@ -535,42 +490,48 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       status: 200,
       data: {
         policy: { max_sponsored_ratio: '1/3', badge_required: 'Tài trợ', hard_allergy_enforced: true },
-        items: store.campaigns
+        items: await repo.listCampaigns()
       }
     };
   }
 
   if (pathname === '/api/v1/ads/campaigns' && method === 'POST') {
-    const newCmp = {
+    const place = await repo.getPlace(body.place_id || 'PLACE-401');
+    const dish = await repo.getDish(body.dish_id || 'DISH-101');
+    if (!place || !dish) return { status: 400, data: { error: 'place_id hoặc dish_id không tồn tại' } };
+    const newCmp = await repo.createCampaign({
       id: `CMP-${Date.now()}`,
-      place_id: body.place_id || 'PLACE-401',
-      dish_id: body.dish_id || 'DISH-101',
-      package_name: body.package_name || 'Gói Đẩy Đề Xuất Khung Giờ Vàng (7 Ngày)',
-      radius_m: Math.min(3000, Number(body.radius_m || 3000)),
-      budget_vnd: Number(body.budget_vnd || 500000),
+      place_id: place.id,
+      dish_id: dish.id,
+      package_name: cleanText(body.package_name, 120) || 'Gói Đẩy Đề Xuất Khung Giờ Vàng (7 Ngày)',
+      radius_m: cleanNumber(body.radius_m, 100, 3000, 3000),
+      budget_vnd: cleanNumber(body.budget_vnd, 0, 1e10, 500000),
       spent_vnd: 0,
       impressions: 0,
       clicks: 0,
       status: 'active',
-      badge_label: 'Tài trợ'
-    };
-    store.campaigns.unshift(newCmp);
+      badge_label: 'Tài trợ',
+      created_by: userId
+    });
     return { status: 200, data: newCmp };
   }
 
   const adPatchMatch = pathname.match(/^\/api\/v1\/ads\/campaigns\/([^/]+)$/);
   if (adPatchMatch && (method === 'PATCH' || method === 'PUT')) {
-    const cmp = store.campaigns.find(c => c.id === adPatchMatch[1]);
+    const patch = {};
+    if (body.status !== undefined) patch.status = cleanText(body.status, 32);
+    if (body.budget_vnd !== undefined) patch.budget_vnd = cleanNumber(body.budget_vnd, 0, 1e10, 0);
+    if (body.radius_m !== undefined) patch.radius_m = cleanNumber(body.radius_m, 100, 3000, 3000);
+    const cmp = await repo.updateCampaign(adPatchMatch[1], patch);
     if (!cmp) return { status: 404, data: { error: 'Campaign not found' } };
-    if (body.status !== undefined) cmp.status = body.status;
-    if (body.budget_vnd !== undefined) cmp.budget_vnd = Number(body.budget_vnd);
-    if (body.radius_m !== undefined) cmp.radius_m = Math.min(3000, Number(body.radius_m));
     return { status: 200, data: cmp };
   }
 
   const adClickMatch = pathname.match(/^\/api\/v1\/ads\/campaigns\/([^/]+)\/click$/);
   if (adClickMatch && method === 'POST') {
-    const res = recordCampaignClick(store, adClickMatch[1], body.fingerprint || 'fp-user-001');
+    const res = await repo.recordCampaignClick(adClickMatch[1], cleanText(body.fingerprint, 64) || 'fp-user-001', userId);
+    if (res.error) return { status: 404, data: res };
+    if (res.charged && repo.kind !== 'memory') bump(store, 'ad_click');
     return { status: 200, data: res };
   }
 
@@ -593,21 +554,21 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   if ((pathname === '/api/v1/ads/payments/vietqr' || pathname === '/api/v1/ads/payments/vietqr/create') && method === 'POST') {
     const invoice = generateVietQrInvoice({
-      campaignId: body.campaign_id || 'CMP-701',
-      amountVnd: body.amount_vnd || 500000,
-      merchantName: body.merchant_name || 'Quán Ngon',
-      description: body.description,
+      campaignId: cleanText(body.campaign_id, 32) || 'CMP-701',
+      amountVnd: cleanNumber(body.amount_vnd, 1000, 1e10, 500000),
+      merchantName: cleanText(body.merchant_name, 80) || 'Quán Ngon',
+      description: body.description ? cleanText(body.description, 25) : null,
     });
     // Ghi đơn chờ thanh toán: webhook chỉ nạp tiền cho đơn đã tạo ở đây
-    store.paymentOrders = store.paymentOrders || {};
-    store.paymentOrders[invoice.order_id] = {
+    await repo.createPaymentOrder({
       order_id: invoice.order_id,
       order_code: invoice.order_code,
       campaign_id: invoice.campaign_id,
       amount_vnd: Number(invoice.amount_vnd),
       status: 'PENDING_PAYMENT',
+      created_by: userId,
       created_at: invoice.created_at,
-    };
+    });
     return { status: 200, data: invoice };
   }
 
@@ -618,15 +579,14 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     if (!checksumKey) {
       return { status: 503, data: { error: 'Payment webhook not configured (PAYOS_CHECKSUM_KEY missing)' } };
     }
-    const data = body && typeof body.data === 'object' && body.data !== null ? body.data : null;
+    const data = typeof body.data === 'object' && body.data !== null ? body.data : null;
     if (!data || !verifyPaymentWebhookSignature(data, body.signature, checksumKey)) {
       return { status: 401, data: { error: 'Invalid webhook signature' } };
     }
     if (String(data.code) !== '00' || body.success === false) {
       return { status: 200, data: { success: true, credited: false, reason: 'payment_not_successful' } };
     }
-    store.paymentOrders = store.paymentOrders || {};
-    const pending = Object.values(store.paymentOrders).find(o => String(o.order_code) === String(data.orderCode));
+    const pending = await repo.findPaymentOrderByCode(data.orderCode);
     if (!pending) {
       // Đơn không do hệ thống tạo (vd. webhook thử của PayOS): xác nhận nhận, không nạp tiền
       return { status: 200, data: { success: true, credited: false, reason: 'unknown_order' } };
@@ -634,21 +594,22 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     if (Number(data.amount) !== Number(pending.amount_vnd)) {
       return { status: 409, data: { error: 'Amount mismatch', expected: pending.amount_vnd, received: Number(data.amount) } };
     }
-    const result = processSuccessfulPayment(store, {
+    const result = await repo.completePayment({
       orderId: pending.order_id,
       campaignId: pending.campaign_id,
       amountVnd: Number(data.amount)
     });
+    if (!result.already_processed && repo.kind !== 'memory') bump(store, 'ad_recharge_success');
     return { status: 200, data: { ...result, credited: !result.already_processed } };
   }
 
   const paymentOrderMatch = pathname.match(/^\/api\/v1\/payments\/orders\/([^/]+)$/);
   if (paymentOrderMatch && method === 'GET') {
     const orderId = paymentOrderMatch[1];
-    store.paymentOrders = store.paymentOrders || {};
-    const order = store.paymentOrders[orderId];
+    const order = await repo.getPaymentOrder(orderId);
     if (order) {
-      return { status: 200, data: order };
+      const { created_by: _createdBy, ...publicOrder } = order;
+      return { status: 200, data: publicOrder };
     }
     return { status: 404, data: { error: 'Order not found', order_id: orderId } };
   }
@@ -670,22 +631,28 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   }
 
   if (pathname === '/api/v1/me/meal-schedule' && (method === 'PUT' || method === 'POST')) {
-    const updated = updateMealReminderSchedule(store, body);
+    if (!authUser) return UNAUTHORIZED;
+    const updated = updateMealReminderSchedule({ userProfile: profile }, body);
+    await repo.saveProfile(authUser.id, profile);
     return { status: 200, data: updated };
   }
 
   // ===========================================================================
   // MODULE M9: ADMIN CMS, OCR MODERATION & AUDIT LOGS (M9-S01 .. M9-S09)
+  // Every admin write is recorded in the audit log (rbac_audit_logs).
   // ===========================================================================
   if (pathname === '/api/v1/admin/dashboard' && method === 'GET') {
+    const [dishes, places, ocrQueue, userReports, campaigns] = await Promise.all([
+      repo.listDishes(), repo.listPlaces(), repo.listOcrQueue(), repo.listUserReports(), repo.listCampaigns()
+    ]);
     return {
       status: 200,
       data: {
-        total_dishes: store.dishes.length,
-        total_verified_places: store.places.filter(p => p.is_verified).length,
-        ocr_queue: store.ocrQueue,
-        user_reports: store.userReports,
-        campaigns: store.campaigns,
+        total_dishes: dishes.length,
+        total_verified_places: places.filter(p => p.is_verified).length,
+        ocr_queue: ocrQueue,
+        user_reports: userReports,
+        campaigns,
         events: store.analyticsEvents
       }
     };
@@ -693,64 +660,69 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   // M9-S02: Admin CRUD Thư viện Món ăn Toàn quốc
   if (pathname === '/api/v1/admin/dishes' && method === 'POST') {
-    const newDish = {
+    const allergens = cleanList(body.allergen_tags || body.allergens);
+    const newDish = await repo.createDish({
       id: `DISH-${Date.now()}`,
-      name: body.name || 'Món Việt Mới',
-      region: body.region || 'Miền Nam',
-      calories: Number(body.calories || 450),
-      ref_price: Number(body.ref_price || 50000),
-      spice_level: Number(body.spice_level || 1),
-      allergens: body.allergens || [],
-      tags: body.tags || ['Đặc sản'],
-      description: body.description || 'Món ăn mới từ Admin CMS'
-    };
-    store.dishes.unshift(newDish);
-    return { status: 201, data: newDish };
+      name: cleanText(body.name, 120) || 'Món Việt Mới',
+      region: cleanText(body.region, 32) || 'Miền Nam',
+      meal_slots: cleanList(body.meal_slots).length ? cleanList(body.meal_slots) : ['lunch', 'dinner'],
+      calories: cleanNumber(body.calories, 0, 10000, 450),
+      ref_price: cleanNumber(body.ref_price, 0, 1e8, 50000),
+      spice_level: Math.round(cleanNumber(body.spice_level, 0, 3, 1)),
+      allergen_tags: allergens,
+      weather_fit: ['any'],
+      tags: cleanList(body.tags).length ? cleanList(body.tags) : ['Đặc sản'],
+      description: cleanText(body.description, 1000) || 'Món ăn mới từ Admin CMS'
+    });
+    await audit('CREATE_DISH', newDish.id);
+    // `allergens` kept for older clients; the recommender reads `allergen_tags`
+    return { status: 201, data: { ...newDish, allergens: newDish.allergen_tags } };
   }
 
   const adminDishMatch = pathname.match(/^\/api\/v1\/admin\/dishes\/([^/]+)$/);
   if (adminDishMatch && (method === 'PUT' || method === 'PATCH')) {
-    const dish = store.dishes.find(d => d.id === adminDishMatch[1]);
+    const patch = {};
+    if (body.name !== undefined) patch.name = cleanText(body.name, 120) || 'Món Việt Mới';
+    if (body.calories !== undefined) patch.calories = cleanNumber(body.calories, 0, 10000, 450);
+    if (body.ref_price !== undefined) patch.ref_price = cleanNumber(body.ref_price, 0, 1e8, 50000);
+    if (body.allergens !== undefined || body.allergen_tags !== undefined) patch.allergen_tags = cleanList(body.allergen_tags || body.allergens);
+    if (body.region !== undefined) patch.region = cleanText(body.region, 32);
+    if (body.spice_level !== undefined) patch.spice_level = Math.round(cleanNumber(body.spice_level, 0, 3, 1));
+    if (body.description !== undefined) patch.description = cleanText(body.description, 1000);
+    const dish = await repo.updateDish(adminDishMatch[1], patch);
     if (!dish) return { status: 404, data: { error: 'Dish not found' } };
-    if (body.name !== undefined) dish.name = body.name;
-    if (body.calories !== undefined) dish.calories = Number(body.calories);
-    if (body.ref_price !== undefined) dish.ref_price = Number(body.ref_price);
-    if (body.allergens !== undefined) dish.allergens = body.allergens;
-    if (body.region !== undefined) dish.region = body.region;
-    return { status: 200, data: dish };
+    await audit('UPDATE_DISH', dish.id);
+    return { status: 200, data: { ...dish, allergens: dish.allergen_tags } };
   }
 
   if (adminDishMatch && method === 'DELETE') {
-    store.dishes = store.dishes.filter(d => d.id !== adminDishMatch[1]);
+    const deleted = await repo.deleteDish(adminDishMatch[1]);
+    if (!deleted) return { status: 404, data: { error: 'Dish not found' } };
+    await audit('DELETE_DISH', adminDishMatch[1]);
     return { status: 200, data: { deleted: true, id: adminDishMatch[1] } };
   }
 
   if (pathname === '/api/v1/admin/ocr-review' && method === 'POST') {
-    const item = store.ocrQueue.find(i => i.id === body.ocr_id);
-    if (item) {
-      item.status = body.decision || 'approved';
-      if (body.reason) item.rejection_reason = body.reason;
-    }
+    const decision = ['approved', 'rejected', 'pending_review'].includes(body.decision) ? body.decision : 'approved';
+    const item = await repo.reviewOcr(body.ocr_id, decision, body.reason ? cleanText(body.reason, 300) : null);
+    if (!item) return { status: 404, data: { error: 'OCR item not found', updated: null } };
+    await audit(decision === 'rejected' ? 'REJECT_OCR_MENU' : 'APPROVE_OCR_MENU', item.id);
     return { status: 200, data: { updated: item } };
   }
 
   const unpausePlaceMatch = pathname.match(/^\/api\/v1\/admin\/places\/([^/]+)\/(?:approve|unpause)$/);
   if (unpausePlaceMatch && method === 'POST') {
-    const placeId = unpausePlaceMatch[1];
-    const place = store.places.find(p => p.id === placeId) || store.places[0];
-    place.is_verified = true;
-    place.is_open_override = true;
-    place.closed_report_count = 0;
-    if (store.userReports) {
-      store.userReports = store.userReports.filter(r => r.place_id !== placeId);
-    }
+    const place = await repo.unpausePlace(unpausePlaceMatch[1]);
+    if (!place) return { status: 404, data: { error: 'Place not found' } };
+    await audit('UNPAUSE_PLACE', place.id);
     return { status: 200, data: { unpaused_place: place, message: 'Đã mở lại quán và xóa cờ báo lỗi thành công.' } };
   }
 
   const moderateAdMatch = pathname.match(/^\/api\/v1\/admin\/ads\/([^/]+)\/moderate$/);
   if (moderateAdMatch && method === 'POST') {
-    const cmp = store.campaigns.find(c => c.id === moderateAdMatch[1]) || store.campaigns[0];
-    cmp.status = body.decision || 'active';
+    const cmp = await repo.updateCampaign(moderateAdMatch[1], { status: cleanText(body.decision, 32) || 'active' });
+    if (!cmp) return { status: 404, data: { error: 'Campaign not found' } };
+    await audit('MODERATE_AD', `${cmp.id}:${cmp.status}`);
     return { status: 200, data: { campaign: cmp, hard_allergy_check: 'passed', sponsored_badge_check: 'passed' } };
   }
 
@@ -759,10 +731,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       status: 200,
       data: {
         rbac_roles: ['Consumer', 'Merchant Owner', 'Merchant Staff', 'Content Moderator', 'Ops Admin', 'Super Admin'],
-        logs: [
-          { id: 'aud-1', actor: 'ops_admin@homnayangi.vn', action: 'APPROVE_OCR_MENU', target: 'PLACE-401', timestamp: new Date().toISOString() },
-          { id: 'aud-2', actor: 'system_crowd_guard', action: 'AUTO_PAUSE_3_REPORTS', target: 'PLACE-405', timestamp: new Date().toISOString() }
-        ]
+        logs: await repo.listAudit(100)
       }
     };
   }
@@ -816,306 +785,25 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   }
 
   // ===========================================================================
-  // MODULE M10: PRODUCT ANALYTICS, 14 POSTHOG EVENTS & AI BENCHMARK (M10-S01 .. M10-S06)
+  // MODULE M20: CREATOR KITCHEN & COMMUNITY RECIPES (tipping, likes)
   // ===========================================================================
-  if (pathname === '/api/v1/events' && method === 'POST') {
-    const ev = body.event_name || 'app_open';
-    store.analyticsEvents[ev] = (store.analyticsEvents[ev] || 0) + 1;
-    return { status: 200, data: { event: ev, count: store.analyticsEvents[ev] } };
-  }
-
-  if (pathname === '/api/v1/analytics/funnel' && method === 'GET') {
-    const ev = store.analyticsEvents;
-    return {
-      status: 200,
-      data: {
-        north_star_metric: 'Weekly Active Meal Decisions (WAMD)',
-        wamd_current: 18420,
-        d7_retention_pct: 28.4,
-        decision_under_60s_pct: 74.2,
-        funnel: [
-          { step: '1. app_open', count: ev.app_open || 1240 },
-          { step: '2. suggestion_shown', count: ev.suggestion_shown || 1180 },
-          { step: '3. suggestion_click / dish_view', count: (ev.suggestion_click || 520) + (ev.dish_view || 640) },
-          { step: '4. order_click / direction_click / recipe_view', count: (ev.order_click || 215) + (ev.direction_click || 180) + (ev.recipe_view || 295) }
-        ],
-        events: ev
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/analytics/ai-benchmark' && method === 'GET') {
-    return { status: 200, data: runVietnameseIntentBenchmark(store) };
-  }
-
-  // ===========================================================================
-  // MODULE M11: WEEKLY MEAL PLANNER & CONSOLIDATED GROCERY LIST (M11-S01 .. M11-S03)
-  // ===========================================================================
-  if ((pathname === '/api/v1/meal-plans/weekly' || pathname === '/api/v1/meal-planner/weekly' || pathname === '/api/v1/groceries/consolidated') && method === 'GET') {
-    const fridge = (searchParams.get('fridge') || 'Hành tím,Nước mắm').split(',').map(s => s.trim());
-    const familySize = Number(searchParams.get('family_size') || 2);
-    const mealsPerDay = Number(searchParams.get('meals_per_day') || 3);
-    if (store.customMealPlan && !searchParams.get('family_size') && !searchParams.get('meals_per_day')) {
-      return { status: 200, data: store.customMealPlan };
-    }
-    return {
-      status: 200,
-      data: generateWeeklyMealPlanAndGroceries(store, fridge, { family_size: familySize, meals_per_day: mealsPerDay })
-    };
-  }
-
-  if (pathname === '/api/v1/meal-plans/weekly' && (method === 'PUT' || method === 'POST')) {
-    store.customMealPlan = {
-      ...(store.customMealPlan || generateWeeklyMealPlanAndGroceries(store)),
-      days: body.days || (store.customMealPlan ? store.customMealPlan.days : []),
-      updated_at: new Date().toISOString()
-    };
-    return { status: 200, data: store.customMealPlan };
-  }
-
-  if (pathname === '/api/v1/groceries/items' && method === 'POST') {
-    store.customGroceries = store.customGroceries || [];
-    const item = { id: `GROC-${Date.now()}`, name: body.name || 'Nguyên liệu mới', amount: body.amount || '1 gói', bought: false };
-    store.customGroceries.unshift(item);
-    return { status: 201, data: item };
-  }
-
-  const grocMatch = pathname.match(/^\/api\/v1\/groceries\/items\/([^/]+)$/);
-  if (grocMatch && method === 'PATCH') {
-    store.customGroceries = store.customGroceries || [];
-    const item = store.customGroceries.find(g => g.id === grocMatch[1]);
-    if (item && body.bought !== undefined) item.bought = Boolean(body.bought);
-    return { status: 200, data: item || { id: grocMatch[1], bought: Boolean(body.bought) } };
-  }
-
-  // ===========================================================================
-  // MODULE M12: GROUP POLLS & GPS-VERIFIED COMMUNITY REVIEWS (M12-S01 .. M12-S03)
-  // ===========================================================================
-  if ((pathname === '/api/v1/polls' || pathname.startsWith('/api/v1/polls/')) && (method === 'GET' || method === 'POST')) {
-    return { status: 200, data: createOrVoteGroupPoll(store, body) };
-  }
-
-  const reviewMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)\/reviews$/);
-  if (reviewMatch && method === 'POST') {
-    const res = submitGpsVerifiedReview(store, reviewMatch[1], body);
-    return { status: res.verified ? 200 : 400, data: res };
-  }
-  if (pathname === '/api/v1/reviews/gps' && method === 'POST') {
-    const placeId = body.place_id || 'PLACE-401';
-    const res = submitGpsVerifiedReview(store, placeId, body);
-    return { status: res.verified ? 200 : 400, data: res };
-  }
-
-  // ===========================================================================
-  // MODULE M13: TABLE BOOKING & DINE-IN QR VOUCHERS (M13-S01 .. M13-S02)
-  // ===========================================================================
-  if (pathname === '/api/v1/bookings' && method === 'GET') {
-    store.bookings = store.bookings || [];
-    return { status: 200, data: { bookings: store.bookings } };
-  }
-
-  if (pathname === '/api/v1/bookings' && method === 'POST') {
-    store.bookings = store.bookings || [];
-    const place = store.places.find(p => p.id === body.place_id) || store.places[0];
-    const booking = {
-      booking_id: `BK-${Date.now()}`,
-      place_id: place.id,
-      place_name: place.name,
-      party_size: body.party_size || 4,
-      time_slot: body.time_slot || '19:00 Hôm nay',
-      has_baby_chair: body.has_baby_chair !== false,
-      note: body.note || '',
-      status: 'confirmed_instant'
-    };
-    store.bookings.unshift(booking);
-    return { status: 200, data: booking };
-  }
-
-  const bookingMatch = pathname.match(/^\/api\/v1\/bookings\/([^/]+)$/);
-  if (bookingMatch && (method === 'PATCH' || method === 'PUT')) {
-    store.bookings = store.bookings || [];
-    const bk = store.bookings.find(b => b.booking_id === bookingMatch[1]);
-    if (!bk) return { status: 404, data: { error: 'Booking not found' } };
-    if (body.party_size !== undefined) bk.party_size = Number(body.party_size);
-    if (body.time_slot !== undefined) bk.time_slot = body.time_slot;
-    if (body.status !== undefined) bk.status = body.status;
-    return { status: 200, data: bk };
-  }
-
-  if (bookingMatch && method === 'DELETE') {
-    store.bookings = store.bookings || [];
-    const bk = store.bookings.find(b => b.booking_id === bookingMatch[1]);
-    if (bk) bk.status = 'cancelled';
-    return { status: 200, data: { cancelled: true, booking_id: bookingMatch[1] } };
-  }
-
-  if (pathname === '/api/v1/vouchers' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        vouchers: [
-          { code: 'HNAG-PHATTAI-15', title: 'Giảm 15% tổng hóa đơn ăn tại quán Phở Phát Tài', qr_payload: 'HNAG:VOUCHER:PLACE-401:15PCT' },
-          { code: 'HNAG-OXUAN-FREE-DRINK', title: 'Tặng 2 ly Nước Sâm Dứa khi ăn tại Bún Bò O Xuân', qr_payload: 'HNAG:VOUCHER:PLACE-403:FREEDRINK' }
-        ]
-      }
-    };
-  }
-
-  // ===========================================================================
-  // MODULE M14: CULINARY CULTURE STORIES (M14-S01 .. M14-S02)
-  // ===========================================================================
-  if (pathname === '/api/v1/stories' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        stories: [
-          { id: 'story-1', title: 'Hành Trình Trăm Năm Của Phở Việt: Từ Gánh Hàng Rong Đến Di Sản Quốc Gia', region: 'Bắc – Nam', read_min: 4 },
-          { id: 'story-2', title: 'Nghệ Thuật Cân Bằng Ngũ Vị Trong Bữa Cơm Gia Đình Miền Nam', region: 'Miền Nam', read_min: 3 }
-        ]
-      }
-    };
-  }
-
-  // ===========================================================================
-  // MODULE M15: CULINARY TOURISM & QR FOOD PASSPORT (M15-S01 .. M15-S02)
-  // ===========================================================================
-  if (pathname === '/api/v1/tourism/trails' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        city: 'Biên Hòa — Đồng Nai',
-        trail_title: 'Food Trail 1 Ngày Khám Phá Ẩm Thực Biên Hòa',
-        stops: [
-          { slot: '07:30 Sáng', dish: 'Phở Bò Tái Nạm Hà Nội', place: 'Phở Gia Truyền Phát Tài' },
-          { slot: '12:00 Trưa', dish: 'Cơm Tấm Sườn Bì Chả', place: 'Cơm Tấm Sài Gòn Xưa' },
-          { slot: '15:30 Xế', dish: 'Gỏi Cuốn Chay Đậu Hũ (Thanh mát)', place: 'Bếp Chay An Lạc' },
-          { slot: '19:00 Tối', dish: 'Bún Bò Huế O Xuân', place: 'Bún Bò Huế O Xuân' }
-        ]
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/tourism/passport/checkin' && method === 'POST') {
-    return {
-      status: 200,
-      data: {
-        stamped: true,
-        place_id: body.place_id || 'PLACE-401',
-        total_stamps: 4,
-        badge_unlocked: 'Đại Sứ Ẩm Thực Biên Hòa'
-      }
-    };
-  }
-
-  // ===========================================================================
-  // MODULE M16: MULTILINGUAL AI MENU TRANSLATOR (M16-S01 .. M16-S02)
-  // ===========================================================================
-  if (pathname === '/api/v1/translate/menu') {
-    const targetLang = (method === 'POST' ? body.target_lang : searchParams.get('lang')) || 'EN';
-    return { status: 200, data: translateVietnameseMenu(store, targetLang) };
-  }
-
-  // ===========================================================================
-  // MODULE M17: B2G TOURISM INSIGHTS & FMCG BRAND SPONSORSHIPS (M17-S01 .. M17-S02)
-  // ===========================================================================
-  if (pathname === '/api/v1/enterprise/tourism-insights' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        k_anonymity_enforced: true,
-        local_specialty_queries_30d: 142500,
-        international_visitors_m16: 18400,
-        top_trending_dishes: ['Phở Bò Tái Nạm', 'Cơm Tấm Sườn Bì Chả', 'Bún Bò Huế']
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/enterprise/brand-campaigns' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        campaigns: [
-          { id: 'BRAND-901', brand: 'Nước Mắm Truyền Thống Phú Quốc', placements: 'Công thức Món Kho & Canh Chua (M2-S06)', ctr_pct: 8.4 }
-        ]
-      }
-    };
-  }
-
-  // ===========================================================================
-  // GIAI ĐOẠN 4 / v0.2: MODULE M18, M19 & M20 ROUTES
-  // ===========================================================================
-  // M18: AI Smart Fridge & IoT Barcode Scanner (Zero Food Waste)
-  if (pathname === '/api/v1/fridge/scan' && method === 'POST') {
-    return { status: 200, data: scanFridgeBarcodeOrPhoto(store, body) };
-  }
-  if (pathname === '/api/v1/fridge/inventory' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        total_items: (store.fridgeInventory || []).length,
-        items: store.fridgeInventory || [],
-        expiring_soon_count: (store.fridgeInventory || []).filter(i => i.is_expiring_soon).length
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/fridge/inventory' && method === 'POST') {
-    store.fridgeInventory = store.fridgeInventory || [];
-    const days = Number(body.expires_in_days ?? 3);
-    const newItem = {
-      id: `FRIDGE-${Date.now()}`,
-      name: body.name || 'Nguyên liệu mới',
-      quantity: body.quantity || '1 phần',
-      compartment: body.compartment || 'chill',
-      expires_in_days: days,
-      is_expiring_soon: days <= 2,
-      category: body.category || 'Tươi sống'
-    };
-    store.fridgeInventory.unshift(newItem);
-    return { status: 201, data: newItem };
-  }
-
-  const fridgeItemMatch = pathname.match(/^\/api\/v1\/fridge\/inventory\/([^/]+)$/);
-  if (fridgeItemMatch && (method === 'PUT' || method === 'PATCH')) {
-    store.fridgeInventory = store.fridgeInventory || [];
-    const item = store.fridgeInventory.find(i => i.id === fridgeItemMatch[1]);
-    if (!item) return { status: 404, data: { error: 'Fridge item not found' } };
-    if (body.name !== undefined) item.name = body.name;
-    if (body.quantity !== undefined) item.quantity = body.quantity;
-    if (body.compartment !== undefined) item.compartment = body.compartment;
-    if (body.expires_in_days !== undefined) {
-      item.expires_in_days = Number(body.expires_in_days);
-      item.is_expiring_soon = item.expires_in_days <= 2;
-    }
-    return { status: 200, data: item };
-  }
-
-  if (fridgeItemMatch && method === 'DELETE') {
-    store.fridgeInventory = (store.fridgeInventory || []).filter(i => i.id !== fridgeItemMatch[1]);
-    return { status: 200, data: { deleted: true, id: fridgeItemMatch[1] } };
-  }
-
-  // M19: Smart Dietitian & Health Wearables Sync (Apple Health / Google Fit)
-  if (pathname === '/api/v1/health/sync' && method === 'POST') {
-    return { status: 200, data: syncHealthWearables(store, body) };
-  }
-  if (pathname === '/api/v1/health/nutrition-profile' && method === 'GET') {
-    return { status: 200, data: store.healthProfile || syncHealthWearables(store) };
-  }
-
-  // M20: Creator Kitchen & Community Recipe Hub (Tipping & Social Sharing)
   if (pathname === '/api/v1/community/recipes' && method === 'GET') {
-    return { status: 200, data: getCommunityRecipes(store, Object.fromEntries(searchParams)) };
+    let recipes = await repo.listRecipes();
+    if (searchParams.get('tag') === 'zero_waste') recipes = recipes.filter(r => r.zero_waste_tag);
+    return { status: 200, data: { total: recipes.length, recipes } };
   }
+
   if (pathname === '/api/v1/community/recipes' && method === 'POST') {
+    if (!authUser) return UNAUTHORIZED;
     const title = cleanText(body.title, 120);
     if (title.length < 2) {
       return { status: 400, data: { error: 'Tiêu đề công thức không hợp lệ (2–120 ký tự, không chứa HTML)' } };
     }
-    const newRecipe = {
-      id: `CREC-${Date.now()}`,
+    const newRecipe = await repo.createRecipe({
+      id: `CREC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       title,
-      author: cleanText(body.author, 60) || cleanText(store.userProfile && store.userProfile.name, 60) || 'Đầu Bếp Nghiệp Dư',
+      author: cleanText(body.author, 60) || cleanText(profile && profile.name, 60) || 'Đầu Bếp Nghiệp Dư',
+      author_id: userId,
       author_avatar: '👨‍🍳',
       prep_time_minutes: cleanNumber(body.prep_time_minutes, 1, 1440, 25),
       difficulty: cleanText(body.difficulty, 20) || 'Dễ',
@@ -1124,88 +812,65 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       tips_received_vnd: 0,
       zero_waste_tag: cleanText(body.zero_waste_tag, 40) || null,
       ingredients: (Array.isArray(body.ingredients) ? body.ingredients : []).slice(0, 30).map(i => cleanText(i, 60)).filter(Boolean)
-    };
-    store.communityRecipes = store.communityRecipes || [];
-    store.communityRecipes.unshift(newRecipe);
+    });
     return { status: 201, data: newRecipe };
   }
 
   const tipMatch = pathname.match(/^\/api\/v1\/community\/recipes\/([^/]+)\/tip$/);
   if (tipMatch && method === 'POST') {
-    const res = tipCommunityRecipe(store, tipMatch[1], body.amount_vnd || 50000);
-    return { status: res.success ? 200 : 404, data: res };
-  }
-
-  const likeRecipeMatch = pathname.match(/^\/api\/v1\/community\/recipes\/([^/]+)\/like$/);
-  if (likeRecipeMatch && method === 'POST') {
-    store.communityRecipes = store.communityRecipes || [];
-    const rec = store.communityRecipes.find(r => r.id === likeRecipeMatch[1]);
-    if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
-    rec.likes_count = (rec.likes_count || 0) + 1;
-    return { status: 200, data: { id: rec.id, likes_count: rec.likes_count } };
-  }
-
-  const recipeCrudMatch = pathname.match(/^\/api\/v1\/community\/recipes\/([^/]+)$/);
-  if (recipeCrudMatch && (method === 'PATCH' || method === 'PUT')) {
-    store.communityRecipes = store.communityRecipes || [];
-    const rec = store.communityRecipes.find(r => r.id === recipeCrudMatch[1]);
-    if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
-    if (body.title !== undefined) {
-      const title = cleanText(body.title, 120);
-      if (title.length < 2) return { status: 400, data: { error: 'Tiêu đề công thức không hợp lệ' } };
-      rec.title = title;
-    }
-    if (body.prep_time_minutes !== undefined) rec.prep_time_minutes = cleanNumber(body.prep_time_minutes, 1, 1440, rec.prep_time_minutes);
-    if (body.calories !== undefined) rec.calories = cleanNumber(body.calories, 0, 10000, rec.calories);
-    if (body.zero_waste_tag !== undefined) rec.zero_waste_tag = cleanText(body.zero_waste_tag, 40) || null;
-    return { status: 200, data: rec };
-  }
-
-  if (recipeCrudMatch && method === 'DELETE') {
-    store.communityRecipes = (store.communityRecipes || []).filter(r => r.id !== recipeCrudMatch[1]);
-    return { status: 200, data: { deleted: true, id: recipeCrudMatch[1] } };
-  }
-
-  // Production Health Check & Monitoring
-  if (pathname === '/api/v1/health-check' && method === 'GET') {
+    const amount = cleanNumber(body.amount_vnd, 1000, 1e8, 50000);
+    const recipe = await repo.tipRecipe(tipMatch[1], amount);
+    if (!recipe) return { status: 404, data: { success: false, error: 'Recipe not found' } };
     return {
       status: 200,
       data: {
-        status: 'healthy',
-        service: 'taste_of_vietnam_backend',
-        version: '0.2.0',
-        modules_loaded: 20,
-        cache_stats: suggestionCache.getStats(),
-        queue_stats: pushQueue.getQueueStatus(),
-        timestamp: new Date().toISOString()
+        success: true,
+        recipe_id: recipe.id,
+        tipped_amount_vnd: amount,
+        total_tips_vnd: recipe.tips_received_vnd,
+        author: recipe.author,
+        message: `Cảm ơn anh đã ủng hộ ${amount.toLocaleString('vi-VN')}đ cho đầu bếp ${recipe.author}!`
       }
     };
   }
 
-  // System Performance: Cache Metrics & Invalidation
-  if (pathname === '/api/v1/system/cache' && method === 'GET') {
-    return { status: 200, data: suggestionCache.getStats() };
-  }
-  if (pathname === '/api/v1/system/cache' && method === 'DELETE') {
-    suggestionCache.clear();
-    return { status: 200, data: { cleared: true, message: 'Bộ đệm đã được xóa sạch.' } };
+  const likeRecipeMatch = pathname.match(/^\/api\/v1\/community\/recipes\/([^/]+)\/like$/);
+  if (likeRecipeMatch && method === 'POST') {
+    const rec = await repo.likeRecipe(likeRecipeMatch[1]);
+    if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
+    return { status: 200, data: { id: rec.id, likes_count: rec.likes_count } };
   }
 
-  // Batch Push Notification Queue (M8 Anti-fatigue)
-  if (pathname === '/api/v1/notifications/queue-status' && method === 'GET') {
-    return { status: 200, data: pushQueue.getQueueStatus() };
-  }
-  if (pathname === '/api/v1/notifications/batch-dispatch' && method === 'POST') {
-    const result = await pushQueue.processBatch();
-    return { status: 200, data: result };
+  // Edit / delete: the author, or an admin
+  const recipeCrudMatch = pathname.match(/^\/api\/v1\/community\/recipes\/([^/]+)$/);
+  if (recipeCrudMatch && ['PATCH', 'PUT', 'DELETE'].includes(method)) {
+    const rec = await repo.getRecipe(recipeCrudMatch[1]);
+    if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
+    if (!authUser || (authUser.role !== 'admin' && rec.author_id !== authUser.id)) {
+      return { status: 403, data: { error: 'Chỉ tác giả hoặc quản trị viên được sửa/xóa công thức này' } };
+    }
+    if (method === 'DELETE') {
+      await repo.deleteRecipe(rec.id);
+      if (authUser.role === 'admin' && rec.author_id !== authUser.id) await audit('DELETE_RECIPE', rec.id);
+      return { status: 200, data: { deleted: true, id: rec.id } };
+    }
+    const patch = {};
+    if (body.title !== undefined) {
+      const title = cleanText(body.title, 120);
+      if (title.length < 2) return { status: 400, data: { error: 'Tiêu đề công thức không hợp lệ' } };
+      patch.title = title;
+    }
+    if (body.prep_time_minutes !== undefined) patch.prep_time_minutes = cleanNumber(body.prep_time_minutes, 1, 1440, rec.prep_time_minutes);
+    if (body.calories !== undefined) patch.calories = cleanNumber(body.calories, 0, 10000, rec.calories);
+    if (body.zero_waste_tag !== undefined) patch.zero_waste_tag = cleanText(body.zero_waste_tag, 40) || null;
+    return { status: 200, data: await repo.updateRecipe(rec.id, patch) };
   }
 
-  // Gemini 2.0 Multimodal Vision (M18 Fridge Scanner & M6 Menu OCR)
-  if (pathname === '/api/v1/vision/analyze' && method === 'POST') {
-    const context = body.context || 'fridge';
-    const result = await analyzeFoodImageWithGemini(body.image_base64 || '', body.mime_type || 'image/jpeg', context);
-    return { status: 200, data: result };
-  }
+  // ===========================================================================
+  // FROZEN MODULES (M6, M10–M19) & SYSTEM ROUTES
+  // ===========================================================================
+  const frozen = await handleFrozenRoute(await buildView(repo, store, authUser), method, pathname, searchParams, body);
+  if (frozen) return frozen;
 
   return { status: 404, data: { error: `Unknown endpoint ${method} ${pathname}` } };
 }

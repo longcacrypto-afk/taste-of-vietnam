@@ -32,6 +32,12 @@ services:
         sync: false
       - key: SMS_BRANDNAME
         sync: false
+      # DATABASE_URL (Render Postgres with PostGIS) is set in the dashboard, not here.
+      # With it set the server refuses to start while migrations are pending (Render then keeps
+      # the previous deploy running). Either run `npm run db:migrate && npm run db:seed` against
+      # that database from a machine with its external URL, or set DB_AUTO_MIGRATE=true (the free
+      # plan has no shell): migrations then run at boot and an empty catalogue gets the demo seed.
+      # Without DATABASE_URL the app runs in memory and loses data on restart.
 
     healthCheckPath: /api/v1/suggestions/today
 

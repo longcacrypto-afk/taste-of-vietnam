@@ -1,9 +1,88 @@
 // =============================================================================
-// REPOSITORY LAYER — POSTGRESQL + POSTGIS SPATIAL QUERIES
-// Hôm nay ăn gì · Taste of Vietnam v0.1
+// REPOSITORY LAYER — the only way the API reads and writes data.
+//
+//   getRepository(store) -> PostgresRepository when the server booted with
+//                           DATABASE_URL (store.repo), otherwise a
+//                           MemoryRepository over the in-memory seed store
+//                           (tests / local dev only: data is lost on restart).
+//   initRepository(...)  -> called once at boot by server.js.
+//
+// Both classes expose the same async methods (users, OTP, history, collections,
+// dishes, places, campaigns, payments, order redirects, recipes, audit log).
+// The helpers at the bottom of this file are the older, unwired queries for the
+// frozen modules (M7 ad clicks, M11–M20); they use the legacy pool in
+// connection.js and return null when it is not connected.
 // =============================================================================
 
-import { query, isPostgresConnected } from './connection.js';
+import { query, isPostgresConnected, createPool } from './connection.js';
+import { MemoryRepository } from './memoryRepository.js';
+import { PostgresRepository } from './postgresRepository.js';
+import { migrationStatus, runMigrations } from './migrate.js';
+import { seedCatalog } from './seedCatalog.js';
+
+export { MemoryRepository, PostgresRepository };
+
+const memoryRepos = new WeakMap();
+
+/** The repository for this store: Postgres if attached at boot, else memory. */
+export function getRepository(store) {
+  if (store.repo) return store.repo;
+  let repo = memoryRepos.get(store);
+  if (!repo) {
+    repo = new MemoryRepository(store);
+    memoryRepos.set(store, repo);
+  }
+  return repo;
+}
+
+/**
+ * Boot-time setup. Without a database URL: memory mode. With one: connect, make sure
+ * every migration is applied (or apply them when autoMigrate, and seed the demo
+ * catalogue if the dishes table is empty), attach the Postgres
+ * repository to the store. Throws when the database is unreachable or behind on
+ * migrations, so the server never silently falls back to memory and loses data.
+ */
+export async function initRepository(store, {
+  databaseUrl = process.env.DATABASE_URL,
+  autoMigrate = process.env.DB_AUTO_MIGRATE === 'true',
+  log = console.log
+} = {}) {
+  if (!databaseUrl) {
+    log(process.env.NODE_ENV === 'production'
+      ? '⚠️  DATABASE_URL not set — IN-MEMORY mode: every account, profile and order is lost on restart.'
+      : 'ℹ️  DATABASE_URL not set — in-memory store (dev/test mode, data is lost on restart).');
+    return getRepository(store);
+  }
+  const pool = createPool(databaseUrl);
+  try {
+    await pool.query('SELECT 1');
+    const status = await migrationStatus(pool);
+    if (status.pending.length) {
+      if (!autoMigrate) {
+        throw new Error(`Database is missing migrations: ${status.pending.join(', ')}. Run "npm run db:migrate" against this DATABASE_URL first (or set DB_AUTO_MIGRATE=true).`);
+      }
+      await runMigrations(pool, { log });
+    }
+    const dishCount = Number((await pool.query('SELECT COUNT(*)::int AS n FROM dishes')).rows[0].n);
+    if (dishCount === 0 && autoMigrate) {
+      // DB_AUTO_MIGRATE on a fresh database: also load the demo catalogue (insert-only, never overwrites)
+      await seedCatalog(pool, { log });
+    } else if (dishCount === 0) {
+      log('⚠️  The dishes table is empty. Load the demo catalogue with "npm run db:seed".');
+    }
+  } catch (err) {
+    await pool.end().catch(() => {});
+    throw err;
+  }
+  const repo = new PostgresRepository(pool);
+  store.repo = repo;
+  log('🐘 PostgreSQL storage active (accounts, profiles, history, catalogue, payments persist across restarts).');
+  return repo;
+}
+
+// =============================================================================
+// LEGACY QUERIES FOR FROZEN MODULES (not wired into the router)
+// =============================================================================
 
 /**
  * M4: Tìm quán trong bán kính R mét sử dụng hàm không gian PostGIS ST_DWithin

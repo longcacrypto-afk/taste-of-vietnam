@@ -10,6 +10,28 @@ const { Pool } = pg;
 let pool = null;
 let isConnected = false;
 
+/** SSL for managed databases (Render, or an explicit sslmode=require), plain TCP locally/CI. */
+export function sslFor(connectionString) {
+  const useSsl = process.env.NODE_ENV === 'production' ||
+    (connectionString && (connectionString.includes('render.com') || connectionString.includes('sslmode=require')));
+  return useSsl ? { rejectUnauthorized: false } : false;
+}
+
+/** A plain pg Pool (used by the repository, migrations and the seed script). */
+export function createPool(connectionString, opts = {}) {
+  const p = new Pool({
+    connectionString,
+    ssl: sslFor(connectionString),
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    ...opts,
+  });
+  p.on('error', (err) => console.error('⚠️  PostgreSQL pool error:', err.message));
+  return p;
+}
+
+/** Legacy pool for the frozen-module helpers at the bottom of repository.js. */
 export function initDatabase() {
   const connectionString = process.env.DATABASE_URL;
 
@@ -19,12 +41,9 @@ export function initDatabase() {
   }
 
   try {
-    const useSsl = process.env.NODE_ENV === 'production' ||
-      (connectionString && (connectionString.includes('render.com') || connectionString.includes('sslmode=require')));
-
     pool = new Pool({
       connectionString,
-      ssl: useSsl ? { rejectUnauthorized: false } : false,
+      ssl: sslFor(connectionString),
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,

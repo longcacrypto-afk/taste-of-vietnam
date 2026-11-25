@@ -25,7 +25,7 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Execute Full QA & E2E Acceptance Suite (38 Test Suites)
+      - name: Execute Full QA & E2E Acceptance Suite (in-memory mode)
         run: npm test
 
       - name: Verify Cloud Health Check Endpoint (/health)
@@ -66,7 +66,56 @@ jobs:
       - name: Verify Docker Compose Architecture
         run: docker compose config -q
 
-  # ─── JOB 2: FLUTTER MOBILE CODE QUALITY & DEPENDENCIES CHECK ────────────────
+  # ─── JOB 2: POSTGRESQL + POSTGIS: MIGRATIONS, REPOSITORY & RESTART SURVIVAL ─
+  postgres-db:
+    name: PostgreSQL + PostGIS Suite (migrations, repository, restart survival)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: tov
+          POSTGRES_PASSWORD: tov
+          POSTGRES_DB: tov_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tov -d tov_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://tov:tov@localhost:5432/tov_test
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run the PostgreSQL suite (fails if any test is skipped)
+        run: |
+          npm run test:db 2>&1 | tee db-test.log
+          test "${PIPESTATUS[0]}" -eq 0
+          grep -q '^# skipped 0' db-test.log || (echo "❌ PostgreSQL tests were skipped" && exit 1)
+
+      - name: Migrations apply cleanly on an empty database and are then up to date
+        env:
+          DATABASE_URL: postgres://tov:tov@localhost:5432/tov_test
+        run: |
+          psql "$DATABASE_URL" -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          npm run db:setup
+          npm run db:migrate:status | tee status.json
+          node -e "const s=JSON.parse(require('fs').readFileSync('status.json','utf8').slice(require('fs').readFileSync('status.json','utf8').indexOf('{')));if(s.pending.length||s.changed.length){console.error('pending/changed migrations',s);process.exit(1)}"
+
+  # ─── JOB 3: FLUTTER MOBILE CODE QUALITY & DEPENDENCIES CHECK ────────────────
   flutter-mobile:
     name: Flutter Mobile Syntax & Lint Validation (20 Screens)
     runs-on: ubuntu-latest

@@ -75,7 +75,9 @@ test('Every write route returns 401 without a token, and works with a guest toke
     const withBadToken = await hit(store, m, p, { authorization: 'Bearer not-a-token' });
     assert.equal(withBadToken.status, 401, `${m} ${p} with a bad token should be 401`);
   }
-  for (const [m, p] of WRITES.filter(([m, p]) => p !== '/api/v1/me')) {
+  // Editing/deleting a recipe is for its author (or an admin): covered by the ownership test below
+  const OWNER_ONLY = (m, p) => /^\/api\/v1\/community\/recipes\/[^/]+$/.test(p) && (m === 'PATCH' || m === 'DELETE');
+  for (const [m, p] of WRITES.filter(([m, p]) => p !== '/api/v1/me' && !OWNER_ONLY(m, p))) {
     const r = await hit(store, m, p, g.headers, { dish_id: 'DISH-101', title: 'Món thử', place_id: 'PLACE-401', party_size: 2 });
     assert.ok(r.status !== 401 && r.status !== 403, `${m} ${p} with guest token got ${r.status}`);
   }
@@ -118,4 +120,23 @@ test('Admin routes: 401 anonymous, 403 for guest/user/merchant, OK for admin (ro
   const before = store.dishes.length;
   await hit(store, 'POST', '/api/v1/admin/dishes', {}, { name: 'Spam' });
   assert.equal(store.dishes.length, before);
+});
+
+test('Community recipes: only the author or an admin can edit or delete one', async () => {
+  const store = createInitialStore();
+  const author = await guest(store);
+  const other = await guest(store);
+  const admin = await loginAdmin(store);
+  const created = await hit(store, 'POST', '/api/v1/community/recipes', author.headers, { title: 'Canh chua nhà làm' });
+  assert.equal(created.status, 201);
+  const path = `/api/v1/community/recipes/${created.data.id}`;
+  assert.equal((await hit(store, 'PATCH', path, other.headers, { title: 'Bị sửa' })).status, 403);
+  assert.equal((await hit(store, 'DELETE', path, other.headers)).status, 403);
+  assert.equal((await hit(store, 'PATCH', '/api/v1/community/recipes/CREC-01', author.headers, { title: 'Bị sửa' })).status, 403);
+  const edited = await hit(store, 'PATCH', path, author.headers, { title: 'Canh chua cá lóc' });
+  assert.equal(edited.status, 200);
+  assert.equal(edited.data.title, 'Canh chua cá lóc');
+  assert.equal((await hit(store, 'DELETE', '/api/v1/community/recipes/CREC-01', admin.headers)).status, 200);
+  assert.equal((await hit(store, 'DELETE', path, author.headers)).status, 200);
+  assert.equal((await hit(store, 'GET', path.replace(/\/[^/]+$/, ''))).data.recipes.some(r => r.id === created.data.id), false);
 });

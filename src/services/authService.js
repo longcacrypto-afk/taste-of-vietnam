@@ -1,6 +1,8 @@
 // =============================================================================
-// AUTH STOPGAP (P0): phone OTP + HMAC-signed expiring tokens, per-user profiles
-// In-memory only (lost on restart). Real auth on PostgreSQL is P1.
+// AUTH: phone OTP + HMAC-signed expiring tokens, per-user profiles.
+// Accounts and OTP challenges are stored through the repository
+// (src/db/repository.js): PostgreSQL in production, memory in tests/dev.
+// Tokens survive a restart only when JWT_SECRET is set.
 // =============================================================================
 
 import crypto from 'node:crypto';
@@ -9,7 +11,6 @@ const OTP_TTL_MS = 5 * 60 * 1000;      // code valid 5 minutes
 const OTP_RESEND_MS = 30 * 1000;       // at most one code per phone every 30 s
 const OTP_MAX_ATTEMPTS = 5;            // wrong codes before the challenge is burned
 const TOKEN_TTL_S = 7 * 24 * 3600;     // 7 days
-const MAX_GUESTS = 10000;              // cap in-memory guest accounts
 
 let ephemeralSecret = null;
 let warnedSecret = false;
@@ -114,21 +115,20 @@ async function sendOtpSms(phone, code) {
 }
 
 /** POST /auth/otp/request. Dev mode (NODE_ENV !== 'production', no SMS keys): logs and returns the code. */
-export async function requestOtp(store, rawPhone) {
+export async function requestOtp(repo, rawPhone) {
   const phone = normalizePhone(rawPhone);
   if (!phone) return { status: 400, data: { error: 'Số điện thoại không hợp lệ' } };
   const isProd = process.env.NODE_ENV === 'production';
   if (isProd && !smsConfigured()) {
     return { status: 503, data: { error: 'Đăng nhập bằng SMS chưa được cấu hình (SMS_API_KEY / SMS_SECRET_KEY).' } };
   }
-  store.otpChallenges = store.otpChallenges || {};
   const now = Date.now();
-  const prev = store.otpChallenges[phone];
+  const prev = await repo.getOtp(phone);
   if (prev && now - prev.created_at < OTP_RESEND_MS) {
     return { status: 429, data: { error: 'Vui lòng đợi trước khi gửi lại mã', retry_after_s: Math.ceil((OTP_RESEND_MS - (now - prev.created_at)) / 1000) } };
   }
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-  store.otpChallenges[phone] = { hash: hashCode(phone, code), created_at: now, expires_at: now + OTP_TTL_MS, attempts: 0 };
+  await repo.putOtp(phone, { hash: hashCode(phone, code), created_at: now, expires_at: now + OTP_TTL_MS, attempts: 0 });
 
   const data = { otp_sent: true, phone, expires_in_s: OTP_TTL_MS / 1000 };
   if (smsConfigured()) {
@@ -136,7 +136,7 @@ export async function requestOtp(store, rawPhone) {
       await sendOtpSms(phone, code);
       data.channel = 'sms';
     } catch (err) {
-      delete store.otpChallenges[phone];
+      await repo.deleteOtp(phone);
       console.error('❌ OTP SMS failed:', err.message);
       return { status: 502, data: { error: 'Không gửi được SMS, vui lòng thử lại sau' } };
     }
@@ -149,108 +149,101 @@ export async function requestOtp(store, rawPhone) {
   return { status: 200, data };
 }
 
-function newProfile(store, id, { name, phone }) {
-  const template = JSON.parse(JSON.stringify(store.userProfile || {}));
-  return { ...template, id, name, phone: phone || null, disliked_dish_ids: [] };
+function newProfile(template, id, { name, phone }) {
+  const base = JSON.parse(JSON.stringify(template || {}));
+  return { ...base, id, name, phone: phone || null, disliked_dish_ids: [] };
 }
 
-function createUser(store, { phone = null, role = 'user', guest = false }) {
-  store.users = store.users || {};
+async function createUser(repo, template, { phone = null, role = 'user', guest = false }) {
   const id = `${guest ? 'gst' : 'usr'}-${crypto.randomBytes(8).toString('hex')}`;
-  const user = {
+  const user = await repo.createUser({
     id,
     role,
     phone,
     guest,
     created_at: new Date().toISOString(),
-    profile: newProfile(store, id, { name: guest ? 'Khách trải nghiệm' : 'Bạn mới', phone }),
-    suggestionHistory: [],
+    profile: newProfile(template, id, { name: guest ? 'Khách trải nghiệm' : 'Bạn mới', phone }),
     savedCollections: [{ id: 'col-1', name: 'Món yêu thích', dish_ids: [] }]
-  };
-  store.users[id] = user;
-  if (guest) evictOldGuests(store);
+  });
+  if (guest) await repo.pruneGuests();
   return user;
-}
-
-function evictOldGuests(store) {
-  const guests = Object.values(store.users).filter(u => u.guest);
-  if (guests.length <= MAX_GUESTS) return;
-  guests.sort((a, b) => a.created_at.localeCompare(b.created_at));
-  for (const g of guests.slice(0, guests.length - MAX_GUESTS)) delete store.users[g.id];
 }
 
 function issue(user) {
   return signToken({ sub: user.id, role: user.role });
 }
 
-/** POST /auth/otp/verify -> { access_token, user } */
-export function verifyOtp(store, rawPhone, rawCode) {
+/** POST /auth/otp/verify -> { access_token, user }. `template` = default profile for new accounts. */
+export async function verifyOtp(repo, rawPhone, rawCode, template = {}) {
   const phone = normalizePhone(rawPhone);
   const code = String(rawCode ?? '').trim();
   if (!phone || !/^\d{6}$/.test(code)) return { status: 400, data: { verified: false, error: 'Thiếu số điện thoại hoặc mã 6 số' } };
-  const ch = (store.otpChallenges || {})[phone];
+  const ch = await repo.getOtp(phone);
   if (!ch || ch.expires_at < Date.now()) {
-    if (ch) delete store.otpChallenges[phone];
+    if (ch) await repo.deleteOtp(phone);
     return { status: 401, data: { verified: false, error: 'Mã đã hết hạn hoặc chưa được gửi' } };
   }
   if (ch.attempts >= OTP_MAX_ATTEMPTS) {
-    delete store.otpChallenges[phone];
+    await repo.deleteOtp(phone);
     return { status: 429, data: { verified: false, error: 'Nhập sai quá nhiều lần, vui lòng yêu cầu mã mới' } };
   }
   const ok = crypto.timingSafeEqual(Buffer.from(ch.hash), Buffer.from(hashCode(phone, code)));
   if (!ok) {
-    ch.attempts += 1;
-    if (ch.attempts >= OTP_MAX_ATTEMPTS) delete store.otpChallenges[phone];
-    return { status: 401, data: { verified: false, error: 'Mã không đúng', attempts_left: Math.max(0, OTP_MAX_ATTEMPTS - ch.attempts) } };
+    const attempts = ch.attempts + 1;
+    if (attempts >= OTP_MAX_ATTEMPTS) await repo.deleteOtp(phone);
+    else await repo.setOtpAttempts(phone, attempts);
+    return { status: 401, data: { verified: false, error: 'Mã không đúng', attempts_left: Math.max(0, OTP_MAX_ATTEMPTS - attempts) } };
   }
-  delete store.otpChallenges[phone];
+  await repo.deleteOtp(phone);
 
-  store.users = store.users || {};
-  let user = Object.values(store.users).find(u => u.phone === phone && !u.guest);
-  if (!user) user = createUser(store, { phone, role: roleForPhone(phone) });
-  else user.role = roleForPhone(phone);
+  let user = await repo.findUserByPhone(phone);
+  const role = roleForPhone(phone);
+  if (!user) user = await createUser(repo, template, { phone, role });
+  else if (user.role !== role) {
+    await repo.setUserRole(user.id, role);
+    user.role = role;
+  }
   return { status: 200, data: { verified: true, access_token: issue(user), token_type: 'Bearer', expires_in_s: TOKEN_TTL_S, role: user.role, user: user.profile } };
 }
 
 /** POST /auth/guest -> a guest account with its own profile and a token. */
-export function createGuest(store) {
-  const user = createUser(store, { guest: true, role: 'guest' });
+export async function createGuest(repo, template = {}) {
+  const user = await createUser(repo, template, { guest: true, role: 'guest' });
   return { status: 200, data: { guest_mode: true, guest_id: user.id, access_token: issue(user), token_type: 'Bearer', expires_in_s: TOKEN_TTL_S, role: 'guest', profile: user.profile } };
 }
 
 /** Resolve the user from `Authorization: Bearer <token>`; null if absent/invalid/deleted. */
-export function authenticate(store, headers = {}) {
+export async function authenticate(repo, headers = {}) {
   const raw = headers.authorization || headers.Authorization || '';
   const m = /^Bearer\s+(.+)$/i.exec(String(raw));
   if (!m) return null;
   const claims = verifyToken(m[1].trim());
   if (!claims) return null;
-  const user = (store.users || {})[claims.sub];
-  return user || null;
+  return repo.getUser(claims.sub);
 }
 
-/** DELETE /me: remove every trace of this user from the in-memory store. */
-export function deleteUser(store, userId) {
-  const user = (store.users || {})[userId];
-  if (!user) return false;
-  if (user.phone && store.otpChallenges) delete store.otpChallenges[user.phone];
-  delete store.users[userId];
-  return true;
+/** DELETE /me: remove the account and everything personal (see the repository's deleteUser). */
+export async function deleteUser(repo, userId) {
+  return repo.deleteUser(userId);
 }
 
 /**
- * A view of the store where userProfile / suggestionHistory / savedCollections
+ * Memory mode: a view of the store where userProfile / suggestionHistory / savedCollections
  * belong to `user`; everything else (dishes, places, campaigns...) is shared.
+ * `overrides` (Postgres mode) replaces more keys, e.g. dishes/places loaded from the DB.
  */
-export function scopeStoreToUser(store, user) {
-  const own = { userProfile: 'profile', suggestionHistory: 'suggestionHistory', savedCollections: 'savedCollections' };
+export function scopeStoreToUser(store, user, overrides = null) {
+  const own = user ? { userProfile: 'profile', suggestionHistory: 'suggestionHistory', savedCollections: 'savedCollections' } : {};
+  const extra = overrides || {};
   return new Proxy(store, {
     get(target, prop, receiver) {
+      if (prop in extra) return extra[prop];
       if (prop in own) return user[own[prop]];
       if (prop === 'currentUser') return user;
       return Reflect.get(target, prop, receiver);
     },
     set(target, prop, value) {
+      if (prop in extra) { extra[prop] = value; return true; }
       if (prop in own) { user[own[prop]] = value; return true; }
       return Reflect.set(target, prop, value);
     }

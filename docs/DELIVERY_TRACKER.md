@@ -57,5 +57,5 @@
 - **CI/CD Automation:** GitHub Actions Pipeline 2 luồng: `backend-qa` (Node 20, 28 tests) & `flutter-mobile` (Flutter SDK stable, lint & syntax check).
 - **Flutter Multi-Tab App:** Cập nhật `main.dart` với Drawer 20 Module mượt mà, `IndexedStack` giữ nguyên trạng thái giữa các tab, 19 màn hình đầy đủ.
 - **Service Worker:** `hnag-v7` hỗ trợ Pre-caching toàn diện (`/`, `/manifest.json`, `/assets/tailwindcss.min.js`, ảnh mascot và món ăn).
-- **Database DDL:** 20 Bảng DDL PostgreSQL + PostGIS + pgvector trong `src/db/schema.sql`.
+- **Database DDL:** 20 Bảng DDL PostgreSQL + PostGIS + pgvector trong `src/db/migrations/` (trước P1: `src/db/schema.sql`).
 - **Test Automation:** 28/28 test suites vượt qua 100% (`npm test`).

@@ -13,12 +13,14 @@ services:
       - PORT=3000
       - HOST=0.0.0.0
       - DATABASE_URL=postgresql://tov_user:tov_secret_password@db:5432/taste_of_vietnam
+      - DB_AUTO_MIGRATE=true          # apply src/db/migrations at boot; load demo data: docker compose exec web npm run db:seed
+      - JWT_SECRET=${JWT_SECRET:-change-me-local-only}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
 
-  # ─── 2. POSTGRESQL + POSTGIS + PGVECTOR ────────────────────────────────────
+  # ─── 2. POSTGRESQL + POSTGIS (pgvector optional: migrations skip it if absent) ─
   db:
     image: postgis/postgis:16-3.4-alpine
     container_name: taste_of_vietnam_db
@@ -31,7 +33,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./src/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tov_user -d taste_of_vietnam"]
       interval: 5s
