@@ -40,7 +40,20 @@ flowchart LR
 - Thiết kế ưu tiên **mã render trong `screens_*.js` và Live App**, vì bảng mã trong PRODUCT_SPEC tự mâu thuẫn: M1-S08 thực tế là vị trí; M2-S05 dinh dưỡng, S06 chia khẩu phần, S07 bước nấu, S08 đã lưu; M4-S01 danh sách/S02 bản đồ; M5-S02 chọn đối tác/S03 chỉ đường/S04 gọi điện; M9-S03 công thức/S04 duyệt quán/S05 OCR/S06 báo sai. Dùng các mã này trong kế hoạch, không đổi thiết kế để khớp bảng sai.
 - API dưới đây có tiền tố `/api/v1`. Không tạo thêm endpoint chỉ vì nhãn `api:` trên mockup ghi như vậy: ưu tiên dùng endpoint đang có; phần mới phải ghi rõ là **đề xuất**.
 - Cỡ: **S** ≤1 ngày, **M** 2–4 ngày, **L** 1–2 tuần, cho một người triển khai; L cần chia thành PR nhỏ. Đây không phải lịch giao. Mỗi dòng gồm màn, API/logic, dữ liệu và cách kiểm.
-- **P2 / PR #3:** đã đọc PR mở ở `079014cb1724caf1bc26abfbde2af82f91daef65`. Tại lần đọc này vẫn là product shell mới (đã bị anh từ chối); luồng P2 đang sửa lại trên `app_shell.html` từ main mới. Những dòng đánh dấu **P2** là phần giao diện dự kiến do PR này phụ trách, **không tính đã xong**. P2 không thay thế việc sửa logic, dữ liệu hay API dưới đây. Cần đọc lại head PR trước nhận việc và trước gộp.
+- **P2 / PR #3:** đọc lần đầu ở `079014cb1724caf1bc26abfbde2af82f91daef65` (shell mới bị từ chối), sau đó fetch và đọc lại head **`8237a43c0f9e4e46104e4a3192452cffb50a37f7`**. Bản mới bỏ product shell, thêm `ui-design/src/product_runtime.js` gắn vào màn có sẵn. Phần “hiện chạy” từng module vẫn mô tả **main**, không nhầm với PR chưa gộp. Những dòng **P2** là phần UI do PR này phụ trách, không tạo việc trùng; API/logic/dữ liệu trong cùng dòng vẫn phải nghiệm thu riêng.
+
+### PR #3 đang bao phủ gì ở head 8237a43c
+
+| Module / việc trong kế hoạch | Đã thấy trong mã PR, chưa tính hoàn tất | Còn ngoài phạm vi hoặc cần kiểm |
+| --- | --- | --- |
+| M1-1; một phần M1-4/6 | Bind onboarding/profile, OTP, GPS browser, export gọi API, xóa dọn token/cache | Picker thủ công chưa thật; consent/schema/guest merge/provider thật chưa có; GPS lỗi chỉ dùng vị trí đã lưu |
+| M2-1 và UI M2-3 | Tìm/lọc vùng, bind dish id/detail/scaled ingredients/saved vào mẫu | API budget/count/404/servings chưa sửa; runtime còn cho 1–20 thay vì mục tiêu 1–10; chưa CMS nội dung |
+| M3-2/5 phần trình bày | Feedback/history/cache UI, chat results, spin gọi API | Invalidate cache server và pipeline backend vẫn thiếu; không được coi mọi mini-game đã an toàn chỉ vì spin đổi API |
+| M4-1 | Danh sách đọc `distance_m`, chi tiết/menu/report bind dữ liệu | Nền bản đồ có nhãn minh họa, chưa map thật; giờ mở/guard reports/dữ liệu vẫn chưa hoàn tất |
+| M5-1/3 phần UI | order→redirect id→nút mở bên ngoài→confirm; nút phone riêng | order chỉ nằm trong state RAM trình duyệt; call không tạo redirect row; idempotency/link validation server chưa sửa; các anchor Live App cũ còn cần kiểm đủ |
+| M9-1 và món CRUD cơ bản | Dashboard/queue/reports, form tên–giá–calo, review/unpause | Form đặt ở S03 hiện chỉnh món cơ bản, **chưa phải quản lý công thức**; S08/S09 chưa được triển khai đầy đủ; OCR publish/role/audit atomic chưa có |
+
+Đây là rà soát mã, không chứng nhận trình duyệt của head mới. Phần Live App cũ vẫn dùng handler gốc ở nhiều chỗ, nên cần kiểm cả Live App desktop lẫn bộ màn `/app`, không chỉ một bề mặt. Header/title/body PR tại lần kiểm có thể còn mô tả cũ; lấy diff/head làm chuẩn.
 
 ## 1. M1 — Tài khoản, vị trí và khẩu vị (45%)
 
@@ -270,7 +283,7 @@ OWASP khuyến nghị mặc định từ chối và kiểm quyền trên mọi r
 - Worker riêng nhánh docs từ main 9adf9e0; setup `npm ci`. Baseline `npm test`: **69 pass, 0 fail, 0 skip**; `npm run build:ui` thành công (99 màn, 2.89 MB). Không có lint/typecheck script.
 - PostgreSQL 15 + PostGIS 3, DB dùng một lần `tov_core_review`: `TEST_DATABASE_URL=postgres://tov:tov@127.0.0.1:5432/tov_core_review npm run test:db` → **13 pass, 0 fail, 0 skip**, bao gồm migrations, SQL thật, restart, scope từng người, reports/unpause, audit. Thông tin đăng nhập này là fixture local trong test repo, không phải prod.
 - Các suite DB gọi router và có bài restart server; **không phải kiểm trình duyệt qua toàn bộ các màn**. Những chỗ “UI → DB” nêu trên dựa vào đọc handler + kiểm route/repository, không gắn nhãn đã nghiệm thu E2E.
-- Đã đọc PR #3 để phân ranh trách nhiệm; evidence cũ 160 browser checks thuộc product shell bị loại, không chuyển thành bằng chứng cho Live App sắp sửa.
+- Đã đọc PR #3 ở 079014cb và fetch lại 8237a43c để phân ranh trách nhiệm; evidence cũ 160 browser checks thuộc product shell bị loại, không chuyển thành bằng chứng cho runtime mới dùng Live App.
 - Không ghi dữ liệu prod, không deploy, không mua dịch vụ, không gửi SMS/đặt món/thanh toán thật; chưa kiểm khóa AI/đối tác, thiết bị thật/Firefox/WebKit, screen reader, performance tải thật hoặc chính sách pháp lý hiện hành.
 - Thay đổi của PR tài liệu này chỉ là `docs/COMPLETION_PLAN_CORE.md`. Các lỗi và API đề xuất phía trên là **kế hoạch**, không có nghĩa mã đã được sửa.
 
