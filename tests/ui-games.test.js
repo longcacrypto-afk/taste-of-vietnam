@@ -92,3 +92,9 @@ test('empty game API never runs a local animation fallback and permits retry on 
   assert.equal(element('btn-draw-fortune').disabled,false);
   assert.equal(element('blindbox-0').dataset.loading,undefined);
 });
+
+
+test('product blind-box copy does not promise a sample voucher', () => {
+  assert.match(runtime,/Keep the original blind-box layout, but do not promise a nonexistent voucher/);
+  assert.match(runtime,/Chọn 1 trong 3 túi để nhận gợi ý món theo điều kiện bữa ăn đã chọn/);
+});

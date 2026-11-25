@@ -1266,6 +1266,9 @@
         if (wheel) wheel.classList.add("wheel-spinning");
       },
     );
+  // Keep the original blind-box layout, but do not promise a nonexistent voucher.
+  text($("#view-subgame-blindbox > div:first-child > div:last-child"),
+    "Chọn 1 trong 3 túi để nhận gợi ý món theo điều kiện bữa ăn đã chọn.");
   // Remove design-tool and frozen-module entry points, not the original app UI.
   document.querySelector("body > header")?.remove();
   $("#main-chatgpt")?.remove();
