@@ -4,6 +4,7 @@
 // =============================================================================
 
 import http from 'node:http';
+import { serveUiPage } from './ui-design/servePages.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -114,18 +115,14 @@ export function createAppServer() {
         const contentType = mimeMap[ext] || 'application/octet-stream';
         res.writeHead(200, {
           'Content-Type': contentType,
-          'Cache-Control': 'public, max-age=86400'
+          'Cache-Control': assetRelative.startsWith('product.') ? 'no-cache' : 'public, max-age=86400'
         });
         return fs.createReadStream(assetPath).pipe(res);
       }
     }
 
-    // 4. Serve Exact 99-Screen UI/UX (1-Screen Full-Screen App Mode at /app & mobile /, Full Studio at /studio & desktop /)
-    const studioFile = path.join(__dirname, 'ui-design', 'index.html');
-    if ((pathname === '/' || pathname === '/app' || pathname === '/studio') && fs.existsSync(studioFile)) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-      return fs.createReadStream(studioFile).pipe(res);
-    }
+    // Product entry points are separate from the password-protected Studio.
+    if (serveUiPage(req, res, pathname)) return;
 
     res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ error: 'Not Found', path: pathname }));
