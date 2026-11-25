@@ -115,7 +115,7 @@ export function createAppServer() {
         const contentType = mimeMap[ext] || 'application/octet-stream';
         res.writeHead(200, {
           'Content-Type': contentType,
-          'Cache-Control': assetRelative.startsWith('product.') ? 'no-cache' : 'public, max-age=86400'
+          'Cache-Control': 'public, max-age=86400'
         });
         return fs.createReadStream(assetPath).pipe(res);
       }

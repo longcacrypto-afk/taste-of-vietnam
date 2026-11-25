@@ -43,7 +43,7 @@ export function serveUiPage(req, res, pathname) {
   if (req.method === "HEAD") res.end();
   else
     fs.createReadStream(
-      path.join(root, isStudio ? "index.html" : "product.html"),
+      path.join(root, "index.html"),
     ).pipe(res);
   return true;
 }

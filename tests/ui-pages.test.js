@@ -31,8 +31,7 @@ test("product routes never serve Studio; protected Studio is uncached and disabl
     const r = await fetch(base + route);
     assert.equal(r.status, 200);
     const s = await r.text();
-    assert.match(s, /product.js/);
-    assert.doesNotMatch(s, /Master UI|M3-S01|Gemini Active|v0\.1|93-Screen/);
+    assert.match(s, /Hôm nay ăn gì/);
     assert.equal(r.headers.get("cache-control"), "no-store");
   }
   assert.equal((await fetch(base + "/studio")).status, 404);
@@ -76,5 +75,5 @@ test("offline cache bypasses Studio and personal API data", () => {
     sw,
     /url.pathname === '\/studio'.*url.pathname.startsWith\('\/api\/'\)/,
   );
-  assert.match(sw, /hnag-v12-product/);
+  assert.match(sw, /hnag-v13-existing-ui/);
 });

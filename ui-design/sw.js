@@ -3,12 +3,10 @@
 // Strategy: Network First with graceful offline fallback & precache (Never crashes)
 // =============================================================================
 
-const CACHE_NAME = 'hnag-v12-product';
+const CACHE_NAME = 'hnag-v13-existing-ui';
 const PRECACHE_ASSETS = [
   '/',
   '/app',
-  '/assets/product.js',
-  '/assets/product.css',
   '/manifest.json',
   '/assets/tailwindcss.min.js',
   '/assets/avatar_mam_ai.jpg',
