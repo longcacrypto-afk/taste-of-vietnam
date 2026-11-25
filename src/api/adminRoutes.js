@@ -11,6 +11,7 @@ const ok = data => ({status:200,data});
 const number = (v,min,max,fallback) => Number.isFinite(Number(v)) ? Math.min(max,Math.max(min,Number(v))) : fallback;
 const list = v => (Array.isArray(v) ? v : []).slice(0,20).map(x=>cleanText(x,40)).filter(Boolean);
 const requireReason = body => {
+  if(typeof body.reason!=='string'||body.reason.trim().length>1000) throw new PolicyError(400,'Cần lý do bằng chữ, tối đa 1000 ký tự');
   const s=cleanText(body.reason,1000);
   if (!s) throw new PolicyError(400,'Cần nêu lý do xử lý');
   return s;

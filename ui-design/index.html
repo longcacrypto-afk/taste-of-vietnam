@@ -8894,6 +8894,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       $("#p2-action-status")?.remove();
       await done?.(d);
     } catch (e) {
+      if(e.status===409) {
+        // Reuse the existing retry control to reload, never replay a stale version.
+        retryWrite=()=>{$("#p2-action-status")?.remove();P2.reload();};
+        status("Bản này đã thay đổi hoặc được xử lý. Bấm Thử lại để tải dữ liệu mới.",true);
+        return;
+      }
       status(
         e.status === 403
           ? "Tài khoản chưa có quyền. Hãy đăng nhập bằng số đã được cấp quyền."
@@ -9618,8 +9624,10 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       if(!reports.length) content.innerHTML=stateHtml(id,"empty");
       else rows(content,tpl,reports,(n,a)=>{
         text($("b",n),a.place_name||a.place_id);
-        text($("p",n),[a.reason,a.evidence,a.status,a.resolution_reason,a.resolved_at].filter(Boolean).join(" · "));
-        text($("span",n),(a.report_count??1)+" báo cáo · "+a.status);
+        const stateLabel=({pending_review:"Chờ xử lý",auto_paused:"Đã tạm ẩn",resolved:"Đã xử lý",rejected:"Đã bác bỏ"})[a.status]||a.status;
+        const reasonLabel=({closed:"Báo đóng cửa",wrong_price:"Sai giá",wrong_location:"Sai vị trí",wrong_menu:"Sai thực đơn",other:"Khác"})[a.reason]||a.reason;
+        text($("p",n),[reasonLabel,a.evidence,a.resolution_reason,a.resolved_at].filter(Boolean).join(" · "));
+        text($("span",n),(a.report_count??1)+" báo cáo · "+stateLabel);
         // No new reason/filter/resolve controls: preserve the original hours button,
         // but don't mislabel it as unpause or allow a write without a reason.
         const button=$("button",n);

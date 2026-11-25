@@ -1,4 +1,5 @@
 -- M6 ingestion remains disabled. Existing fixtures can be reviewed by a human.
+UPDATE ocr_review_queue SET status='pending_review' WHERE status='pending';
 ALTER TABLE ocr_review_queue ADD COLUMN version INTEGER NOT NULL DEFAULT 1 CHECK(version>0);
 ALTER TABLE ocr_review_queue ADD COLUMN approved_price INTEGER CHECK(approved_price BETWEEN 0 AND 100000000);
 ALTER TABLE ocr_review_queue ADD COLUMN reviewed_by VARCHAR(40);
