@@ -1358,6 +1358,7 @@
       }
       window.TOV_AUTH = {
         role: () => ls.get(ROLE_KEY) || 'guest',
+        async google(id_token) { const r = await postJson('/api/v1/auth/google', { id_token }); if (r.ok) save(r.data); return r; },
         requestOtp: (phone) => postJson('/api/v1/auth/otp/request', { phone }),
         async verifyOtp(phone, code) { const r = await postJson('/api/v1/auth/otp/verify', { phone, code }); if (r.ok) save(r.data); return r; },
         logout() { ls.del(KEY); ls.del(ROLE_KEY); },
@@ -8849,6 +8850,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     return r.json();
   }
   const action = async (job, done) => {
+    retryWrite = () => action(job, done);
     try {
       status("Đang xử lý…");
       const d = await job();
@@ -8943,6 +8945,11 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     if (appState.activeScreenId === id) paint();
     try {
       const data = await get();
+      if (!data || typeof data !== "object" ||
+          (/^(dishes:|places:|today$|saved$|history$)/.test(key) && !Array.isArray(data.items)) ||
+          (key.startsWith("dish:") && !data.id) ||
+          (key === "admin" && !Array.isArray(data.ocr_queue)))
+        throw new Error("Dữ liệu chưa hợp lệ. Vui lòng thử lại.");
       state.cache[key] = { status: "success", data };
       if (key === "today") appState.liveToday = data;
     } catch (e) {
@@ -9076,6 +9083,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           $("p.text-\\[11px\\]", root),
           d.description || "Chưa có mô tả món.",
         );
+        const heroBadges = $$(".absolute.bottom-7 > span > span", root);
+        text(heroBadges[0], (d.prep_minutes ?? "—") + " phút");
+        text(heroBadges[1], d.difficulty || "Chưa rõ độ khó");
         const meta = $(".grid-cols-3", root);
         if (meta) {
           meta.children[0].innerHTML = `<div><b>${H(d.prep_minutes || "—")} phút</b><div class="text-[9px] text-[#64748B]">Thời gian nấu</div></div>`;
@@ -9108,6 +9118,8 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             text($(".flex-1 .font-extrabold", step), a.title);
             text($("p", step), a.text);
             img($("img", step), d.img_key);
+            const duration = $(".flex-1 > span", step);
+            if (duration) duration.textContent = (a.duration_min ?? "—") + " phút";
           } else step.innerHTML = "<p>Chưa có cách nấu cho món này.</p>";
         }
         $$("button", root).forEach((b) => {
@@ -9222,24 +9234,28 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     }
     if (/^M4-/.test(id) || /^M5-/.test(id)) bindPlaces(root, id, d.items || []);
     if (/^M1-/.test(id)) bindProfile(root, id, d || {});
-    if (/^M9-/.test(id)) return adminHtml(id, d);
+    if (/^M9-/.test(id)) return bindAdmin(root, id, d);
     return root.outerHTML;
   }
   function bindProfile(root, id, p) {
     if (id === "M1-S01") {
-      const phone = $("input", root);
-      phone.removeAttribute("readonly");
-      phone.type = "tel";
-      phone.value = state.phone;
-      phone.placeholder = "0912 345 678";
-      phone.setAttribute("aria-label", "Số điện thoại");
-      click($('[onclick*="M1-S02"]', root), "P2.requestOtp()");
-      $$('[onclick*="M1-S03"]', root).forEach((b) => {
-        b.disabled = true;
-        b.title = "Chưa được cấu hình";
+      $("input",root)?.closest(".space-y-3")?.remove();
+      $$("button",root).forEach(b=>{
+        if(["Zalo","Apple"].includes(b.textContent.trim())) b.remove();
+        else if(b.textContent.trim()==="Google") {
+          b.disabled=!state.google?.enabled;
+          b.textContent=state.google?.enabled?"Google":"Google · Sắp có";
+          click(b,"P2.google()");
+        }
       });
     }
     if (id === "M1-S02") {
+      const tip = root.children[1];
+      if (tip) {
+        const title = $(".font-extrabold", tip);
+        text(title, "Nhập mã xác thực");
+        text($("p", tip), "Nhập 6 chữ số cho số điện thoại " + state.phone + ". Mã phát triển chỉ dùng để kiểm tra, không phải SMS thật.");
+      }
       const grid = $(".grid-cols-6", root);
       grid.innerHTML = Array.from(
         { length: 6 },
@@ -9342,17 +9358,8 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       const banner = $(".bg-\\[\\#18181B\\] span", root);
       if (banner && banner.textContent.includes("94%"))
         text(banner, "Khẩu vị đã lưu");
-      const edit = document.createElement("button");
-      edit.className =
-        "w-full py-3 rounded-full bg-[#FBBF24] text-[#0F172A] font-extrabold";
-      edit.textContent = "Chỉnh sửa khẩu vị";
-      click(edit, "goScreen('M1-S03')");
-      root.insertBefore(edit, root.lastElementChild);
-      const login = document.createElement("button");
-      login.className = "w-full py-2 rounded-full bg-[#F8FAFC] font-bold";
-      login.textContent = "Đăng nhập / Quản trị";
-      click(login, "goScreen('M1-S01')");
-      root.append(login);
+      const card=$(".bg-\\[\\#18181B\\]",root);
+      if(card) { click(card,"goScreen('M1-S03')");card.setAttribute("aria-label","Chỉnh sửa khẩu vị"); }
     }
     if (id === "M1-S10") {
       const download = $$("span", root).find(
@@ -9486,6 +9493,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       }
     }
     if (id === "M5-S05") {
+      text($("h3", root), "Liên kết đã sẵn sàng");
+      const tip = root.children[1];
+      if (tip) {
+        text($(".font-extrabold", tip), "Bạn chưa đặt món trong ứng dụng này");
+        text($("p", tip), "Mở dịch vụ bên ngoài để xem giá và xác nhận. Chỉ đánh dấu Đã ăn sau khi bạn thực sự dùng bữa.");
+      }
       const a = document.createElement("a"),
         url = state.order?.target_deeplink;
       try {
@@ -9503,86 +9516,104 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       click(root.lastElementChild, "P2.confirmMeal()");
     }
   }
-  function adminHtml(id, d) {
-    const row = (a) =>
-      `<div class="p-3 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex flex-wrap items-center justify-between gap-3">${a}</div>`;
-    const button = (label, code) =>
-      `<button onclick="${code}" class="px-4 py-2 rounded-full bg-[#FBBF24] text-[#0F172A] font-extrabold">${label}</button>`;
-    let body = "";
-    if (id === "M9-S01")
-      body = `<div class="grid grid-cols-1 md:grid-cols-2 gap-3">${row(button("Quản lý món", "goScreen('M9-S02')"))}${row(button("Duyệt thực đơn", "goScreen('M9-S05')"))}${row(button("Báo cáo quán", "goScreen('M9-S06')"))}</div>`;
-    if (id === "M9-S02")
-      body =
-        (d.catalog || [])
-          .map((a) =>
-            row(
-              `<div><b>${H(a.name)}</b><p>${money(a.ref_price)}</p></div>${button("Sửa", `P2.edit('${J(a.id)}')`)}`,
-            ),
-          )
-          .join("") + button("Thêm món mới", "P2.edit('')");
-    if (id === "M9-S03") {
-      const a = (d.catalog || []).find((a) => a.id === state.edit) || {};
-      body = `<form onsubmit="event.preventDefault();P2.saveDish(this)" class="p-4 bg-white rounded-2xl border border-[#E2E8F0] space-y-3">${[
-        ["name", "Tên món", a.name || ""],
-        ["ref_price", "Giá tham khảo (đ)", a.ref_price || 0],
-        ["calories", "Năng lượng (kcal)", a.calories || 0],
-        ["allergen_tags", "Thành phần gây dị ứng (mã, ngăn bằng dấu phẩy)", (a.allergen_tags || []).join(", ")],
-      ]
-        .map(
-          ([key, label, v]) =>
-            `<label class="block font-bold">${label}<input ${key === "allergen_tags" ? "" : "required"} name="${key}" value="${H(v)}" class="block w-full p-3 mt-1 rounded-2xl border border-[#E2E8F0]"></label>`,
-        )
-        .join(
-          "",
-        )}<p class="text-xs">Mã dị ứng dùng trong hồ sơ: shrimp (tôm/hải sản), peanut (đậu phộng), milk (sữa), gluten, egg (trứng), soy (đậu nành). Giữ nguyên các mã khác nếu có; cần kiểm tra nguồn nguyên liệu trước khi lưu.</p><label class="block font-bold">Vùng miền<select name="region" required class="block w-full p-3 mt-1 rounded-2xl border border-[#E2E8F0]">${[["bac","Miền Bắc"],["trung","Miền Trung"],["nam","Miền Nam"]].map(([v,l])=>`<option value="${v}" ${a.region===v?"selected":""}>${l}</option>`).join("")}</select></label><label class="flex gap-2 items-start"><input type="checkbox" name="allergens_checked" required> Tôi đã kiểm tra thông tin dị ứng; ô trống chỉ khi nguồn dữ liệu xác nhận không có thành phần cần đánh dấu.</label>${button("Lưu món", "")}${a.id ? button("Xóa món", `P2.deleteDish('${J(a.id)}')`) : ""}</form>`;
+  function bindAdmin(root, id, d) {
+    const workspace=root.lastElementChild, content=workspace.lastElementChild;
+    const queue=(d.ocr_queue||[]).filter(a=>a.status==="pending_review");
+    const reports=d.user_reports||[];
+    $$("aside nav button",root).forEach(b=>{
+      const code=b.getAttribute("onclick")||"";
+      if (!/M9-S0[12356]/.test(code)) b.remove();
+      const badge=b.lastElementChild;
+      if (badge?.tagName==="SPAN" && badge!==b.firstElementChild) {
+        if(code.includes("M9-S05")) text(badge,queue.length);
+        else if(code.includes("M9-S06")) text(badge,reports.length);
+        else badge.remove();
+      }
+      for(const span of $$("span",b)) if(span.children.length===0) span.textContent=span.textContent.replace(/\(542\)/g,"("+(d.total_dishes??0)+")");
+    });
+    $("aside > div:last-child",root)?.remove();
+    const title=$("h3",workspace);
+    if(title) title.textContent=title.textContent.replace(/542 Món/g,(d.total_dishes??0)+" Món").replace(/5 Báo cáo/g,reports.length+" Báo cáo");
+    $$("span",workspace.firstElementChild).filter(n=>/LiteLLM/.test(n.textContent)).forEach(n=>n.remove());
+    if(id==="M9-S01") {
+      const kpis=workspace.children[1];
+      [...kpis.children].forEach((card,i)=>{
+        const value=$(".text-base > span",card);
+        text(value,[d.total_dishes??0,d.total_verified_places??0,queue.length,reports.length][i]);
+        value?.nextElementSibling?.remove();
+      });
+      const chart=content.firstElementChild?.firstElementChild;
+      if(chart) chart.innerHTML=stateHtml(id,"empty");
+      const links=$$("[onclick]",content);
+      links.forEach(n=>{
+        const code=n.getAttribute("onclick")||"";
+        if(code.includes("M9-S07")) n.remove();
+        else text($(".text-\\[10px\\]",n),code.includes("M9-S05")?queue.length:reports.length);
+      });
     }
-    if (id === "M9-S05")
-      body =
-        (d.ocr_queue || [])
-          .filter((a) => a.status === "pending_review")
-          .map((a) =>
-            row(
-              `<div><b>${H(a.extracted_name)}</b><p>${H(a.place_name)} · ${money(a.extracted_price)}</p></div><div>${button("Duyệt", `P2.review('${J(a.id)}','approved')`)} ${button("Từ chối", `P2.review('${J(a.id)}','rejected')`)}</div>`,
-            ),
-          )
-          .join("") || "<p>Không có thực đơn cần kiểm tra.</p>";
-    if (id === "M9-S04" || id === "M9-S06")
-      body =
-        (d.user_reports || [])
-          .map((a) =>
-            row(
-              `<div><b>${H(a.place_name)}</b><p>${H(a.reason)}</p></div>${button("Xác nhận quán mở lại", `P2.unpause('${J(a.place_id)}')`)}`,
-            ),
-          )
-          .join("") || "<p>Không có báo cáo cần xử lý.</p>";
-    if (!body)
-      body =
-        '<p class="p-4">Mục này chưa nằm trong luồng quản trị đang hoàn thiện. Chọn quản lý món, duyệt thực đơn hoặc báo cáo quán.</p>';
-    return K.adminShell(
-      id,
-      "Quản trị nội dung",
-      "Món ăn và quán trong dữ liệu hiện có",
-      [
-        {
-          label: "Món trong thư viện",
-          value: d.total_dishes ?? 0,
-          delta: "",
-          icon: "utensils",
-          bg: "bg-[#FEF3C7] text-[#B45309]",
-        },
-        {
-          label: "Quán xác thực",
-          value: d.total_verified_places ?? 0,
-          delta: "",
-          icon: "store",
-          bg: "bg-[#DCFCE7] text-[#15803D]",
-        },
-      ],
-      body,
-    );
+    if(id==="M9-S02") {
+      const tbody=$("tbody",content), tpl=tbody.firstElementChild.cloneNode(true);
+      $("thead tr",content)?.lastElementChild?.remove();
+      rows(tbody,tpl,d.catalog||[],(n,a)=>{
+        const cells=[...n.children];
+        img($("img",cells[0]),a.img_key);text($("b",cells[0]),a.name);
+        text(cells[1],({bac:"Miền Bắc",trung:"Miền Trung",nam:"Miền Nam"})[a.region]||a.region||"—");
+        text(cells[2],(a.allergen_tags||[]).join(", ")||"—");
+        text(cells[3],(a.calories??"—")+" kcal · "+money(a.ref_price));cells[4]?.remove();
+      });
+      if(!(d.catalog||[]).length) content.innerHTML=stateHtml(id,"empty");
+    }
+    if(id==="M9-S03") {
+      const a=(d.catalog||[]).find(a=>a.id===selected())||d.catalog?.[0];
+      if(!a) content.innerHTML=stateHtml(id,"empty");
+      else {
+        const cards=[...content.firstElementChild.children];
+        text($(".font-extrabold",cards[0]),a.name);
+        text($(".text-\\[\\#64748B\\]",cards[0]),(a.calories??"—")+" kcal");
+        text($(".font-extrabold",cards[1]),(a.ingredients||[]).length+" Nhóm Nguyên liệu");
+        text($(".text-\\[\\#64748B\\]",cards[1]),(a.ingredients||[]).map(x=>x.name+" "+x.amount+x.unit).join(" · "));
+        text($(".font-extrabold",cards[2]),(a.steps||[]).length+" Bước Nấu Có Timer");
+        text($(".text-\\[\\#64748B\\]",cards[2]),(a.steps||[]).map(x=>x.title).join(" · "));
+      }
+    }
+    if(id==="M9-S05") {
+      const holder=content.firstElementChild,tpl=holder.firstElementChild.cloneNode(true);
+      if(!queue.length) holder.innerHTML=stateHtml(id,"empty");
+      else rows(holder,tpl,queue,(n,a)=>{
+        const spans=$$(".flex.items-center.gap-2 > span",n);
+        text(spans[0],a.extracted_name);text(spans[2],a.matched_dish_name||a.suggested_dish_id||"—");
+        text(spans[3],a.confidence==null?"—":Math.round(a.confidence*100)+"%");
+        text($(".text-\\[11px\\]",n),(a.place_name||a.place_id||"")+" · "+money(a.extracted_price));
+        click($("button",n),`P2.review('${J(a.id)}','approved')`);
+      });
+    }
+    if(id==="M9-S06") {
+      const tpl=content.firstElementChild.cloneNode(true);
+      if(!reports.length) content.innerHTML=stateHtml(id,"empty");
+      else rows(content,tpl,reports,(n,a)=>{
+        text($("b",n),a.place_name||a.place_id);
+        text($("p",n),a.reason);
+        text($("span",n),a.report_count??1);
+        // Existing button edits opening hours; do not pretend it unpauses a place.
+        $("button",n)?.remove();
+      });
+    }
+    return root.outerHTML;
   }
   function polish(root = document) {
     if (!root) return;
+    // Darker shades from the existing palette keep small labels readable.
+    const contrast = {"#D97736":"#92400E","#F59E0B":"#92400E","#B45309":"#92400E","#22C55E":"#166534","#16A34A":"#15803D","#4ADE80":"#15803D","#60A5FA":"#1D4ED8","#F87171":"#B91C1C","#DB2777":"#BE185D"};
+    $$("[class]", root).forEach(el=>{
+      for (const [from,to] of Object.entries(contrast))
+        if (el.classList.contains("text-["+from+"]")) el.style.color=to;
+      if (el.classList.contains("text-red-400")) el.style.color="#B91C1C";
+      if (el.classList.contains("text-green-400")) el.style.color="#166534";
+      if (el.classList.contains("text-blue-400")) el.style.color="#1D4ED8";
+      if (el.classList.contains("bg-[#22C55E]")) el.style.backgroundColor="#15803D";
+      if (el.classList.contains("bg-[#00B14F]")) el.style.backgroundColor="#15803D";
+      if (el.classList.contains("bg-[#EE4D2D]")) el.style.backgroundColor="#C2410C";
+    });
     // Only presented product text is cleaned; Studio templates retain their specs.
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) =>
@@ -9664,7 +9695,14 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     });
     hydrateImages(root);
   }
+  TOV_AUTH.renderLoginRequired = function(container) {
+    container.innerHTML=ALL_SCREENS["M1-S01"].render();polish(container);
+  };
   window.P2 = {
+    async google() {
+      if(!state.google?.enabled || !window.google?.accounts?.id) return;
+      google.accounts.id.prompt();
+    },
     state,
     retryWrite() {
       retryWrite?.();
@@ -9898,39 +9936,6 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           },
         );
     },
-    edit(id) {
-      state.edit = id;
-      goScreen("M9-S03");
-    },
-    saveDish(form) {
-      const f = new FormData(form),
-        payload = Object.fromEntries(f);
-      payload.allergen_tags = String(payload.allergen_tags || "").split(",").map(v=>v.trim()).filter(Boolean);
-      delete payload.allergens_checked;
-      action(
-        () =>
-          api(
-            "/admin/dishes" +
-              (state.edit ? "/" + encodeURIComponent(state.edit) : ""),
-            state.edit ? "PATCH" : "POST",
-            payload,
-          ),
-        () => {
-          delete state.cache.admin;
-          goScreen("M9-S02");
-        },
-      );
-    },
-    deleteDish(id) {
-      if (confirm("Xóa món này khỏi thư viện?"))
-        action(
-          () => api("/admin/dishes/" + encodeURIComponent(id), "DELETE"),
-          () => {
-            delete state.cache.admin;
-            goScreen("M9-S02");
-          },
-        );
-    },
     review(id, decision) {
       action(
         () => api("/admin/ocr-review", "POST", { ocr_id: id, decision }),
@@ -9969,10 +9974,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     };
   });
   goScreen = function (id) {
+    if(id==="M1-S02") id="M1-S01";
     if (!/^M[1-59]-/.test(id))
       return status("Tính năng này chưa mở trong bản hiện tại.");
     if (id === "M9-S01" && !document.body.classList.contains("pwa-mobile-mode"))
       return setLiveAppTab("admin");
+    if(id==="M1-S09" && TOV_AUTH.role()==="guest") id="M1-S01";
     originalGo(id);
     load(id);
     polish($("#stage-container"));
@@ -10046,7 +10053,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   });
   $$("[data-ai-badge]").forEach((n) => n.remove());
   const style = document.createElement("style");
-  style.textContent = `.product-mode #p2-action-status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;max-width:calc(100vw - 24px);width:420px;box-shadow:0 8px 30px #0003}.product-mode :focus-visible{outline:3px solid #B45309;outline-offset:3px}.product-mode input{min-width:0}.product-mode [onclick]{touch-action:manipulation}.product-mode .phone-frame .flex-1{min-width:0}.product-mode .phone-frame button{white-space:normal}.product-mode .phone-frame{overflow:hidden}.product-mode #main-liveapp{min-width:0}.product-mode [data-p2-layout]{min-width:0}@media(max-width:768px){.product-mode #stage-container .min-w-\\[1100px\\],.product-mode #stage-container .min-w-\\[1000px\\]{min-width:0!important}.product-mode #stage-container table{display:block;max-width:100%;overflow:auto}.product-mode #stage-container aside{display:none}.product-mode #stage-container .grid-cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}.product-mode #stage-container .w-64{width:auto}.product-mode #stage-container .min-w-0{max-width:100%}}`;
+  style.textContent = `.product-mode{--text-muted:#5B6A80}.product-mode #p2-action-status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;max-width:calc(100vw - 24px);width:420px;box-shadow:0 8px 30px #0003}.product-mode :focus-visible{outline:3px solid #B45309;outline-offset:3px}.product-mode input{min-width:0}.product-mode [onclick]{touch-action:manipulation}.product-mode .phone-frame .flex-1{min-width:0}.product-mode .phone-frame button{white-space:normal}.product-mode .phone-frame{overflow:hidden}.product-mode #main-liveapp{min-width:0}.product-mode [data-p2-layout]{min-width:0}@media(max-width:768px){.product-mode #stage-container .min-w-\\[1100px\\],.product-mode #stage-container .min-w-\\[1000px\\]{min-width:0!important}.product-mode #stage-container table{display:block;max-width:100%;overflow:auto}.product-mode #stage-container aside nav{display:flex;flex-wrap:wrap;max-height:none}.product-mode #stage-container aside nav button{width:auto}.product-mode #stage-container .grid-cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}.product-mode #stage-container .w-64{width:auto}.product-mode #stage-container .min-w-0{max-width:100%}}`;
   document.head.append(style);
   polish(document.body);
   // Existing dynamic live panels retain their original functions and markup.
@@ -10065,6 +10072,22 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     });
     observer.observe(observed, { childList: true, subtree: true });
   }
+  (async()=>{
+    try {
+      const res=await request("/api/v1/auth/google/config");
+      state.google=res.ok?await res.json():{enabled:false};
+      if(state.google.enabled && state.google.client_id) {
+        const script=document.createElement("script");script.src="https://accounts.google.com/gsi/client";script.async=true;
+        script.onload=()=>google.accounts.id.initialize({client_id:state.google.client_id,callback:credential=>action(
+          async()=>{const r=await TOV_AUTH.google(credential.credential);if(!r.ok)throw Object.assign(new Error("Đăng nhập chưa thành công"),{status:r.status});return r.data;},
+          ()=>{state.cache={};goScreen("M1-S03");}
+        )});
+        document.head.append(script);
+      }
+    } catch {state.google={enabled:false};}
+    if(appState.activeScreenId==="M1-S01")paint();
+    $$("[onclick='P2.google()']").forEach(b=>{b.disabled=!state.google?.enabled;b.textContent=state.google?.enabled?"Google":"Google · Sắp có";});
+  })();
   load("M1-S09");
   load(appState.activeScreenId);
   window.P2.polish = polish;

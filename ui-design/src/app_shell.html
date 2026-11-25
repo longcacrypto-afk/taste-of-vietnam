@@ -1358,6 +1358,7 @@
       }
       window.TOV_AUTH = {
         role: () => ls.get(ROLE_KEY) || 'guest',
+        async google(id_token) { const r = await postJson('/api/v1/auth/google', { id_token }); if (r.ok) save(r.data); return r; },
         requestOtp: (phone) => postJson('/api/v1/auth/otp/request', { phone }),
         async verifyOtp(phone, code) { const r = await postJson('/api/v1/auth/otp/verify', { phone, code }); if (r.ok) save(r.data); return r; },
         logout() { ls.del(KEY); ls.del(ROLE_KEY); },
