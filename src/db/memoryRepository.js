@@ -251,10 +251,27 @@ export class MemoryRepository {
     return (this.store.orderRedirects || []).find(o => o.id === id) || null;
   }
 
-  async confirmOrderEaten(id) {
-    const o = await this.getOrderRedirect(id);
-    if (o) o.loopback_confirmed_eaten = true;
-    return o;
+  async listOrderRedirects(userId) {
+    return (this.store.orderRedirects || []).filter(o => o.user_id === userId).slice(0, 50);
+  }
+
+  async confirmOrderEaten(id, userId) {
+    // No await between lookup and mutation: one atomic critical section in memory mode.
+    const o = (this.store.orderRedirects || []).find(o => o.id === id && o.user_id === userId);
+    if (!userId || !o) return null;
+    if (!o.dish_id) return { no_dish: true };
+    if (o.loopback_confirmed_eaten) return { order: o, already_confirmed: true };
+    const user = this.store.users?.[userId];
+    if (!user) return null;
+    const now = new Date().toISOString();
+    const history = { id: `hist-${id}`, dish_id: o.dish_id, dish_name: o.dish_name,
+      place_id: o.place_id, place_name: o.place_name,
+      price_vnd: this.store.dishes.find(d => d.id === o.dish_id)?.ref_price ?? null,
+      action: 'eaten', created_at: now };
+    user.suggestionHistory.unshift(history);
+    o.confirmed_at = now;
+    o.loopback_confirmed_eaten = true;
+    return { order: o, already_confirmed: false };
   }
 
   // ── M20 community recipes ──────────────────────────────────────────────────

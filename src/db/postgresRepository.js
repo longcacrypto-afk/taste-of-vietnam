@@ -170,6 +170,7 @@ function orderFromRow(r) {
   return {
     id: r.id, user_id: r.user_id, place_id: r.place_id, place_name: r.place_name, dish_id: r.dish_id, dish_name: r.dish_name,
     partner: r.partner, target_deeplink: r.target_deeplink, fallback_web_url: r.fallback_web_url,
+    action_type: r.action_type, clicked_at: iso(r.clicked_at), confirmed_at: iso(r.confirmed_at) || null,
     loopback_confirmed_eaten: r.loopback_confirmed_eaten, created_at: iso(r.created_at)
   };
 }
@@ -527,9 +528,9 @@ export class PostgresRepository {
   // ── M5 order redirects ─────────────────────────────────────────────────────
   async createOrderRedirect(o) {
     await this.q(
-      `INSERT INTO order_redirects (id, user_id, place_id, place_name, dish_id, dish_name, partner, target_deeplink, fallback_web_url, loopback_confirmed_eaten, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [o.id, o.user_id, o.place_id, o.place_name, o.dish_id, o.dish_name, o.partner, o.target_deeplink, o.fallback_web_url, o.loopback_confirmed_eaten, o.created_at]);
+      `INSERT INTO order_redirects (id, user_id, place_id, place_name, dish_id, dish_name, partner, target_deeplink, fallback_web_url, loopback_confirmed_eaten, created_at, action_type, clicked_at, confirmed_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [o.id, o.user_id, o.place_id, o.place_name, o.dish_id, o.dish_name, o.partner, o.target_deeplink, o.fallback_web_url, o.loopback_confirmed_eaten, o.created_at, o.action_type, o.clicked_at, o.confirmed_at]);
     return o;
   }
 
@@ -538,9 +539,26 @@ export class PostgresRepository {
     return r ? orderFromRow(r) : null;
   }
 
-  async confirmOrderEaten(id) {
-    const r = (await this.q('UPDATE order_redirects SET loopback_confirmed_eaten = TRUE WHERE id = $1 RETURNING *', [id])).rows[0];
-    return r ? orderFromRow(r) : null;
+  async listOrderRedirects(userId) {
+    if (!userId) return [];
+    return (await this.q('SELECT * FROM order_redirects WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50', [userId])).rows.map(orderFromRow);
+  }
+
+  async confirmOrderEaten(id, userId) {
+    if (!userId) return null;
+    return this.tx(async c => {
+      const r = (await c.query('SELECT * FROM order_redirects WHERE id = $1 AND user_id = $2 FOR UPDATE', [id, userId])).rows[0];
+      if (!r) return null;
+      if (!r.dish_id) return { no_dish: true };
+      if (r.loopback_confirmed_eaten) return { order: orderFromRow(r), already_confirmed: true };
+      const now = new Date().toISOString();
+      await c.query(
+        `INSERT INTO suggestion_history (id, user_id, dish_id, dish_name, place_id, place_name, price_vnd, action, created_at)
+         VALUES ($1,$2,$3::varchar(32),$4,$5,$6,(SELECT estimated_price_vnd FROM dishes WHERE id = $3::varchar(32)),'eaten',$7)`,
+        [`hist-${id}`, userId, r.dish_id, r.dish_name, r.place_id, r.place_name, now]);
+      const updated = (await c.query('UPDATE order_redirects SET loopback_confirmed_eaten = TRUE, confirmed_at = $2 WHERE id = $1 RETURNING *', [id, now])).rows[0];
+      return { order: orderFromRow(updated), already_confirmed: false };
+    });
   }
 
   // ── M20 community recipes ──────────────────────────────────────────────────
