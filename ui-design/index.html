@@ -9796,13 +9796,19 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       const items = state.cache["places:" + selected()]?.data.items || [],
         p = items.find((p) => p.id === state.place) || items[0];
       if (!p) return status("Chưa chọn được quán.");
-      const tab=window.open("about:blank","_blank");
+      const dishId=selected();
+      let tab=window.open("about:blank","_blank");
       if(!tab) return status("Trình duyệt đang chặn mở dịch vụ bên ngoài. Cho phép cửa sổ mới rồi thử lại.");
       tab.opener=null;
       action(
         async()=>{
+          if(tab.closed) {
+            tab=window.open("about:blank","_blank");
+            if(!tab) throw new Error("Trình duyệt đang chặn cửa sổ mới");
+            tab.opener=null;
+          }
           try {
-            const d=await api("/orders/redirect", "POST", {dish_id:selected(),place_id:p.id,partner});
+            const d=await api("/orders/redirect", "POST", {dish_id:dishId,place_id:p.id,partner});
             const u=new URL(d.target_deeplink);
             if(u.protocol!=="https:") throw new Error("Liên kết không hợp lệ");
             return {...d,target_deeplink:u.href};
