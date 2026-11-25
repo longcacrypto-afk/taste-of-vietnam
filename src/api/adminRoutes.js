@@ -21,7 +21,7 @@ const publicReport = ({reporter_key,...r}) => r;
 
 export async function handleAdminRoute(repo,user,method,path,q,body,headers,store) {
   return repo.atomic(async tx => {
-    const actor=await tx.getUser(user.id);
+    const actor=structuredClone(await tx.getUser(user.id));
     if (!actor || !adminAllowed(method,path,actor.role)) throw new PolicyError(403,'Không có quyền thực hiện thao tác này');
     const result=await dispatch(tx,actor,method,path,q,body,store);
     if (result.audit) {
@@ -74,6 +74,7 @@ async function dispatch(repo,actor,method,path,q,body,store) {
     if(!['resolved','rejected'].includes(body.status)) throw new PolicyError(400,'Trạng thái xử lý không hợp lệ');
     const row=(await repo.listUserReports()).find(r=>r.id===m[1]);
     if(!row) throw new PolicyError(404,'Không tìm thấy báo cáo');
+    await repo.lockPlace(row.place_id);
     const before=structuredClone(publicReport(row));
     const after=await repo.updateReport(m[1],{status:body.status,reason,actorId:actor.id});
     if(!after) throw new PolicyError(409,'Báo cáo đã được xử lý');
@@ -83,6 +84,7 @@ async function dispatch(repo,actor,method,path,q,body,store) {
   m=path.match(/^\/api\/v1\/admin\/places\/([^/]+)\/(approve|unpause)$/);
   if(m) {
     const reason=requireReason(body);
+    await repo.lockPlace(m[1]);
     const before=structuredClone(await repo.getPlace(m[1]));
     if(!before) throw new PolicyError(404,'Place not found');
     // Preserve evidence and record the resolver on all still-pending reports.

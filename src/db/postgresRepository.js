@@ -5,7 +5,7 @@
 // Schema: src/db/migrations/*.sql (run `npm run db:migrate` first).
 // =============================================================================
 
-import { PolicyError, ROLES } from '../services/adminPolicy.js';
+import { PolicyError, ROLES, bootstrapAllowed } from '../services/adminPolicy.js';
 import crypto from 'node:crypto';
 import { removeVietnameseTones } from '../services/textUtils.js';
 
@@ -21,7 +21,7 @@ const hourToTime = (h, fallback) => `${String(Number.isFinite(Number(h)) ? Math.
 // ── row <-> API object mappers ───────────────────────────────────────────────
 function userFromRow(r) {
   if (!r) return null;
-  return { id: r.id, role: r.role, phone: r.phone, guest: r.is_guest, created_at: iso(r.created_at), identity_verified: r.identity_verified, profile: r.profile };
+  return { id: r.id, role: r.role, phone: r.phone, guest: r.is_guest, created_at: iso(r.created_at), identity_verified: r.identity_verified, email:r.email,google_sub:r.google_sub,profile: r.profile };
 }
 
 export function dishFromRow(r) {
@@ -213,8 +213,8 @@ export class PostgresRepository {
   async createUser(user) {
     return this.tx(async (c) => {
       const r = await c.query(
-        `INSERT INTO users (id, role, phone, is_guest, profile, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [user.id, user.role, user.phone, user.guest, JSON.stringify(user.profile || {}), user.created_at || new Date().toISOString()]
+        `INSERT INTO users (id, role, phone, is_guest, profile, created_at, identity_verified) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [user.id, user.role, user.phone, user.guest, JSON.stringify(user.profile || {}), user.created_at || new Date().toISOString(), Boolean(!user.guest && (user.phone || user.identity_verified))]
       );
       let pos = 0;
       for (const col of user.savedCollections || []) {
@@ -398,8 +398,8 @@ export class PostgresRepository {
       const r = (await c.query(`UPDATE place_reports SET report_count=$2,
         status=CASE WHEN $3 THEN 'auto_paused' ELSE 'pending_review' END WHERE id=$1 RETURNING *`, [id,n,reason === 'closed' && n >= 3])).rows[0];
       if (!p.is_paused && n >= 3) await c.query(`INSERT INTO rbac_audit_logs
-        (actor_email,actor_id,role,action,target,before_data,after_data,reason,request_id)
-        VALUES('closure_guard',$1,'system','AUTO_PAUSE_PLACE',$2,$3,$4,'3 distinct verified accounts / 24h',$5)`,
+        (actor_email,actor_id,role,action,target,before_data,after_data,reason,request_id,ip_address)
+        VALUES('closure_guard',$1,'system','AUTO_PAUSE_PLACE',$2,$3,$4,'3 distinct verified accounts / 24h',$5,'unknown')`,
         [userId,placeId,JSON.stringify({is_paused:p.is_paused,report_count:p.report_count}),JSON.stringify({is_paused:true,report_count:n}),crypto.randomUUID()]);
       return { ...r, place_name:p.name };
     });
@@ -414,6 +414,8 @@ export class PostgresRepository {
       WHERE place_id=$1 AND status IN ('pending_review','auto_paused')`,[placeId]);
     return this.getPlace(placeId);
   }
+
+  async lockPlace(id) { await this.q('SELECT id FROM places WHERE id=$1 FOR UPDATE',[id]); }
 
   async listUserReports() {
     const r = await this.q(`SELECT r.*, p.name AS place_name FROM place_reports r JOIN places p ON p.id = r.place_id ORDER BY r.created_at DESC, r.id DESC`);
@@ -443,7 +445,7 @@ export class PostgresRepository {
     return this.atomic(async repo => {
       if ((await repo.listUsers()).some(u => u.role === 'super_admin')) return false;
       const user = await repo.getUser(id);
-      if (!user || user.guest) return false;
+      if (!bootstrapAllowed(user)) return false;
       await repo.setUserRole(id,'super_admin');
       await repo.addAudit({actor:id,actor_id:id,role:'system',action:'BOOTSTRAP_SUPER_ADMIN',target:id,
         before:{role:user.role},after:{role:'super_admin'},reason:'verified identity on bootstrap allowlist',requestId:crypto.randomUUID()});

@@ -30,3 +30,17 @@ export function adminAllowed(method, path, role) {
 export class PolicyError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
+
+// Only trusted root identity columns, never editable profile.phone/profile.email.
+export function bootstrapAllowed(user) {
+  if (!user || user.guest || user.role === 'guest') return false;
+  const phones=(process.env.ADMIN_PHONES || '').split(',').map(p=>{
+    p=p.replace(/[\s.\-()]/g,'');
+    if(p.startsWith('0')) return '+84'+p.slice(1);
+    if(p.startsWith('84')) return '+'+p;
+    return p;
+  });
+  const emails=(process.env.ADMIN_EMAILS || '').split(',').map(e=>e.trim().toLowerCase()).filter(Boolean);
+  return Boolean((user.phone && phones.includes(user.phone)) ||
+    (user.identity_verified && user.email && emails.includes(user.email.toLowerCase())));
+}

@@ -4,7 +4,7 @@
 // src/data/seed.js and is lost when the process stops.
 // =============================================================================
 
-import { PolicyError, ROLES } from '../services/adminPolicy.js';
+import { PolicyError, ROLES, bootstrapAllowed } from '../services/adminPolicy.js';
 import crypto from 'node:crypto';
 import { haversineDistanceMeters } from '../services/textUtils.js';
 import { recordCampaignClick } from '../services/expansionServices.js';
@@ -197,6 +197,7 @@ export class MemoryRepository {
     }
     return place;
   }
+  async lockPlace() { /* atomic() serializes memory writes */ }
   async listUserReports() { return this.store.userReports || []; }
   async updateReport(id, {status,reason,actorId}) {
     const r=(await this.listUserReports()).find(r=>r.id===id);
@@ -217,7 +218,7 @@ export class MemoryRepository {
   async bootstrapSuperAdmin(id) {
     return this.atomic(async repo=>{
       if ((await repo.listUsers()).some(u=>u.role==='super_admin')) return false;
-      const u=await repo.getUser(id); if(!u || u.guest) return false;
+      const u=await repo.getUser(id); if(!bootstrapAllowed(u)) return false;
       const before={role:u.role};u.role='super_admin';
       await repo.addAudit({actor:id,actor_id:id,role:'system',action:'BOOTSTRAP_SUPER_ADMIN',target:id,before,
         after:{role:'super_admin'},reason:'verified identity on bootstrap allowlist',requestId:crypto.randomUUID()});
@@ -343,7 +344,7 @@ export class MemoryRepository {
   // ── M9 audit log ───────────────────────────────────────────────────────────
   async addAudit(entry) {
     this.store.auditLogs = this.store.auditLogs || [];
-    const row = { id: `aud-${Date.now()}-${this.store.auditLogs.length}`, ...entry, timestamp: new Date().toISOString() };
+    const row = { id: `aud-${Date.now()}-${this.store.auditLogs.length}`, ...entry, request_id:entry.requestId || crypto.randomUUID(),timestamp: new Date().toISOString() };
     this.store.auditLogs.unshift(row);
 
     return row;
