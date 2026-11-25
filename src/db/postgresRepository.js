@@ -5,6 +5,8 @@
 // Schema: src/db/migrations/*.sql (run `npm run db:migrate` first).
 // =============================================================================
 
+import { PolicyError, ROLES, bootstrapAllowed } from '../services/adminPolicy.js';
+import crypto from 'node:crypto';
 import { removeVietnameseTones } from '../services/textUtils.js';
 
 const GUEST_TTL_DAYS = Number(process.env.GUEST_TTL_DAYS || 30);
@@ -19,7 +21,7 @@ const hourToTime = (h, fallback) => `${String(Number.isFinite(Number(h)) ? Math.
 // ── row <-> API object mappers ───────────────────────────────────────────────
 function userFromRow(r) {
   if (!r) return null;
-  return { id: r.id, role: r.role, phone: r.phone, guest: r.is_guest, created_at: iso(r.created_at), profile: r.profile };
+  return { id: r.id, role: r.role, phone: r.phone, guest: r.is_guest, created_at: iso(r.created_at), identity_verified: r.identity_verified, email:r.email,google_sub:r.google_sub,profile: r.profile };
 }
 
 export function dishFromRow(r) {
@@ -211,8 +213,8 @@ export class PostgresRepository {
   async createUser(user) {
     return this.tx(async (c) => {
       const r = await c.query(
-        `INSERT INTO users (id, role, phone, is_guest, profile, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [user.id, user.role, user.phone, user.guest, JSON.stringify(user.profile || {}), user.created_at || new Date().toISOString()]
+        `INSERT INTO users (id, role, phone, is_guest, profile, created_at, identity_verified) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [user.id, user.role, user.phone, user.guest, JSON.stringify(user.profile || {}), user.created_at || new Date().toISOString(), Boolean(!user.guest && (user.phone || user.identity_verified))]
       );
       let pos = 0;
       for (const col of user.savedCollections || []) {
@@ -375,41 +377,94 @@ export class PostgresRepository {
     return r.rows.map(placeFromRow);
   }
 
-  async reportPlace(placeId, { reason, userId = null }) {
-    return this.tx(async (c) => {
-      const up = (await c.query(
-        `UPDATE places SET report_count = report_count + 1,
-                is_paused = CASE WHEN report_count + 1 >= 3 THEN TRUE ELSE is_paused END
-         WHERE id = $1 RETURNING id, name, report_count`, [placeId])).rows[0];
-      if (!up) return null;
-      const rep = {
-        id: `rep-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        place_id: up.id,
-        place_name: up.name,
-        reason,
-        report_count: up.report_count,
-        status: up.report_count >= 3 ? 'auto_paused' : 'pending_review',
-        created_at: new Date().toISOString()
-      };
-      await c.query('INSERT INTO place_reports (id, place_id, user_id, reason, report_count, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [rep.id, rep.place_id, userId, rep.reason, rep.report_count, rep.status, rep.created_at]);
-      return rep;
+  async reportPlace(placeId, { reason, userId, reporterKey, evidence = '' }) {
+    return this.tx(async c => {
+      const p = (await c.query('SELECT * FROM places WHERE id = $1 FOR UPDATE', [placeId])).rows[0];
+      if (!p) return null;
+      const prior = (await c.query(`SELECT r.* FROM report_dedupe d JOIN place_reports r ON r.id = d.report_id
+        WHERE d.place_id=$1 AND d.reporter_key=$2 AND d.reason=$3
+          AND d.last_at > NOW() - INTERVAL '24 hours'`, [placeId, reporterKey, reason])).rows[0];
+      if (prior) return { ...prior, duplicate: true };
+      const id = `rep-${crypto.randomUUID()}`;
+      await c.query(`INSERT INTO place_reports(id, place_id, user_id, reason, reporter_key, evidence)
+        VALUES($1,$2,$3,$4,$5,$6)`, [id, placeId, userId, reason, reporterKey, evidence]);
+      await c.query(`INSERT INTO report_dedupe(place_id,reporter_key,reason,report_id,last_at)
+        VALUES($1,$2,$3,$4,NOW()) ON CONFLICT(place_id,reporter_key,reason)
+        DO UPDATE SET report_id=EXCLUDED.report_id,last_at=EXCLUDED.last_at`, [placeId, reporterKey, reason, id]);
+      const n = Number((await c.query(`SELECT COUNT(DISTINCT reporter_key) AS n FROM place_reports
+        WHERE place_id=$1 AND reason='closed' AND reporter_key IS NOT NULL
+          AND status IN ('pending_review','auto_paused') AND created_at > NOW() - INTERVAL '24 hours'`, [placeId])).rows[0].n);
+      await c.query('UPDATE places SET report_count=$2,is_paused=(is_paused OR $2 >= 3) WHERE id=$1', [placeId,n]);
+      const r = (await c.query(`UPDATE place_reports SET report_count=$2,
+        status=CASE WHEN $3 THEN 'auto_paused' ELSE 'pending_review' END WHERE id=$1 RETURNING *`, [id,n,reason === 'closed' && n >= 3])).rows[0];
+      if (!p.is_paused && n >= 3) await c.query(`INSERT INTO rbac_audit_logs
+        (actor_email,actor_id,role,action,target,before_data,after_data,reason,request_id,ip_address)
+        VALUES('closure_guard',$1,'system','AUTO_PAUSE_PLACE',$2,$3,$4,'3 distinct verified accounts / 24h',$5,'unknown')`,
+        [userId,placeId,JSON.stringify({is_paused:p.is_paused,report_count:p.report_count}),JSON.stringify({is_paused:true,report_count:n}),crypto.randomUUID()]);
+      return { ...r, place_name:p.name };
     });
   }
 
-  async unpausePlace(placeId) {
-    const ok = await this.tx(async (c) => {
-      const r = await c.query('UPDATE places SET is_verified = TRUE, is_paused = FALSE, report_count = 0 WHERE id = $1', [placeId]);
-      if (!r.rowCount) return false;
-      await c.query('DELETE FROM place_reports WHERE place_id = $1', [placeId]);
-      return true;
-    });
-    return ok ? this.getPlace(placeId) : null;
+  async unpausePlace(placeId, { approve = false } = {}) {
+    const r = await this.q(`UPDATE places SET is_verified=CASE WHEN $2 THEN TRUE ELSE is_verified END,
+      is_paused=CASE WHEN $2 THEN is_paused ELSE FALSE END,
+      report_count=CASE WHEN $2 THEN report_count ELSE 0 END WHERE id=$1 RETURNING id`,[placeId,approve]);
+    if (!r.rowCount) return null;
+    if (!approve) await this.q(`UPDATE place_reports SET status='resolved',resolved_at=NOW()
+      WHERE place_id=$1 AND status IN ('pending_review','auto_paused')`,[placeId]);
+    return this.getPlace(placeId);
   }
+
+  async lockPlace(id) { await this.q('SELECT id FROM places WHERE id=$1 FOR UPDATE',[id]); }
 
   async listUserReports() {
-    const r = await this.q(`SELECT r.*, p.name AS place_name FROM place_reports r JOIN places p ON p.id = r.place_id ORDER BY r.created_at DESC LIMIT 200`);
-    return r.rows.map(reportFromRow);
+    const r = await this.q(`SELECT r.*, p.name AS place_name FROM place_reports r JOIN places p ON p.id = r.place_id ORDER BY r.created_at DESC, r.id DESC`);
+    return r.rows.map(r => ({...r, created_at:iso(r.created_at),resolved_at:iso(r.resolved_at)}));
+  }
+
+  async updateReport(id, { status, reason, actorId }) {
+    return (await this.q(`UPDATE place_reports SET status=$2,resolution_reason=$3,resolved_by=$4,resolved_at=NOW()
+      WHERE id=$1 AND status IN ('pending_review','auto_paused') RETURNING *`,[id,status,reason,actorId])).rows[0] || null;
+  }
+
+  async listUsers() {
+    return (await this.q('SELECT id,role,is_guest,created_at FROM users ORDER BY created_at,id')).rows.map(r => ({id:r.id,role:r.role,guest:r.is_guest,created_at:iso(r.created_at)}));
+  }
+
+  async atomic(fn) {
+    return this.tx(async c => {
+      await c.query("SELECT pg_advisory_xact_lock(hashtext('m9-role-grants'))");
+      const repo = new PostgresRepository(this.pool);
+      repo.q = (text,params) => c.query(text,params);
+      repo.inAtomic = true;
+      repo.tx = inner => inner(c);
+      return fn(repo);
+    });
+  }
+
+  async bootstrapSuperAdmin(id) {
+    return this.atomic(async repo => {
+      if ((await repo.listUsers()).some(u => u.role === 'super_admin')) return false;
+      const user = await repo.getUser(id);
+      if (!bootstrapAllowed(user)) return false;
+      await repo.setUserRole(id,'super_admin');
+      await repo.addAudit({actor:id,actor_id:id,role:'system',action:'BOOTSTRAP_SUPER_ADMIN',target:id,
+        before:{role:user.role},after:{role:'super_admin'},reason:'verified identity on bootstrap allowlist',requestId:crypto.randomUUID()});
+      return true;
+    });
+  }
+
+  async assignRole(id, role) {
+    const user = await this.getUser(id);
+    if (!user) throw new PolicyError(404,'Không tìm thấy tài khoản');
+    if (user.guest) throw new PolicyError(400,'Không thể cấp vai trò cho khách');
+    if (!ROLES.some(r=>r.id===role)) throw new PolicyError(400,'Vai trò không hợp lệ');
+    if (user.role === 'super_admin' && role !== 'super_admin' &&
+      (await this.listUsers()).filter(u=>u.role === 'super_admin').length <= 1) {
+      throw new PolicyError(409,'Không thể gỡ quản trị viên cấp cao cuối cùng');
+    }
+    await this.setUserRole(id,role);
+    return this.getUser(id);
   }
 
   // ── OCR moderation ─────────────────────────────────────────────────────────
@@ -589,9 +644,26 @@ export class PostgresRepository {
   // ── M9 audit log ───────────────────────────────────────────────────────────
   async addAudit(e) {
     const r = await this.q(
-      `INSERT INTO rbac_audit_logs (actor_email, actor_id, role, action, target, ip_address) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [String(e.actor || 'unknown').slice(0, 255), e.actor_id || null, e.role || 'unknown', e.action, e.target ? String(e.target).slice(0, 255) : null, String(e.ip || 'unknown').slice(0, 45)]);
+      `INSERT INTO rbac_audit_logs (actor_email, actor_id, role, action, target, ip_address,before_data,after_data,reason,request_id) VALUES ($1, $2, $3, $4, $5, $6,$7,$8,$9,$10) RETURNING *`,
+      [String(e.actor || 'unknown').slice(0, 255), e.actor_id || null, e.role || 'unknown', e.action, e.target ? String(e.target).slice(0, 255) : null, String(e.ip || 'unknown').slice(0, 45),JSON.stringify(e.before ?? null),JSON.stringify(e.after ?? null),e.reason || null,e.requestId || crypto.randomUUID()]);
     return auditFromRow(r.rows[0]);
+  }
+
+  // Call through atomic() alongside account deletion. No business fields may change.
+  async anonymizeAuditActor(userId, client = null) {
+    if (client) {
+      const scoped=new PostgresRepository(this.pool);
+      scoped.q=(text,params)=>client.query(text,params);
+      scoped.inAtomic=true;
+      return scoped.anonymizeAuditActor(userId);
+    }
+    if (!this.inAtomic) return this.atomic(tx=>tx.anonymizeAuditActor(userId));
+    const n=Number((await this.q('SELECT COUNT(*) AS n FROM rbac_audit_logs WHERE actor_id=$1',[userId])).rows[0].n);
+    if (!n) return 0;
+    await this.addAudit({actor:'privacy-service',role:'system',action:'ANONYMIZE_ACTOR',target:'deleted-user',
+      before:{entries:n},after:{actor_id:null,actor:'deleted-user'},reason:'Account deletion'});
+    await this.q("UPDATE rbac_audit_logs SET actor_id=NULL,actor_email='deleted-user' WHERE actor_id=$1",[userId]);
+    return n;
   }
 
   async listAudit(limit = 100) {
@@ -600,7 +672,7 @@ export class PostgresRepository {
 }
 
 function auditFromRow(r) {
-  return { id: r.id, actor: r.actor_email, actor_id: r.actor_id, role: r.role, action: r.action, target: r.target, ip: r.ip_address, timestamp: iso(r.created_at) };
+  return { id: r.id, actor: r.actor_email, actor_id: r.actor_id, role: r.role, action: r.action, target: r.target, ip: r.ip_address, before:r.before_data,after:r.after_data,reason:r.reason,request_id:r.request_id,timestamp: iso(r.created_at) };
 }
 
 export { hourToTime };

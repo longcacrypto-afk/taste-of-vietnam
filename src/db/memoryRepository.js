@@ -4,6 +4,8 @@
 // src/data/seed.js and is lost when the process stops.
 // =============================================================================
 
+import { PolicyError, ROLES, bootstrapAllowed } from '../services/adminPolicy.js';
+import crypto from 'node:crypto';
 import { haversineDistanceMeters } from '../services/textUtils.js';
 import { recordCampaignClick } from '../services/expansionServices.js';
 import { processSuccessfulPayment } from '../services/paymentService.js';
@@ -159,35 +161,79 @@ export class MemoryRepository {
       .sort((a, b) => a.distance_m - b.distance_m);
   }
 
-  async reportPlace(placeId, { reason, userId = null }) {
-    const place = await this.getPlace(placeId);
-    if (!place) return null;
-    place.closed_report_count = (place.closed_report_count || 0) + 1;
-    if (place.closed_report_count >= 3) place.is_open_override = false; // auto-pause
-    const rep = {
-      id: `rep-${Date.now()}`,
-      place_id: place.id,
-      place_name: place.name,
-      reason,
-      report_count: place.closed_report_count,
-      status: place.closed_report_count >= 3 ? 'auto_paused' : 'pending_review',
-      created_at: new Date().toISOString()
-    };
-    this.store.userReports.unshift(userId ? { ...rep, user_id: userId } : rep);
-    return rep;
+  async reportPlace(placeId, { reason, userId, reporterKey, evidence = '' }) {
+    return this.atomic(async repo => {
+      const place = await repo.getPlace(placeId);
+      if (!place) return null;
+      const reports = this.store.userReports ||= [];
+      const cutoff = Date.now() - 86400000;
+      const prior = reports.find(r => r.place_id === placeId && r.reporter_key === reporterKey && r.reason === reason && Date.parse(r.created_at) > cutoff);
+      if (prior) return {...prior,duplicate:true};
+      const rep = {id:`rep-${crypto.randomUUID()}`,place_id:placeId,place_name:place.name,user_id:userId,
+        reporter_key:reporterKey,reason,evidence,status:'pending_review',created_at:new Date().toISOString()};
+      reports.unshift(rep);
+      const n = new Set(reports.filter(r=>r.place_id===placeId && r.reason==='closed' && r.reporter_key &&
+        ['pending_review','auto_paused'].includes(r.status) && Date.parse(r.created_at)>cutoff).map(r=>r.reporter_key)).size;
+      const before = structuredClone(place);
+      place.closed_report_count=n;
+      if (n>=3) place.is_open_override=false;
+      rep.report_count=n;
+      if (reason==='closed' && n>=3) rep.status='auto_paused';
+      if (n>=3 && before.is_open_override) await repo.addAudit({actor:'closure_guard',actor_id:userId,role:'system',
+        action:'AUTO_PAUSE_PLACE',target:placeId,before,after:structuredClone(place),reason:'3 distinct verified accounts / 24h',requestId:crypto.randomUUID()});
+      return rep;
+    });
   }
 
-  async unpausePlace(placeId) {
+  async unpausePlace(placeId, { approve = false } = {}) {
     const place = await this.getPlace(placeId);
     if (!place) return null;
-    place.is_verified = true;
-    place.is_open_override = true;
-    place.closed_report_count = 0;
-    if (this.store.userReports) this.store.userReports = this.store.userReports.filter(r => r.place_id !== placeId);
+    if (approve) place.is_verified = true;
+    else {
+      place.is_open_override=true; place.closed_report_count=0;
+      for (const r of this.store.userReports || []) if (r.place_id===placeId && ['pending_review','auto_paused'].includes(r.status)) {
+        r.status='resolved';r.resolved_at=new Date().toISOString();
+      }
+    }
     return place;
   }
-
+  async lockPlace() { /* atomic() serializes memory writes */ }
   async listUserReports() { return this.store.userReports || []; }
+  async updateReport(id, {status,reason,actorId}) {
+    const r=(await this.listUserReports()).find(r=>r.id===id);
+    if (!r || !['pending_review','auto_paused'].includes(r.status)) return null;
+    Object.assign(r,{status,resolution_reason:reason,resolved_by:actorId,resolved_at:new Date().toISOString()});
+    return r;
+  }
+  async listUsers() { return Object.values(this.store.users || {}).map(({id,role,guest,created_at})=>({id,role,guest,created_at})); }
+  async atomic(fn) {
+    const prior=this.pending || Promise.resolve();
+    let release; this.pending=new Promise(r=>{release=r;});
+    await prior;
+    const backup=structuredClone(this.store);
+    try { return await fn(this); }
+    catch(e) { for(const k of Object.keys(this.store)) delete this.store[k]; Object.assign(this.store,backup); throw e; }
+    finally { release(); }
+  }
+  async bootstrapSuperAdmin(id) {
+    return this.atomic(async repo=>{
+      if ((await repo.listUsers()).some(u=>u.role==='super_admin')) return false;
+      const u=await repo.getUser(id); if(!bootstrapAllowed(u)) return false;
+      const before={role:u.role};u.role='super_admin';
+      await repo.addAudit({actor:id,actor_id:id,role:'system',action:'BOOTSTRAP_SUPER_ADMIN',target:id,before,
+        after:{role:'super_admin'},reason:'verified identity on bootstrap allowlist',requestId:crypto.randomUUID()});
+      return true;
+    });
+  }
+  async assignRole(id,role) {
+    const u=await this.getUser(id);
+    if(!u) throw new PolicyError(404,'Không tìm thấy tài khoản');
+    if(u.guest) throw new PolicyError(400,'Không thể cấp vai trò cho khách');
+    if(!ROLES.some(r=>r.id===role)) throw new PolicyError(400,'Vai trò không hợp lệ');
+    if(u.role==='super_admin' && role!=='super_admin' && (await this.listUsers()).filter(u=>u.role==='super_admin').length<=1)
+      throw new PolicyError(409,'Không thể gỡ quản trị viên cấp cao cuối cùng');
+    u.role=role;return u;
+  }
 
   // ── OCR moderation ─────────────────────────────────────────────────────────
   async listOcrQueue() { return this.store.ocrQueue || []; }
@@ -298,10 +344,19 @@ export class MemoryRepository {
   // ── M9 audit log ───────────────────────────────────────────────────────────
   async addAudit(entry) {
     this.store.auditLogs = this.store.auditLogs || [];
-    const row = { id: `aud-${Date.now()}-${this.store.auditLogs.length}`, ...entry, timestamp: new Date().toISOString() };
+    const row = { id: `aud-${Date.now()}-${this.store.auditLogs.length}`, ...entry, request_id:entry.requestId || crypto.randomUUID(),timestamp: new Date().toISOString() };
     this.store.auditLogs.unshift(row);
-    if (this.store.auditLogs.length > 1000) this.store.auditLogs.length = 1000;
+
     return row;
+  }
+
+  async anonymizeAuditActor(userId, _client = null) {
+    const rows=(this.store.auditLogs || []).filter(r=>r.actor_id===userId);
+    if (!rows.length) return 0;
+    await this.addAudit({actor:'privacy-service',role:'system',action:'ANONYMIZE_ACTOR',target:'deleted-user',
+      before:{entries:rows.length},after:{actor_id:null,actor:'deleted-user'},reason:'Account deletion'});
+    for(const r of rows) {r.actor_id=null;r.actor='deleted-user';}
+    return rows.length;
   }
 
   async listAudit(limit = 100) {

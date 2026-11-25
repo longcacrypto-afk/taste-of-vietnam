@@ -77,7 +77,7 @@ test('Every write route returns 401 without a token, and works with a guest toke
   }
   // Editing/deleting a recipe is for its author (or an admin): covered by the ownership test below
   const OWNER_ONLY = (m, p) => /^\/api\/v1\/community\/recipes\/[^/]+$/.test(p) && (m === 'PATCH' || m === 'DELETE');
-  for (const [m, p] of WRITES.filter(([m, p]) => p !== '/api/v1/me' && !OWNER_ONLY(m, p))) {
+  for (const [m, p] of WRITES.filter(([m, p]) => p !== '/api/v1/me' && !p.endsWith('/reports') && !OWNER_ONLY(m, p))) {
     const r = await hit(store, m, p, g.headers, { dish_id: 'DISH-101', title: 'Món thử', place_id: 'PLACE-401', party_size: 2 });
     assert.ok(r.status !== 401 && r.status !== 403, `${m} ${p} with guest token got ${r.status}`);
   }
@@ -107,7 +107,7 @@ test('Admin routes: 401 anonymous, 403 for guest/user/merchant, OK for admin (ro
   const u = await login(store, '0988888888');
   const merchant = await loginMerchant(store);
   const admin = await loginAdmin(store);
-  assert.equal(admin.role, 'admin');
+  assert.equal(admin.role, 'super_admin');
   for (const [m, p] of ADMIN_ROUTES) {
     assert.equal((await hit(store, m, p)).status, 401, `${m} ${p} anon`);
     for (const who of [g, u, merchant]) {

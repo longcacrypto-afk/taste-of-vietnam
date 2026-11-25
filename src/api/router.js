@@ -6,6 +6,9 @@
 // ./frozenRoutes.js.
 // =============================================================================
 
+import { handleAdminRoute } from './adminRoutes.js';
+import { reportInput } from '../services/reportPolicy.js';
+import { PolicyError } from '../services/adminPolicy.js';
 import { matchesVietnameseQuery } from '../services/textUtils.js';
 import { getTodaySuggestions, isDishSafeForUser } from '../services/recommender.js';
 import { runAiFoodChat } from '../services/intentParser.js';
@@ -92,10 +95,6 @@ async function buildView(repo, store, authUser) {
   });
 }
 
-function clientIp(headers) {
-  return String(headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown').split(',')[0].trim();
-}
-
 export async function handleApiRequest(store, method, pathname, searchParams, body = {}, headers = {}) {
   const repo = getRepository(store);
   // Who is calling? (null = anonymous)
@@ -104,12 +103,13 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   if (denied) return denied;
   body = body && typeof body === 'object' ? body : {};
 
+  if (pathname.startsWith('/api/v1/admin/')) {
+    try { return await handleAdminRoute(repo, authUser, method, pathname, searchParams, body, headers, store); }
+    catch(e) { if(e instanceof PolicyError) return {status:e.status,data:{error:e.message}}; throw e; }
+  }
   const userId = authUser ? authUser.id : null;
   // The caller's taste profile; anonymous reads use the shared default profile.
   const profile = authUser ? authUser.profile : store.userProfile;
-  const audit = (action, target) => repo.addAudit({
-    actor: authUser.phone || authUser.id, actor_id: authUser.id, role: authUser.role, action, target, ip: clientIp(headers)
-  });
 
   // ===========================================================================
   // MODULE M1: ACCOUNT, AUTH, ONBOARDING & TASTE PROFILE (M1-S01 .. M1-S10)
@@ -158,6 +158,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     if (!authUser) return UNAUTHORIZED;
     suggestionCache.invalidateUser(authUser.id);
     const deleted = await deleteUser(repo, authUser.id);
+    if (!deleted) return {status:409,data:{error:'Không thể xóa quản trị viên cấp cao cuối cùng'}};
+
     return {
       status: 200,
       data: {
@@ -410,10 +412,13 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   const reportMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)\/reports$/);
   if (reportMatch && method === 'POST') {
-    const rep = await repo.reportPlace(reportMatch[1], { reason: cleanText(body.reason, 300) || 'Quán đóng cửa', userId });
+    let rep;
+    try { rep = await repo.reportPlace(reportMatch[1], reportInput(authUser,body)); }
+    catch(e) { if(e instanceof PolicyError) return {status:e.status,data:{error:e.message}};throw e; }
     if (!rep) return { status: 404, data: { error: 'Place not found' } };
     bump(store, 'report_issue');
-    return { status: 200, data: rep };
+    const {reporter_key,...publicReport}=rep;
+    return { status: 200, data: publicReport };
   }
 
   // ===========================================================================
@@ -637,138 +642,6 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 200, data: updated };
   }
 
-  // ===========================================================================
-  // MODULE M9: ADMIN CMS, OCR MODERATION & AUDIT LOGS (M9-S01 .. M9-S09)
-  // Every admin write is recorded in the audit log (rbac_audit_logs).
-  // ===========================================================================
-  if (pathname === '/api/v1/admin/dashboard' && method === 'GET') {
-    const [dishes, places, ocrQueue, userReports, campaigns] = await Promise.all([
-      repo.listDishes(), repo.listPlaces(), repo.listOcrQueue(), repo.listUserReports(), repo.listCampaigns()
-    ]);
-    return {
-      status: 200,
-      data: {
-        total_dishes: dishes.length,
-        total_verified_places: places.filter(p => p.is_verified).length,
-        ocr_queue: ocrQueue,
-        user_reports: userReports,
-        campaigns,
-        events: store.analyticsEvents
-      }
-    };
-  }
-
-  // M9-S02: Admin CRUD Thư viện Món ăn Toàn quốc
-  if (pathname === '/api/v1/admin/dishes' && method === 'POST') {
-    const allergens = cleanList(body.allergen_tags || body.allergens);
-    const newDish = await repo.createDish({
-      id: `DISH-${Date.now()}`,
-      name: cleanText(body.name, 120) || 'Món Việt Mới',
-      region: cleanText(body.region, 32) || 'Miền Nam',
-      meal_slots: cleanList(body.meal_slots).length ? cleanList(body.meal_slots) : ['lunch', 'dinner'],
-      calories: cleanNumber(body.calories, 0, 10000, 450),
-      ref_price: cleanNumber(body.ref_price, 0, 1e8, 50000),
-      spice_level: Math.round(cleanNumber(body.spice_level, 0, 3, 1)),
-      allergen_tags: allergens,
-      weather_fit: ['any'],
-      tags: cleanList(body.tags).length ? cleanList(body.tags) : ['Đặc sản'],
-      description: cleanText(body.description, 1000) || 'Món ăn mới từ Admin CMS'
-    });
-    await audit('CREATE_DISH', newDish.id);
-    // `allergens` kept for older clients; the recommender reads `allergen_tags`
-    return { status: 201, data: { ...newDish, allergens: newDish.allergen_tags } };
-  }
-
-  const adminDishMatch = pathname.match(/^\/api\/v1\/admin\/dishes\/([^/]+)$/);
-  if (adminDishMatch && (method === 'PUT' || method === 'PATCH')) {
-    const patch = {};
-    if (body.name !== undefined) patch.name = cleanText(body.name, 120) || 'Món Việt Mới';
-    if (body.calories !== undefined) patch.calories = cleanNumber(body.calories, 0, 10000, 450);
-    if (body.ref_price !== undefined) patch.ref_price = cleanNumber(body.ref_price, 0, 1e8, 50000);
-    if (body.allergens !== undefined || body.allergen_tags !== undefined) patch.allergen_tags = cleanList(body.allergen_tags || body.allergens);
-    if (body.region !== undefined) patch.region = cleanText(body.region, 32);
-    if (body.spice_level !== undefined) patch.spice_level = Math.round(cleanNumber(body.spice_level, 0, 3, 1));
-    if (body.description !== undefined) patch.description = cleanText(body.description, 1000);
-    const dish = await repo.updateDish(adminDishMatch[1], patch);
-    if (!dish) return { status: 404, data: { error: 'Dish not found' } };
-    await audit('UPDATE_DISH', dish.id);
-    return { status: 200, data: { ...dish, allergens: dish.allergen_tags } };
-  }
-
-  if (adminDishMatch && method === 'DELETE') {
-    const deleted = await repo.deleteDish(adminDishMatch[1]);
-    if (!deleted) return { status: 404, data: { error: 'Dish not found' } };
-    await audit('DELETE_DISH', adminDishMatch[1]);
-    return { status: 200, data: { deleted: true, id: adminDishMatch[1] } };
-  }
-
-  if (pathname === '/api/v1/admin/ocr-review' && method === 'POST') {
-    const decision = ['approved', 'rejected', 'pending_review'].includes(body.decision) ? body.decision : 'approved';
-    const item = await repo.reviewOcr(body.ocr_id, decision, body.reason ? cleanText(body.reason, 300) : null);
-    if (!item) return { status: 404, data: { error: 'OCR item not found', updated: null } };
-    await audit(decision === 'rejected' ? 'REJECT_OCR_MENU' : 'APPROVE_OCR_MENU', item.id);
-    return { status: 200, data: { updated: item } };
-  }
-
-  const unpausePlaceMatch = pathname.match(/^\/api\/v1\/admin\/places\/([^/]+)\/(?:approve|unpause)$/);
-  if (unpausePlaceMatch && method === 'POST') {
-    const place = await repo.unpausePlace(unpausePlaceMatch[1]);
-    if (!place) return { status: 404, data: { error: 'Place not found' } };
-    await audit('UNPAUSE_PLACE', place.id);
-    return { status: 200, data: { unpaused_place: place, message: 'Đã mở lại quán và xóa cờ báo lỗi thành công.' } };
-  }
-
-  const moderateAdMatch = pathname.match(/^\/api\/v1\/admin\/ads\/([^/]+)\/moderate$/);
-  if (moderateAdMatch && method === 'POST') {
-    const cmp = await repo.updateCampaign(moderateAdMatch[1], { status: cleanText(body.decision, 32) || 'active' });
-    if (!cmp) return { status: 404, data: { error: 'Campaign not found' } };
-    await audit('MODERATE_AD', `${cmp.id}:${cmp.status}`);
-    return { status: 200, data: { campaign: cmp, hard_allergy_check: 'passed', sponsored_badge_check: 'passed' } };
-  }
-
-  if (pathname === '/api/v1/admin/audit-logs' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        rbac_roles: ['Consumer', 'Merchant Owner', 'Merchant Staff', 'Content Moderator', 'Ops Admin', 'Super Admin'],
-        logs: await repo.listAudit(100)
-      }
-    };
-  }
-
-  // M9-S08: RBAC Roles Management (6 roles)
-  if (pathname === '/api/v1/admin/rbac/roles' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        roles: [
-          { id: 'consumer', name: 'Consumer', permissions: ['read_suggestions', 'write_feedback', 'read_places'] },
-          { id: 'merchant_owner', name: 'Merchant Owner', permissions: ['manage_menu', 'manage_campaigns', 'view_analytics'] },
-          { id: 'merchant_staff', name: 'Merchant Staff', permissions: ['update_daily_special', 'view_bookings'] },
-          { id: 'content_moderator', name: 'Content Moderator', permissions: ['approve_ocr', 'reject_ocr', 'moderate_reviews'] },
-          { id: 'ops_admin', name: 'Ops Admin', permissions: ['manage_places', 'unpause_places', 'manage_campaigns', 'view_audit_logs'] },
-          { id: 'super_admin', name: 'Super Admin', permissions: ['*'] }
-        ]
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/admin/rbac/users' && (method === 'GET' || method === 'POST')) {
-    if (method === 'POST') {
-      return { status: 200, data: { updated: true, user_id: body.user_id, new_role: body.role } };
-    }
-    return {
-      status: 200,
-      data: {
-        users: [
-          { id: 'USR-001', name: 'Admin Hệ Thống', role: 'super_admin', email: 'admin@homnayangi.vn' },
-          { id: 'USR-002', name: 'Kiểm Duyệt Nội Dung', role: 'content_moderator', email: 'mod@homnayangi.vn' },
-          { id: 'USR-003', name: 'Điều Hành Vận Hành', role: 'ops_admin', email: 'ops@homnayangi.vn' }
-        ]
-      }
-    };
-  }
-
   // M10-S06: A/B Testing Algorithms
   if (pathname === '/api/v1/analytics/ab-test' && method === 'GET') {
     return {
@@ -846,12 +719,24 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   if (recipeCrudMatch && ['PATCH', 'PUT', 'DELETE'].includes(method)) {
     const rec = await repo.getRecipe(recipeCrudMatch[1]);
     if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
-    if (!authUser || (authUser.role !== 'admin' && rec.author_id !== authUser.id)) {
+    if (!authUser || (authUser.role !== 'super_admin' && rec.author_id !== authUser.id)) {
       return { status: 403, data: { error: 'Chỉ tác giả hoặc quản trị viên được sửa/xóa công thức này' } };
     }
+    const mutate = async patch => {
+      if (rec.author_id === authUser.id) return patch === null ? repo.deleteRecipe(rec.id) : repo.updateRecipe(rec.id,patch);
+      return repo.atomic(async tx => {
+        const actor=await tx.getUser(authUser.id);
+        if (actor?.role !== 'super_admin') return null;
+        const before=structuredClone(await tx.getRecipe(rec.id));
+        const after=patch === null ? await tx.deleteRecipe(rec.id) : await tx.updateRecipe(rec.id,patch);
+        await tx.addAudit({actor:actor.id,actor_id:actor.id,role:actor.role,
+          action:patch === null ? 'DELETE_RECIPE' : 'UPDATE_RECIPE',target:rec.id,
+          before,after:patch === null ? null : after,reason:cleanText(body.reason,1000) || 'Community moderation'});
+        return after;
+      });
+    };
     if (method === 'DELETE') {
-      await repo.deleteRecipe(rec.id);
-      if (authUser.role === 'admin' && rec.author_id !== authUser.id) await audit('DELETE_RECIPE', rec.id);
+      if (!await mutate(null)) return {status:403,data:{error:'Quyền quản trị đã thay đổi'}};
       return { status: 200, data: { deleted: true, id: rec.id } };
     }
     const patch = {};
@@ -863,7 +748,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     if (body.prep_time_minutes !== undefined) patch.prep_time_minutes = cleanNumber(body.prep_time_minutes, 1, 1440, rec.prep_time_minutes);
     if (body.calories !== undefined) patch.calories = cleanNumber(body.calories, 0, 10000, rec.calories);
     if (body.zero_waste_tag !== undefined) patch.zero_waste_tag = cleanText(body.zero_waste_tag, 40) || null;
-    return { status: 200, data: await repo.updateRecipe(rec.id, patch) };
+    const updated=await mutate(patch);
+    if (!updated) return {status:403,data:{error:'Quyền quản trị đã thay đổi'}};
+    return { status: 200, data: updated };
   }
 
   // ===========================================================================

@@ -101,7 +101,7 @@ test('M3-S04 & M3-S05: Vietnamese Natural Language Chat extracts party size, bud
   assert.ok(res.data.options.length > 0);
 });
 
-test('QA-09, M4-S06 & M9-S06: Closed places are excluded and 3 user reports auto-pause a restaurant', async () => {
+test('QA-09, M4-S06 & M9-S06: Closed places excluded; repeated reports by one person never auto-pause', async () => {
   const store = createInitialStore();
   const openRes = await call(store, 'GET', '/api/v1/places', new URLSearchParams({ open_only: 'true' }));
   assert.ok(!openRes.data.items.some(p => p.id === 'PLACE-405'));
@@ -109,7 +109,8 @@ test('QA-09, M4-S06 & M9-S06: Closed places are excluded and 3 user reports auto
   await call(store, 'POST', '/api/v1/places/PLACE-404/reports', new URLSearchParams(), { reason: 'Đóng cửa' });
   await call(store, 'POST', '/api/v1/places/PLACE-404/reports', new URLSearchParams(), { reason: 'Đóng cửa' });
   const third = await call(store, 'POST', '/api/v1/places/PLACE-404/reports', new URLSearchParams(), { reason: 'Đóng cửa' });
-  assert.equal(third.data.status, 'auto_paused');
+  assert.equal(third.data.duplicate, true);
+  assert.equal(third.data.status, 'pending_review');
 });
 
 test('M5-S01 & M5-S05: Order Deep-Link Redirect logs UTM tracking & Loopback Confirmation updates 3-day cooldown', async () => {
@@ -356,13 +357,13 @@ test('M9: Admin OCR Review rejection with reason & Restaurant Un-pause auto-reco
   assert.ok(store.userReports.some(r => r.place_id === 'PLACE-405'));
 
   // 3. Admin un-pauses restaurant PLACE-405
-  const unpauseRes = await call(store, 'POST', '/api/v1/admin/places/PLACE-405/unpause', new URLSearchParams());
+  const unpauseRes = await call(store, 'POST', '/api/v1/admin/places/PLACE-405/unpause', new URLSearchParams(), { reason:'Đã kiểm tra lại quán' });
   assert.equal(unpauseRes.status, 200);
   assert.equal(unpauseRes.data.unpaused_place.is_open_override, true);
   assert.equal(unpauseRes.data.unpaused_place.closed_report_count, 0);
 
-  // 4. Verify userReports no longer contains PLACE-405
-  assert.ok(!store.userReports.some(r => r.place_id === 'PLACE-405'));
+  // 4. Reports remain as evidence, with their resolution status.
+  assert.ok(store.userReports.filter(r => r.place_id === 'PLACE-405').every(r=>r.status==='resolved'));
 });
 
 test('M8 & M3-S06: Notification Queue API & Suggestion Feedback actions (liked, skipped, eaten)', async () => {
@@ -602,7 +603,7 @@ test('AUDIT-GAPS: M1 PDPD export, M6 daily-special, M7 fraud-logs, M9 RBAC & M10
 
   const rbacUsersRes = await call(store, 'GET', '/api/v1/admin/rbac/users', new URLSearchParams());
   assert.equal(rbacUsersRes.status, 200);
-  assert.ok(rbacUsersRes.data.users.length >= 3);
+  assert.equal(rbacUsersRes.data.users.length, Object.keys(store.users).length);
 
   // M10-S06: A/B Testing
   const abRes = await call(store, 'GET', '/api/v1/analytics/ab-test', new URLSearchParams());
