@@ -568,6 +568,22 @@ class _BookingScreenState extends State<BookingScreen>
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () async {
+              await ApiService.cancelBooking(_bookingCode);
+              if (!mounted) return;
+              setState(() {
+                _submitted = false;
+                _successAnim.reset();
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('🗑️ Đã hủy đặt bàn $_bookingCode thành công')),
+              );
+            },
+            icon: const Icon(Icons.cancel_outlined, size: 16, color: Colors.redAccent),
+            label: const Text('Hủy Đặt Bàn Này', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+          ),
         ],
       );
 

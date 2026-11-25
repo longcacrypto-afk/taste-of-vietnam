@@ -30,6 +30,12 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
   bool _isLoading = false;
   Map<String, dynamic>? _userProfile;
 
+  final List<Map<String, dynamic>> _familyMembers = [
+    {'name': 'Bố (Anh Long)', 'role': 'Ăn đậm đà · Không dị ứng', 'allergies': <String>[]},
+    {'name': 'Mẹ (Chị Lan)', 'role': 'Eat Clean · Kiêng cay', 'allergies': <String>['chili']},
+    {'name': 'Bé Bi (5 tuổi)', 'role': 'Không cay · Dị ứng Tôm', 'allergies': <String>['shrimp']},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -491,6 +497,52 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
         ),
         const SizedBox(height: 14),
 
+        // 5b. Hồ Sơ Gia Đình (M1-S08)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('👨‍👩‍👧‍👦 Khẩu Vị Gia Đình (M1-S08)',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                  TextButton.icon(
+                    onPressed: _addFamilyMemberModal,
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 15, color: AppTheme.amberDark),
+                    label: const Text('Thêm', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.amberDark)),
+                  ),
+                ],
+              ),
+              ..._familyMembers.map((m) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Color(0xFFFEF3C7),
+                      child: Text('👤', style: TextStyle(fontSize: 14)),
+                    ),
+                    title: Text(m['name'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    subtitle: Text(m['role'] as String, style: const TextStyle(fontSize: 10, color: AppTheme.slateMuted)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16, color: Colors.redAccent),
+                      onPressed: () {
+                        setState(() => _familyMembers.remove(m));
+                        ApiService.updateUserProfile({'family_members': _familyMembers});
+                      },
+                    ),
+                  )),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
         // 6. PDPD Compliance Actions (Nghị định 13/2023/NĐ-CP)
         Container(
           padding: const EdgeInsets.all(16),
@@ -537,6 +589,39 @@ class _ProfileExpansionScreenState extends State<ProfileExpansionScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  void _addFamilyMemberModal() {
+    final nameCtrl = TextEditingController();
+    final noteCtrl = TextEditingController(text: 'Ăn vừa · Không cay');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Thêm Thành Viên Gia Đình', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên thành viên (VD: Ông Nội)')),
+            TextField(controller: noteCtrl, decoration: const InputDecoration(labelText: 'Ghi chú khẩu vị / dị ứng')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          ElevatedButton(
+            onPressed: () {
+              final n = nameCtrl.text.trim();
+              if (n.isEmpty) return;
+              Navigator.pop(ctx);
+              setState(() {
+                _familyMembers.add({'name': n, 'role': noteCtrl.text.trim(), 'allergies': <String>[]});
+              });
+              ApiService.updateUserProfile({'family_members': _familyMembers});
+            },
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
     );
   }
 }

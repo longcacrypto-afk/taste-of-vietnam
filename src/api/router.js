@@ -794,7 +794,15 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ===========================================================================
   if ((pathname === '/api/v1/meal-plans/weekly' || pathname === '/api/v1/meal-planner/weekly' || pathname === '/api/v1/groceries/consolidated') && method === 'GET') {
     const fridge = (searchParams.get('fridge') || 'Hành tím,Nước mắm').split(',').map(s => s.trim());
-    return { status: 200, data: store.customMealPlan || generateWeeklyMealPlanAndGroceries(store, fridge) };
+    const familySize = Number(searchParams.get('family_size') || 2);
+    const mealsPerDay = Number(searchParams.get('meals_per_day') || 3);
+    if (store.customMealPlan && !searchParams.get('family_size') && !searchParams.get('meals_per_day')) {
+      return { status: 200, data: store.customMealPlan };
+    }
+    return {
+      status: 200,
+      data: generateWeeklyMealPlanAndGroceries(store, fridge, { family_size: familySize, meals_per_day: mealsPerDay })
+    };
   }
 
   if (pathname === '/api/v1/meal-plans/weekly' && (method === 'PUT' || method === 'POST')) {

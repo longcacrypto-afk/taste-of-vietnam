@@ -26,6 +26,12 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
     {'name': 'Trứng Chần Nước Béo', 'priceRaw': '15.000đ', 'priceVnd': 15000, 'confidence': 96.5, 'matched': 'SIDE-202'},
   ];
 
+  final List<Map<String, dynamic>> _manualMenu = [
+    {'id': 'MENU-01', 'name': 'Phở Bò Tái Nạm', 'price_vnd': 55000, 'available': true, 'special': true},
+    {'id': 'MENU-02', 'name': 'Phở Gà Ta Lá Chanh', 'price_vnd': 50000, 'available': true, 'special': false},
+    {'id': 'MENU-03', 'name': 'Quẩy Giòn', 'price_vnd': 10000, 'available': true, 'special': false},
+  ];
+
   final List<Map<String, dynamic>> _campaigns = [
     {'id': 'CMP-701', 'name': 'Ưu tiên gợi ý bữa trưa (Bán kính 3km)', 'cpc': '4.500đ / click', 'clicks': '128 clicks', 'total': '576.000đ', 'active': true},
     {'id': 'CMP-702', 'name': 'Tài trợ vị trí món Phở Bò Tái', 'cpc': '3.800đ / click', 'clicks': '94 clicks', 'total': '357.200đ', 'active': true},
@@ -446,13 +452,80 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
         ),
       );
 
-  // ─── TAB 2: AI MENU OCR ─────────────────────────────────────────
+  // ─── TAB 2: AI MENU OCR & MANUAL MENU CRUD (M6-S04..S07) ─────────
   Widget _buildOcrTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _buildOcrUploadCard(),
         const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Thực Đơn Quán (${_manualMenu.length} món)', style: AppTheme.titleMedium.copyWith(fontSize: 14)),
+            TextButton.icon(
+              onPressed: () => _openMenuItemModal(),
+              icon: const Icon(Icons.add_circle_outline_rounded, size: 16, color: AppTheme.goldenAmber),
+              label: const Text('Thêm Món', style: TextStyle(color: AppTheme.goldenAmber, fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ..._manualMenu.map((m) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceElevated,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(m['name'] as String, style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w700, fontSize: 13)),
+                            if (m['special'] == true) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: AppTheme.goldenAmber.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                                child: const Text('⭐ Đặc biệt', style: TextStyle(color: AppTheme.goldenAmber, fontSize: 9, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ],
+                        ),
+                        Text('${_fmt((m['price_vnd'] as num).toInt())}đ · ${m['available'] == true ? 'Còn món' : 'Tạm hết'}',
+                            style: AppTheme.labelSmall.copyWith(fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.star_rounded, size: 18, color: m['special'] == true ? AppTheme.goldenAmber : Colors.white38),
+                    tooltip: 'Gắn Món Đặc Biệt Hôm Nay',
+                    onPressed: () async {
+                      setState(() => m['special'] = !(m['special'] == true));
+                      await ApiService.tagDailySpecial(dishId: m['id'] as String, label: 'Món đặc biệt hôm nay');
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 17, color: Colors.white70),
+                    onPressed: () => _openMenuItemModal(existing: m),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, size: 17, color: Colors.redAccent),
+                    onPressed: () async {
+                      final id = m['id'] as String;
+                      setState(() => _manualMenu.removeWhere((x) => x['id'] == id));
+                      await ApiService.deleteMerchantMenuItem(id);
+                    },
+                  ),
+                ],
+              ),
+            )),
+        const SizedBox(height: 12),
         if (_isOcrScanning)
           Container(
             padding: const EdgeInsets.all(24),
@@ -782,5 +855,99 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
       buf.write(s[i]);
     }
     return buf.toString();
+  }
+
+  void _openMenuItemModal({Map<String, dynamic>? existing}) {
+    final nameCtrl = TextEditingController(text: existing?['name'] as String? ?? '');
+    final priceCtrl = TextEditingController(text: '${existing?['price_vnd'] ?? 50000}');
+    bool available = existing?['available'] != false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.charcoalHero,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setMState) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(existing == null ? '➕ Thêm Món Vào Thực Đơn' : '✏️ Chỉnh Sửa Món',
+                  style: const TextStyle(color: AppTheme.goldenAmber, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Tên món ăn',
+                  labelStyle: const TextStyle(color: Colors.white54),
+                  filled: true,
+                  fillColor: const Color(0xFF27272A),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Giá bán (VNĐ)',
+                  labelStyle: const TextStyle(color: Colors.white54),
+                  filled: true,
+                  fillColor: const Color(0xFF27272A),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Đang còn món tại quán', style: TextStyle(color: Colors.white, fontSize: 13)),
+                value: available,
+                activeColor: AppTheme.emeraldBadge,
+                onChanged: (v) => setMState(() => available = v),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.goldenAmber, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14)),
+                  onPressed: () async {
+                    final n = nameCtrl.text.trim();
+                    final p = int.tryParse(priceCtrl.text.trim()) ?? 50000;
+                    if (n.isEmpty) return;
+                    Navigator.pop(ctx);
+                    final saved = await ApiService.upsertMerchantMenuItem(
+                      id: existing?['id'] as String?,
+                      name: n,
+                      priceVnd: p,
+                      available: available,
+                    );
+                    if (!mounted) return;
+                    setState(() {
+                      if (existing == null) {
+                        _manualMenu.insert(0, {
+                          'id': (saved?['id'] as String?) ?? 'MENU-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                          'name': n,
+                          'price_vnd': p,
+                          'available': available,
+                          'special': false,
+                        });
+                      } else {
+                        existing['name'] = n;
+                        existing['price_vnd'] = p;
+                        existing['available'] = available;
+                      }
+                    });
+                  },
+                  child: Text(existing == null ? 'Thêm Món' : 'Lưu Thay Đổi', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

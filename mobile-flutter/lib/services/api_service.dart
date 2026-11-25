@@ -120,12 +120,14 @@ class ApiService {
     }
   }
 
-  // ─── 4. M11: THỰC ĐƠN 7 NGÀY & GIỎ ĐI CHỢ ───────────────────────────────
-  static Future<Map<String, dynamic>?> fetchWeeklyMealPlan() async {
+  // ─── 4. M11: THỰC ĐƠN 7 NGÀY (3 BỮA x GIA ĐÌNH) & GIỎ ĐI CHỢ ──────────────
+  static Future<Map<String, dynamic>?> fetchWeeklyMealPlan({int familySize = 4, int mealsPerDay = 3}) async {
     try {
-      final res = await http.get(
-        Uri.parse('$baseUrl/meal-planner/weekly'),
-      ).timeout(const Duration(seconds: 5));
+      final uri = Uri.parse('$baseUrl/meal-planner/weekly').replace(queryParameters: {
+        'family_size': familySize.toString(),
+        'meals_per_day': mealsPerDay.toString(),
+      });
+      final res = await http.get(uri).timeout(const Duration(seconds: 5));
 
       if (res.statusCode == 200) {
         return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;

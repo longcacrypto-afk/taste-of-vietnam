@@ -662,7 +662,13 @@ test('CRUD-FULL: M6 Menu, M7 Campaign Patch, M9 Dish CRUD, M11 MealPlan PUT, M13
   const delDish = await handleApiRequest(store, 'DELETE', `/api/v1/admin/dishes/${addDish.data.id}`, new URLSearchParams());
   assert.equal(delDish.status, 200);
 
-  // M11 Meal Plan PUT & Groceries POST/PATCH
+  // M11 Meal Plan PUT & 3-Meals-Per-Day Family Scaling
+  const plan3Meals = await handleApiRequest(store, 'GET', '/api/v1/meal-plans/weekly', new URLSearchParams('family_size=4&meals_per_day=3'));
+  assert.equal(plan3Meals.status, 200);
+  assert.equal(plan3Meals.data.family_size, 4);
+  assert.equal(plan3Meals.data.meals_per_day, 3);
+  assert.ok(plan3Meals.data.days[0].meals.breakfast && plan3Meals.data.days[0].meals.lunch && plan3Meals.data.days[0].meals.dinner);
+
   const putPlan = await handleApiRequest(store, 'PUT', '/api/v1/meal-plans/weekly', new URLSearchParams(), { days: [{ day: 'Thứ 2', dish_name: 'Phở Gà' }] });
   assert.equal(putPlan.status, 200);
   assert.equal(putPlan.data.days[0].dish_name, 'Phở Gà');

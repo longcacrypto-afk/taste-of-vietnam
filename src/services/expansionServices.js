@@ -128,42 +128,92 @@ export function runVietnameseIntentBenchmark(store) {
   };
 }
 
-// M11: 7-Day Meal Plan & Consolidated Grocery List Merger (with Fridge Deduction)
-export function generateWeeklyMealPlanAndGroceries(store, fridgeItems = ['Hành tím', 'Nước mắm']) {
+// M11: 7-Day Meal Plan (3 Meals/Day x Family Size) & Consolidated Grocery List Merger
+export function generateWeeklyMealPlanAndGroceries(store, fridgeItems = ['Hành tím', 'Nước mắm'], opts = {}) {
+  const familySize = Math.max(1, Math.min(10, Number(opts.family_size || 2)));
+  const mealsPerDay = Math.max(1, Math.min(3, Number(opts.meals_per_day || 3)));
+  const scaleFactor = familySize / 2;
+
   const safeDishes = store.dishes.filter(
     d => !(d.allergen_tags || []).some(tag => (store.userProfile.hard_allergies || []).includes(tag))
   );
   const days = ['Thứ 2', 'Thứ 3', 'Thứ 4 (Mùng 1)', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
   const plan = days.map((day, idx) => {
-    const dish = safeDishes[idx % safeDishes.length];
+    const bDish = safeDishes[(idx * 3) % safeDishes.length];
+    const lDish = safeDishes[(idx * 3 + 1) % safeDishes.length];
+    const dDish = safeDishes[(idx * 3 + 2) % safeDishes.length];
+
+    const meals = {
+      breakfast: {
+        slot: 'Sáng',
+        dish_id: bDish.id,
+        dish_name: bDish.name,
+        calories: bDish.calories,
+        est_market_cost_vnd: Math.round((bDish.market_cost_base || 40000) * scaleFactor)
+      },
+      lunch: {
+        slot: 'Trưa',
+        dish_id: lDish.id,
+        dish_name: lDish.name,
+        calories: lDish.calories,
+        est_market_cost_vnd: Math.round((lDish.market_cost_base || 55000) * scaleFactor)
+      },
+      dinner: {
+        slot: 'Tối',
+        dish_id: dDish.id,
+        dish_name: dDish.name,
+        calories: dDish.calories,
+        est_market_cost_vnd: Math.round((dDish.market_cost_base || 60000) * scaleFactor)
+      }
+    };
+
+    const activeMeals = mealsPerDay === 1
+      ? [meals.lunch]
+      : mealsPerDay === 2
+        ? [meals.lunch, meals.dinner]
+        : [meals.breakfast, meals.lunch, meals.dinner];
+
     return {
       day,
-      dish_id: dish.id,
-      dish_name: dish.name,
-      calories: dish.calories,
-      est_market_cost_vnd: dish.market_cost_base || 55000
+      family_size: familySize,
+      meals_per_day: mealsPerDay,
+      dish_id: lDish.id,
+      dish_name: lDish.name,
+      calories: activeMeals.reduce((s, m) => s + m.calories, 0),
+      est_market_cost_vnd: activeMeals.reduce((s, m) => s + m.est_market_cost_vnd, 0),
+      meals
     };
   });
 
-  // Merge ingredients across all planned meals & subtract fridge items
+  // Merge ingredients across all active meals & subtract fridge items
   const mergedMap = new Map();
   const normFridge = fridgeItems.map(f => removeVietnameseTones(f));
 
   for (const slot of plan) {
-    const dish = store.dishes.find(d => d.id === slot.dish_id);
-    for (const ing of dish?.ingredients || []) {
-      const key = `${ing.name}|${ing.unit}`;
-      const prev = mergedMap.get(key) || { name: ing.name, amount: 0, unit: ing.unit, in_fridge: false };
-      prev.amount = Number((prev.amount + ing.amount).toFixed(1));
-      if (normFridge.some(f => f && removeVietnameseTones(ing.name).includes(f))) {
-        prev.in_fridge = true;
+    const activeIds = mealsPerDay === 1
+      ? [slot.meals.lunch.dish_id]
+      : mealsPerDay === 2
+        ? [slot.meals.lunch.dish_id, slot.meals.dinner.dish_id]
+        : [slot.meals.breakfast.dish_id, slot.meals.lunch.dish_id, slot.meals.dinner.dish_id];
+
+    for (const dId of activeIds) {
+      const dish = store.dishes.find(d => d.id === dId);
+      for (const ing of dish?.ingredients || []) {
+        const key = `${ing.name}|${ing.unit}`;
+        const prev = mergedMap.get(key) || { name: ing.name, amount: 0, unit: ing.unit, in_fridge: false };
+        prev.amount = Number((prev.amount + ing.amount * scaleFactor).toFixed(1));
+        if (normFridge.some(f => f && removeVietnameseTones(ing.name).includes(f))) {
+          prev.in_fridge = true;
+        }
+        mergedMap.set(key, prev);
       }
-      mergedMap.set(key, prev);
     }
   }
 
   const groceries = Array.from(mergedMap.values());
   return {
+    family_size: familySize,
+    meals_per_day: mealsPerDay,
     weekly_budget_vnd: plan.reduce((sum, p) => sum + p.est_market_cost_vnd, 0),
     days: plan,
     consolidated_groceries: groceries,
