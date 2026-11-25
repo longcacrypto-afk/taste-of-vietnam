@@ -104,6 +104,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   const authUser = await authenticate(repo, headers);
   const denied = checkAccess(method, pathname, authUser);
   if (denied) return denied;
+  const rawBody = body;
   body = body && typeof body === 'object' ? body : {};
 
   const userId = authUser ? authUser.id : null;
@@ -148,7 +149,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   if (pathname === '/api/v1/me/profile' && (method === 'PUT' || method === 'PATCH')) {
     if (!authUser) return UNAUTHORIZED;
-    const validated = validateProfilePatch(profile, body);
+    const validated = validateProfilePatch(profile, rawBody);
     if (validated.error) return { status: 400, data: { error: validated.error } };
     const next = validated.profile;
     if (Buffer.byteLength(JSON.stringify(next)) > MAX_PROFILE_BYTES) {
