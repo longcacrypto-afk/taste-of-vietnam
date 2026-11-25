@@ -6396,18 +6396,24 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       }
     }
 
-    function startLiveSpin() {
+    async function startLiveSpin() {
       const wheel = document.getElementById('live-wheel-svg');
       const btn = document.getElementById('btn-spin-live');
       const title = document.getElementById('live-spin-title');
       if (!wheel || btn.disabled) return;
 
       btn.disabled = true;
+      const picked = window.P2 ? await P2.gamePick('game') : undefined;
+      if (window.P2 && !picked) {
+        btn.disabled = false;
+        title.textContent = 'Chưa có món phù hợp. Bấm quay để thử lại.';
+        return;
+      }
       btn.textContent = '⏳ Đang quay định mệnh...';
       title.innerHTML = '<span class="text-xs text-[var(--text-muted)] animate-pulse">Vòng quay phong thủy đang chọn món trưa cho bạn...</span>';
       playWebAudioSound('spin');
 
-      const slices = [
+      const slices = picked ? [{ name: picked.name, price: Number(picked.ref_price || 0).toLocaleString('vi-VN') + 'đ', desc: picked.description || '' }] : [
         { name: 'Phở Bò Tái Nạm Hà Nội', price: '45k', emoji: '🍜', desc: 'Nước dùng trong ngọt thanh thảo quả quế hồi, bánh phở mềm mướt.' },
         { name: 'Cơm Tấm Sườn Bì Chả', price: '40k', emoji: '🍚', desc: 'Sườn nướng than hoa đẫm mỡ hành, chả trứng bùi thơm đậm đà Sài Gòn.' },
         { name: 'Bún Bò Huế O Xuân', price: '50k', emoji: '🍲', desc: 'Nước lèo cay nồng sả ớt, chả cua giòn ngọt bừng tỉnh ngày mới.' },
@@ -6419,8 +6425,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       ];
 
       // CRITICAL FIX: Needle points squarely at center of target slice
-      const targetIndex = Math.floor(Math.random() * slices.length);
-      const anglePerSlice = 360 / slices.length; // 45 degrees
+      const targetIndex = picked ? 0 : Math.floor(Math.random() * slices.length);
+      if (picked) wheel.querySelectorAll('g[font-family] > text > tspan:last-child').forEach((n, i) => { n.textContent = i === 0 ? picked.name : '·'; });
+      const anglePerSlice = 360 / (picked ? 8 : slices.length); // 45 degrees
       const centerOffset = anglePerSlice / 2; // 22.5 degrees (SLOT CENTER)
       
       // Calculate angle that places slot `targetIndex` center exactly at 12 o'clock (0°)
@@ -6528,7 +6535,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       }
     ];
 
-    function drawFoodFortune() {
+    async function drawFoodFortune() {
       const btn = document.getElementById('btn-draw-fortune');
       const cylinder = document.getElementById('fortune-bamboo-cylinder');
       const stick = document.getElementById('fortune-emerging-stick');
@@ -6536,6 +6543,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       if (!btn || btn.disabled) return;
 
       btn.disabled = true;
+      const picked = window.P2 ? await P2.gamePick('fortune') : undefined;
+      if (window.P2 && !picked) {
+        btn.disabled = false;
+        result.textContent = 'Chưa có món phù hợp. Bấm lắc để thử lại.';
+        return;
+      }
       btn.textContent = '⏳ Đang lắc ống xăm...';
       cylinder.classList.add('bamboo-shaking');
       stick.classList.add('hidden');
@@ -6544,7 +6557,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
 
       setTimeout(() => {
         cylinder.classList.remove('bamboo-shaking');
-        const fortune = foodFortunes[Math.floor(Math.random() * foodFortunes.length)];
+        const fortune = picked ? {
+          num: '—', rank: 'Gợi ý bữa ăn', dish: picked.name, emoji: '🍽️',
+          price: Number(picked.ref_price || 0).toLocaleString('vi-VN') + 'đ',
+          poem: picked.description || '', divination: 'Gợi ý theo điều kiện bữa ăn đã chọn.',
+          cal: picked.calories == null ? 'Chưa rõ kcal' : picked.calories + ' kcal'
+        } : foodFortunes[Math.floor(Math.random() * foodFortunes.length)];
         const stickNum = document.getElementById('fortune-stick-num');
         if (stickNum) stickNum.textContent = fortune.num;
 
@@ -6642,10 +6660,18 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       }
     ];
 
-    function openBlindBox(boxIndex) {
+    async function openBlindBox(boxIndex) {
       const box = document.getElementById(`blindbox-${boxIndex}`);
       const reveal = document.getElementById('blindbox-reveal');
-      if (!box || !reveal) return;
+      if (!box || !reveal || box.dataset.loading) return;
+      box.dataset.loading = 'true';
+      const picked = window.P2 ? await P2.gamePick('blind-box') : undefined;
+      if (window.P2 && !picked) {
+        delete box.dataset.loading;
+        reveal.classList.remove('hidden');
+        reveal.textContent = 'Chưa có món phù hợp. Bấm túi để thử lại.';
+        return;
+      }
 
       box.classList.add('blindbox-shaking');
       playWebAudioSound('rattle');
@@ -6655,7 +6681,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         playWebAudioSound('win');
         launchMiniConfetti();
 
-        const loot = blindBoxLoots[Math.floor(Math.random() * blindBoxLoots.length)];
+        delete box.dataset.loading;
+        const loot = picked ? {
+          rarityColor: 'text-[#B45309]', rarity: 'Gợi ý bữa ăn', discount: 'Không có ưu đãi xác nhận',
+          emoji: '🍽️', dish: picked.name, price: Number(picked.ref_price || 0).toLocaleString('vi-VN') + 'đ',
+          desc: picked.description || '', voucher: ''
+        } : blindBoxLoots[Math.floor(Math.random() * blindBoxLoots.length)];
 
         reveal.classList.remove('hidden');
         reveal.innerHTML = `
@@ -6705,6 +6736,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             </div>
           </div>
         `;
+        if (picked) {
+          // Reuse the existing result, but never invent a voucher or partner link.
+          reveal.querySelector('#voucher-code-val')?.parentElement?.parentElement?.remove();
+          const link = reveal.querySelector('a');
+          if (link) { link.removeAttribute('target'); link.href = '#'; link.textContent = '📖 Xem công thức'; link.onclick = e => { e.preventDefault(); P2.dish(picked.id || picked.dish_id); }; }
+        }
       }, 900);
     }
 
@@ -9684,6 +9721,26 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     },
     reload() {
       load(appState.activeScreenId, true);
+    },
+    async gamePick(kind) {
+      if (!["spin", "game", "fortune", "blind-box"].includes(kind)) return null;
+      try {
+        const result = await api("/suggestions/" + kind);
+        state.spin = result.picked_dish || null;
+        if (!state.spin) {
+          state.dish = null;
+          status((result.reasons || []).map(r => r.message).filter(Boolean).join(" ") || "Chưa có món phù hợp. Không tự nới bộ lọc.");
+          return null;
+        }
+        state.dish = state.spin.id || state.spin.dish_id;
+        state.place = result.nearest_place?.place_id || null;
+        return state.spin;
+      } catch (e) {
+        state.spin = null;
+        state.dish = null;
+        status("Chưa tải được món. Kiểm tra kết nối rồi bấm thử lại.");
+        return null; // NEVER fall back to a local, unfiltered dish.
+      }
     },
     dish(id, target = "M2-S04") {
       state.dish = id;

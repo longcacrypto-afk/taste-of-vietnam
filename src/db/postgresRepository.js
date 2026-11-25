@@ -44,6 +44,7 @@ export function dishFromRow(r) {
     spice_level: r.spice_level,
     allergen_tags: r.allergen_flags,
     diet_flags: r.diet_flags,
+    safety_status: r.safety_status,
     weather_fit: r.weather_fit,
     tags: r.tags,
     img_key: r.img_key,
@@ -58,7 +59,7 @@ export function dishFromRow(r) {
 /** API dish object -> column values (only the keys present in `d`). */
 function dishColumns(d) {
   const map = {
-    name: 'name', region: 'region', meal_slots: 'meal_slots', ref_price: 'estimated_price_vnd', calories: 'calories',
+    safety_status: 'safety_status', name: 'name', region: 'region', meal_slots: 'meal_slots', ref_price: 'estimated_price_vnd', calories: 'calories',
     prep_minutes: 'prep_time_minutes', difficulty: 'difficulty', spice_level: 'spice_level',
     allergen_tags: 'allergen_flags', diet_flags: 'diet_flags', weather_fit: 'weather_fit', tags: 'tags',
     img_key: 'img_key', description: 'description', base_servings: 'base_servings', market_cost_base: 'market_cost_base'
@@ -435,6 +436,7 @@ export class PostgresRepository {
   }
 
   async updateDish(id, patch) {
+    if (['allergen_tags', 'diet_flags', 'ingredients', 'steps'].some(k => patch[k] !== undefined)) patch = { ...patch, safety_status: 'pending' };
     const cols = dishColumns(patch);
     const keys = Object.keys(cols);
     if (!keys.length) return this.getDish(id);

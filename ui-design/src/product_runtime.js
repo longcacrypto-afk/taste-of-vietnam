@@ -960,6 +960,26 @@
     reload() {
       load(appState.activeScreenId, true);
     },
+    async gamePick(kind) {
+      if (!["spin", "game", "fortune", "blind-box"].includes(kind)) return null;
+      try {
+        const result = await api("/suggestions/" + kind);
+        state.spin = result.picked_dish || null;
+        if (!state.spin) {
+          state.dish = null;
+          status((result.reasons || []).map(r => r.message).filter(Boolean).join(" ") || "Chưa có món phù hợp. Không tự nới bộ lọc.");
+          return null;
+        }
+        state.dish = state.spin.id || state.spin.dish_id;
+        state.place = result.nearest_place?.place_id || null;
+        return state.spin;
+      } catch (e) {
+        state.spin = null;
+        state.dish = null;
+        status("Chưa tải được món. Kiểm tra kết nối rồi bấm thử lại.");
+        return null; // NEVER fall back to a local, unfiltered dish.
+      }
+    },
     dish(id, target = "M2-S04") {
       state.dish = id;
       if(target !== "M5-S01") state.place = null;
