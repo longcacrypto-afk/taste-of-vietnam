@@ -18,6 +18,20 @@ services:
         # Render injects PORT automatically — do not set here
       - key: GEMINI_API_KEY
         sync: false   # Set manually in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true   # Render generates a random secret once
+      - key: PAYOS_CHECKSUM_KEY
+        sync: false   # From the PayOS dashboard; without it the payment webhook rejects everything
+      - key: ADMIN_PHONES
+        sync: false   # Comma-separated phones that log in as admin
+      - key: MERCHANT_PHONES
+        sync: false
+      - key: SMS_API_KEY
+        sync: false   # eSMS.vn; without SMS keys phone login is off in production (guest works)
+      - key: SMS_SECRET_KEY
+        sync: false
+      - key: SMS_BRANDNAME
+        sync: false
 
     healthCheckPath: /api/v1/suggestions/today
 
