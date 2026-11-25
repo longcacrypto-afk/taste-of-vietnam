@@ -1,3 +1,4 @@
+import { mergeProfile, mergeCollections } from '../services/profileService.js';
 // =============================================================================
 // POSTGRESQL REPOSITORY — production storage for the core modules (M1–M5, M7
 // payments/campaigns, M9 admin, M20 community recipes). Same interface as
@@ -200,6 +201,61 @@ export class PostgresRepository {
     }
   }
 
+  async loginGoogle(identity, guestId, fresh) {
+    return this.tx(async c => {
+      // Serialize identity creation before looking it up (also across server instances).
+      await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`google:${identity.sub}`]);
+      let row = (await c.query('SELECT * FROM users WHERE google_sub = $1 FOR UPDATE', [identity.sub])).rows[0];
+      const isNew = !row;
+      if (!row) row = (await c.query(`INSERT INTO users
+        (id, role, phone, is_guest, profile, google_sub, email, identity_verified)
+        VALUES ($1, 'user', NULL, FALSE, $2, $3, $4, $5) RETURNING *`,
+        [fresh.id, JSON.stringify(fresh.profile), identity.sub, identity.email, identity.identity_verified])).rows[0];
+      const id = row.id;
+      // A guest can be consumed once only. A body-supplied guest/user id is never used.
+      const guest = guestId ? (await c.query('SELECT * FROM users WHERE id = $1 AND is_guest FOR UPDATE', [guestId])).rows[0] : null;
+      const getCols = async uid => (await c.query('SELECT id,name,dish_ids FROM saved_collections WHERE user_id=$1 ORDER BY position,id FOR UPDATE', [uid])).rows;
+      let cols = isNew ? fresh.savedCollections : await getCols(id);
+      let profile = row.profile;
+      if (guest) {
+        profile = mergeProfile(profile, guest.profile, isNew);
+        cols = mergeCollections(cols, await getCols(guestId));
+      }
+      if (isNew || guest) {
+        await c.query('DELETE FROM saved_collections WHERE user_id=$1', [id]);
+        for (let i=0; i<cols.length; i++) await c.query('INSERT INTO saved_collections(user_id,id,name,dish_ids,position) VALUES($1,$2,$3,$4,$5)', [id,cols[i].id,cols[i].name,cols[i].dish_ids,i]);
+      }
+      if (guest) {
+        await c.query('UPDATE suggestion_history SET user_id=$1 WHERE user_id=$2', [id,guestId]);
+        await c.query('UPDATE order_redirects SET user_id=$1 WHERE user_id=$2', [id,guestId]);
+        await c.query('UPDATE place_reports SET user_id=$1 WHERE user_id=$2', [id,guestId]);
+        await c.query('UPDATE community_recipes SET author_id=$1 WHERE author_id=$2', [id,guestId]);
+        await c.query('UPDATE ad_clicks SET user_id=$1 WHERE user_id=$2', [id,guestId]);
+        await c.query('DELETE FROM users WHERE id=$1', [guestId]);
+      }
+      return userFromRow((await c.query('UPDATE users SET profile=$2,email=$3,identity_verified=$4,updated_at=NOW() WHERE id=$1 RETURNING *', [id,JSON.stringify(profile),identity.email,identity.identity_verified])).rows[0]);
+    });
+  }
+
+  async exportUserData(id) {
+    // Consistent snapshot, no shared analytics and no hard limit on history.
+    return this.tx(async c => {
+      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+      const user = userFromRow((await c.query('SELECT * FROM users WHERE id=$1', [id])).rows[0]);
+      const rows = async (sql) => (await c.query(sql, [id])).rows;
+      return {
+        account: { id: user.id, role: user.role, phone: user.phone, email: user.email, guest: user.guest, created_at: user.created_at },
+        profile: user.profile,
+        suggestion_history: (await rows('SELECT * FROM suggestion_history WHERE user_id=$1 ORDER BY created_at DESC,id DESC')).map(historyFromRow),
+        saved_collections: await rows('SELECT id,name,dish_ids FROM saved_collections WHERE user_id=$1 ORDER BY position,id'),
+        order_redirects: (await rows('SELECT * FROM order_redirects WHERE user_id=$1 ORDER BY created_at DESC,id')).map(orderFromRow),
+        place_reports: await rows('SELECT * FROM place_reports WHERE user_id=$1 ORDER BY created_at DESC,id'),
+        community_recipes: (await rows('SELECT * FROM community_recipes WHERE author_id=$1 ORDER BY id')).map(recipeFromRow),
+        payment_orders: (await rows('SELECT * FROM payment_orders WHERE created_by=$1 ORDER BY created_at,order_id')).map(paymentFromRow)
+      };
+    });
+  }
+
   // ── users & OTP ────────────────────────────────────────────────────────────
   async getUser(id) {
     if (typeof id !== 'string') return null;
@@ -246,6 +302,9 @@ export class PostgresRepository {
       if (u.phone) await c.query('DELETE FROM otp_challenges WHERE phone = $1', [u.phone]);
       await c.query('DELETE FROM community_recipes WHERE author_id = $1', [id]);
       await c.query('UPDATE ad_clicks SET user_id = NULL WHERE user_id = $1', [id]);
+      await c.query('UPDATE ad_campaigns SET created_by = NULL WHERE created_by = $1', [id]);
+      if (typeof this.anonymizeAuditActor === 'function') await this.anonymizeAuditActor(id, c);
+      else await c.query("UPDATE rbac_audit_logs SET actor_id = NULL, actor_email = 'deleted-user' WHERE actor_id = $1", [id]);
       await c.query('DELETE FROM users WHERE id = $1', [id]);
       return true;
     });
@@ -434,7 +493,7 @@ export class PostgresRepository {
   async atomic(fn) {
     return this.tx(async c => {
       await c.query("SELECT pg_advisory_xact_lock(hashtext('m9-role-grants'))");
-      const repo = new PostgresRepository(this.pool);
+      const repo = Object.create(this); // preserve repository hooks in the same transaction
       repo.q = (text,params) => c.query(text,params);
       repo.inAtomic = true;
       repo.tx = inner => inner(c);

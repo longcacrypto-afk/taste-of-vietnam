@@ -297,6 +297,7 @@ test('M7 (VietQR & PayOS Webhook): Invoice generation, EMVCo payload, webhook to
 test('M2/M3 (Semantic Dish Search): Concept matching, allergy safety, and similarity scoring', async () => {
   const store = createInitialStore();
 
+  await call(store, 'PATCH', '/api/v1/me/profile', new URLSearchParams(), { hard_allergies: ['shrimp'] });
   // Query: món nước ấm bụng trời mưa
   const searchRes = await call(store, 'GET', '/api/v1/dishes/semantic-search', new URLSearchParams({ q: 'mon nuoc am bung troi mua' }));
   assert.equal(searchRes.status, 200);
@@ -475,13 +476,13 @@ test('E2E Full Loop (M1 -> M3 -> M2 -> M4 -> M5 -> Cooldown -> M8 -> M18 -> M19 
 
   // Step 1: Onboard User with Shrimp allergy & Spicy tolerance level 1
   const updateProfileRes = await call(store, 'PUT', '/api/v1/me/profile', new URLSearchParams(), {
-    allergies: ['shrimp', 'peanut'],
-    spiciness_level: 1,
-    budget_level: 'medium',
-    diet_preference: 'balanced'
+    hard_allergies: ['shrimp', 'peanut'],
+    spice_level: 1,
+    budget_min: 0, budget_max: 65000,
+    diet_mode: 'balanced'
   });
   assert.equal(updateProfileRes.status, 200);
-  assert.deepEqual(updateProfileRes.data.allergies, ['shrimp', 'peanut']);
+  assert.deepEqual(updateProfileRes.data.hard_allergies, ['shrimp', 'peanut']);
 
   // Step 2: Fetch Today's 3 Suggestions (M3-S01)
   const sugRes = await call(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
@@ -575,7 +576,7 @@ test('AUDIT-GAPS: M1 PDPD export, M6 daily-special, M7 fraud-logs, M9 RBAC & M10
   const exportRes = await call(store, 'GET', '/api/v1/me/export', new URLSearchParams());
   assert.equal(exportRes.status, 200);
   assert.equal(exportRes.data.export_format, 'JSON');
-  assert.ok(exportRes.data.pdpd_compliance.includes('13/2023/NĐ-CP'));
+  assert.equal(exportRes.data.analytics_summary, undefined, 'no shared analytics in a personal export');
   assert.ok(exportRes.data.profile);
 
   // M6-S07: Daily Special Tagging

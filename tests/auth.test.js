@@ -98,7 +98,7 @@ test('Profiles are per user: anonymous PUT is 401, one user cannot change anothe
   assert.equal(aProfile.data.name, 'Chị An');
   assert.equal(aProfile.data.id, a.user.id, 'id cannot be overwritten');
   assert.notEqual(bProfile.data.name, 'Chị An');
-  assert.deepEqual(bProfile.data.hard_allergies, ['shrimp', 'peanut']);
+  assert.deepEqual(bProfile.data.hard_allergies, []);
   assert.equal(store.userProfile.name, 'Anh Long', 'shared default profile untouched');
 });
 

@@ -6,6 +6,7 @@
 // =============================================================================
 
 import crypto from 'node:crypto';
+import { defaultProfile } from './profileService.js';
 
 const OTP_TTL_MS = 5 * 60 * 1000;      // code valid 5 minutes
 const OTP_RESEND_MS = 30 * 1000;       // at most one code per phone every 30 s
@@ -150,8 +151,7 @@ export async function requestOtp(repo, rawPhone) {
 }
 
 function newProfile(template, id, { name, phone }) {
-  const base = JSON.parse(JSON.stringify(template || {}));
-  return { ...base, id, name, phone: phone || null, disliked_dish_ids: [] };
+  return defaultProfile(id, name, phone);
 }
 
 async function createUser(repo, template, { phone = null, role = 'user', guest = false }) {
@@ -229,7 +229,7 @@ export async function deleteUser(repo, userId) {
     if (user?.role === 'super_admin' && (await tx.listUsers()).filter(u => u.role === 'super_admin').length <= 1) {
       return false;
     }
-    await tx.anonymizeAuditActor(userId);
+    // deleteUser owns audit anonymization in this same transaction.
     return tx.deleteUser(userId);
   });
 }

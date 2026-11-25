@@ -68,7 +68,7 @@ export function contracts(make,options={}) {
     assert.equal((await repo.getUser('test-user')).role,'content_moderator');
     assert.equal((await api('POST','/api/v1/admin/dishes','user',{name:'Được phép'})).status,201);
     assert.equal((await api('GET','/api/v1/admin/audit-logs','user')).status,403);
-    assert.equal((await api('PUT','/api/v1/me/profile','user',{role:'super_admin',identity_verified:true})).status,200);
+    assert.equal((await api('PUT','/api/v1/me/profile','user',{role:'super_admin',identity_verified:true})).status,400);
     assert.equal((await api('GET','/api/v1/admin/rbac/users','user')).status,403);
     assert.equal((await assign('consumer')).status,200);
     assert.equal((await api('POST','/api/v1/admin/dishes','user',{name:'Không được phép'})).status,403);

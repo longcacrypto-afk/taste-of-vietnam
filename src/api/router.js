@@ -1,3 +1,5 @@
+import { googleConfig, googleLogin } from '../services/googleAuthService.js';
+import { validateProfilePatch } from '../services/profileService.js';
 // =============================================================================
 // REST API GATEWAY ROUTER (/api/v1/*) — HÔM NAY ĂN GÌ · TASTE OF VIETNAM
 // Core launch modules (M1–M5, M7 campaigns/payments, M9 admin, M20 recipes)
@@ -101,6 +103,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   const authUser = await authenticate(repo, headers);
   const denied = checkAccess(method, pathname, authUser);
   if (denied) return denied;
+  const rawBody = body;
   body = body && typeof body === 'object' ? body : {};
 
   if (pathname.startsWith('/api/v1/admin/')) {
@@ -114,6 +117,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ===========================================================================
   // MODULE M1: ACCOUNT, AUTH, ONBOARDING & TASTE PROFILE (M1-S01 .. M1-S10)
   // ===========================================================================
+  if (pathname === '/api/v1/auth/google/config' && method === 'GET') return { status: 200, data: googleConfig() };
+  if (pathname === '/api/v1/auth/google' && method === 'POST') return googleLogin(repo, body.id_token, authUser);
+
   // Request an OTP for a phone number (/auth/login kept as an alias)
   if ((pathname === '/api/v1/auth/otp/request' || pathname === '/api/v1/auth/login') && method === 'POST') {
     const res = await requestOtp(repo, body.phone);
@@ -143,15 +149,15 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   if (pathname === '/api/v1/me/profile' && (method === 'PUT' || method === 'PATCH')) {
     if (!authUser) return UNAUTHORIZED;
-    const { id: _id, phone: _phone, role: _role, ...changes } = body;
-    const next = { ...profile, ...changes };
+    const validated = validateProfilePatch(profile, rawBody);
+    if (validated.error) return { status: 400, data: { error: validated.error } };
+    const next = validated.profile;
     if (Buffer.byteLength(JSON.stringify(next)) > MAX_PROFILE_BYTES) {
       return { status: 413, data: { error: 'Hồ sơ quá lớn' } };
     }
-    Object.assign(profile, changes);
-    await repo.saveProfile(authUser.id, profile);
+    await repo.saveProfile(authUser.id, next);
     suggestionCache.invalidateUser(profile.id);
-    return { status: 200, data: profile };
+    return { status: 200, data: next };
   }
 
   if (pathname === '/api/v1/me' && method === 'DELETE') {
@@ -165,7 +171,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       data: {
         deleted,
         user_id: authUser.id,
-        pdpd_compliance: 'Nghị định 13/2023/NĐ-CP — Đã xóa toàn bộ hồ sơ vị giác & lịch sử cá nhân ngay lập tức.'
+        message: 'Đã xóa tài khoản và dữ liệu cá nhân. Chứng từ thanh toán được giữ lại nhưng bỏ liên kết tài khoản.'
       }
     };
   }
@@ -173,25 +179,10 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // M1-S09: PDPD Data Export (Nghị định 13/2023/NĐ-CP — Right to Data Portability)
   if (pathname === '/api/v1/me/export' && method === 'GET') {
     if (!authUser) return UNAUTHORIZED;
-    const [history, collections] = await Promise.all([repo.listHistory(userId), repo.listCollections(userId)]);
-    return {
-      status: 200,
-      data: {
-        export_format: 'JSON',
-        pdpd_compliance: 'Nghị định 13/2023/NĐ-CP',
-        exported_at: new Date().toISOString(),
-        account: { id: authUser.id, role: authUser.role, phone: authUser.phone, guest: authUser.guest, created_at: authUser.created_at },
-        profile,
-        suggestion_history: history.slice(0, 50),
-        saved_collections: collections,
-        analytics_summary: {
-          total_dish_views: store.analyticsEvents.dish_view || 0,
-          total_order_clicks: store.analyticsEvents.order_click || 0,
-          onboarding_completed: store.analyticsEvents.onboarding_complete || 0
-        },
-        message: 'Xuất dữ liệu thành công. File JSON tuân thủ PDPD Nghị định 13/2023/NĐ-CP.'
-      }
-    };
+    return { status: 200, data: {
+      export_format: 'JSON', exported_at: new Date().toISOString(),
+      ...(await repo.exportUserData(userId))
+    } };
   }
 
   // ===========================================================================
