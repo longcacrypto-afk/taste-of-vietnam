@@ -8,6 +8,9 @@ import { mergeProfile, mergeCollections } from '../services/profileService.js';
 
 import { PolicyError, ROLES, bootstrapAllowed } from '../services/adminPolicy.js';
 import crypto from 'node:crypto';
+import { placeWithStatus, validCoordinates } from '../services/placeQuery.js';
+import { isPlaceEligible } from '../services/placeHours.js';
+
 import { removeVietnameseTones } from '../services/textUtils.js';
 
 import { applyCollectionOperation } from '../services/collectionOps.js';
@@ -81,8 +84,10 @@ function placeFromRow(r) {
     id: r.id,
     name: r.name,
     address: r.address,
-    lat: Number(r.lat),
-    lng: Number(r.lng),
+    lat: r.lat == null ? null : Number(r.lat),
+    lng: r.lng == null ? null : Number(r.lng),
+    opening_hours: r.opening_hours ?? null,
+    verified_at: iso(r.verified_at) ?? null,
     open_hour: r.open_hour,
     close_hour: r.close_hour,
     is_open_override: !r.is_paused,
@@ -98,8 +103,7 @@ function placeFromRow(r) {
     menu: r.menu || []
   };
   if (r.distance_m !== undefined) {
-    out.distance_m = Math.round(Number(r.distance_m));
-    out.is_currently_open = Boolean(r.is_verified && !r.is_paused && r.report_count < 3);
+    out.distance_m = r.distance_m == null ? null : Math.round(Number(r.distance_m));
   }
   return out;
 }
@@ -461,18 +465,20 @@ export class PostgresRepository {
   }
 
   /** ST_DWithin on the geography column (GiST index), ST_Distance in metres, nearest first. */
-  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true }) {
+  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true, now = new Date(),
+    requireVerifiedHours = process.env.REQUIRE_VERIFIED_HOURS === 'true' }) {
+    const located = validCoordinates(lat, lng);
     const sql = `
-      WITH me AS (SELECT ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography AS g)
+      WITH me AS (SELECT CASE WHEN $4::boolean THEN ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography ELSE NULL END AS g)
       SELECT x.*, ST_Distance(x.geom, me.g) AS distance_m
       FROM (${PLACE_SELECT}) x, me
-      WHERE ST_DWithin(x.geom, me.g, $3)
-        AND (NOT $4::boolean OR (x.is_verified AND NOT x.is_paused AND x.report_count < 3))
+      WHERE (NOT $4::boolean OR ST_DWithin(x.geom, me.g, $3))
         AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM place_dishes pd WHERE pd.place_id = x.id AND pd.dish_id = $5 AND pd.is_available))
-      ORDER BY distance_m ASC
-      LIMIT 100`;
-    const r = await this.q(sql, [Number(lng), Number(lat), Number(radiusM), Boolean(openOnly), dishId || null]);
-    return r.rows.map(placeFromRow);
+      ORDER BY distance_m ASC NULLS LAST, x.id`;
+    const r = await this.q(sql, [located ? lng : null, located ? lat : null, Number(radiusM), located, dishId || null]);
+    // Filter BEFORE limit: a near closed place must not crowd out an open one.
+    return r.rows.map(placeFromRow).map(p => placeWithStatus(p, now))
+      .filter(p => !openOnly || isPlaceEligible(p, now, { requireVerifiedHours })).slice(0, 100);
   }
 
   async reportPlace(placeId, { reason, userId, reporterKey, evidence = '' }) {

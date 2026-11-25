@@ -8,6 +8,8 @@ import { mergeProfile, mergeCollections } from '../services/profileService.js';
 import { PolicyError, ROLES, bootstrapAllowed } from '../services/adminPolicy.js';
 import crypto from 'node:crypto';
 import { haversineDistanceMeters } from '../services/textUtils.js';
+import { placeWithStatus, placeDistance } from '../services/placeQuery.js';
+import { isPlaceEligible } from '../services/placeHours.js';
 import { recordCampaignClick } from '../services/expansionServices.js';
 import { processSuccessfulPayment } from '../services/paymentService.js';
 
@@ -203,19 +205,18 @@ export class MemoryRepository {
   async getPlace(id) { return this.store.places.find(p => p.id === id) || null; }
 
   /** Places within radiusM of (lat, lng), nearest first; same rules as the PostGIS query. */
-  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true }) {
+  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true, now = new Date(),
+    requireVerifiedHours = process.env.REQUIRE_VERIFIED_HOURS === 'true' }) {
+    const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
     return this.store.places
-      .map(p => ({
-        ...p,
-        distance_m: haversineDistanceMeters(lat, lng, p.lat, p.lng),
-        is_currently_open: Boolean(p.is_verified && p.is_open_override && p.closed_report_count < 3)
-      }))
+      .map(p => ({ ...placeWithStatus(p, now), distance_m: placeDistance(p, lat, lng) }))
       .filter(p => {
-        if (openOnly && !p.is_currently_open) return false;
+        if (openOnly && !isPlaceEligible(p, now, { requireVerifiedHours })) return false;
         if (dishId && !(p.menu || []).some(m => m.dish_id === dishId && m.available)) return false;
-        return p.distance_m <= radiusM;
+        return !hasLocation || (p.distance_m !== null && p.distance_m <= radiusM);
       })
-      .sort((a, b) => a.distance_m - b.distance_m);
+      .sort((a, b) => (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity) || a.id.localeCompare(b.id))
+      .slice(0, 100);
   }
 
   async reportPlace(placeId, { reason, userId, reporterKey, evidence = '' }) {
