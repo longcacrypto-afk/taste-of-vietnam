@@ -8,6 +8,8 @@ export const ROLES = [
   { id: 'super_admin', name: 'Super Admin', permissions: ['dashboard', 'dishes', 'ocr', 'places', 'reports', 'ads', 'audit', 'rbac'] }
 ];
 export const ADMIN_ROUTES = [
+  ['GET', /^\/api\/v1\/admin\/(ocr-review|menu-revisions)$/, 'ocr'],
+  ['GET', /^\/api\/v1\/admin\/reports\/[^/]+$/, 'reports'],
   ['GET', /^\/api\/v1\/admin\/dishes(?:\/[^/]+(?:\/versions)?)?$/, 'dishes'],
   ['GET', /^\/api\/v1\/admin\/recipes\/[^/]+(?:\/versions)?$/, 'dishes'],
   ['PUT', /^\/api\/v1\/admin\/recipes\/[^/]+$/, 'dishes'],

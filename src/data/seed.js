@@ -668,6 +668,7 @@ export function createInitialStore() {
     ocrQueue: [
       {
         id: 'ocr-901',
+        version: 1,
         place_id: 'PLACE-401',
         place_name: 'Phở Gia Truyền Phát Tài',
         raw_text: 'Phở tái lăn gầu giòn 55K',
@@ -680,6 +681,7 @@ export function createInitialStore() {
       },
       {
         id: 'ocr-902',
+        version: 1,
         place_id: 'PLACE-402',
         place_name: 'Cơm Tấm Bụi Sài Gòn',
         raw_text: 'Cơm sườn trứng ốp la 42K',

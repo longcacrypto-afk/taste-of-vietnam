@@ -845,7 +845,10 @@
         text(spans[0],a.extracted_name);text(spans[2],a.matched_dish_name||a.suggested_dish_id||"—");
         text(spans[3],a.confidence==null?"—":Math.round(a.confidence*100)+"%");
         text($(".text-\\[11px\\]",n),(a.place_name||a.place_id||"")+" · "+money(a.extracted_price));
-        click($("button",n),`P2.review('${J(a.id)}','approved')`);
+        const button=$("button",n);
+        click(button,`P2.review('${J(a.id)}','approved',${Number(a.version)},'${J(a.matched_dish_id||"")}',${Number(a.extracted_price)})`);
+        button.disabled=!a.matched_dish_id||!Number.isSafeInteger(a.extracted_price)||!Number.isSafeInteger(a.version);
+        button.title="Xác nhận món và giá đang hiển thị; đổi lựa chọn hoặc từ chối qua API vì màn gốc chưa có ô nhập.";
       });
     }
     if(id==="M9-S06") {
@@ -853,10 +856,15 @@
       if(!reports.length) content.innerHTML=stateHtml(id,"empty");
       else rows(content,tpl,reports,(n,a)=>{
         text($("b",n),a.place_name||a.place_id);
-        text($("p",n),a.reason);
-        text($("span",n),a.report_count??1);
-        // Existing button edits opening hours; do not pretend it unpauses a place.
-        $("button",n)?.remove();
+        text($("p",n),[a.reason,a.evidence,a.status,a.resolution_reason,a.resolved_at].filter(Boolean).join(" · "));
+        text($("span",n),(a.report_count??1)+" báo cáo · "+a.status);
+        // No new reason/filter/resolve controls: preserve the original hours button,
+        // but don't mislabel it as unpause or allow a write without a reason.
+        const button=$("button",n);
+        if(button) {
+          button.disabled=true;button.removeAttribute("onclick");
+          button.title="Màn gốc chưa có ô sửa giờ/lý do xử lý. Lọc, xử lý báo cáo và mở lại qua API.";
+        }
       });
     }
     return root.outerHTML;
@@ -1194,23 +1202,27 @@
       action(()=>api("/admin/places/"+encodeURIComponent(id)+"/approve","POST",{version,reason:"Duyệt hồ sơ theo bằng chứng đã lưu"}),
         ()=>{delete state.cache.admin;goScreen("M9-S04");});
     },
-    review(id, decision) {
+    review(id, decision, version, dish_id, price) {
       action(
-        () => api("/admin/ocr-review", "POST", { ocr_id: id, decision }),
+        () => api("/admin/ocr-review", "POST", { ocr_id: id, decision, version, dish_id, price }),
         () => {
           delete state.cache.admin;
           goScreen("M9-S05");
         },
       );
     },
-    unpause(id) {
+    unpause(id, reason) {
+      if(typeof reason!=="string"||!reason.trim()) {
+        status("Màn gốc chưa có ô lý do mở lại; hãy dùng API có reason.");
+        return;
+      }
       if (confirm("Bạn đã xác nhận quán mở lại?"))
         action(
           () =>
             api(
               "/admin/places/" + encodeURIComponent(id) + "/unpause",
               "POST",
-              {},
+              {reason},
             ),
           () => {
             delete state.cache.admin;

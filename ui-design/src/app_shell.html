@@ -3529,10 +3529,10 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button onclick="submitOcrReview('${escJs(q.id)}', 'approved')" class="px-3.5 py-1.5 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs hover:bg-[#16A34A] transition">
+                    <button onclick="submitOcrReview('${escJs(q.id)}', 'approved', ${Number(q.version)}, '${escJs(q.matched_dish_id||'')}', ${Number(q.extracted_price)})" class="px-3.5 py-1.5 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs hover:bg-[#16A34A] transition">
                       ✅ Duyệt Ghép Món
                     </button>
-                    <button onclick="submitOcrReview('${escJs(q.id)}', 'rejected')" class="px-3.5 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-bold hover:text-red-400 transition">
+                    <button onclick="submitOcrReview('${escJs(q.id)}', 'rejected', ${Number(q.version)})" class="px-3.5 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-bold hover:text-red-400 transition">
                       ❌ Từ Chối
                     </button>
                   </div>
@@ -3621,19 +3621,19 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       }
     }
 
-    async function submitOcrReview(ocrId, action) {
+    async function submitOcrReview(ocrId, action, version, dish_id, price) {
       let reason = '';
       if (action === 'rejected') {
-        const inputReason = prompt('Nhập lý do từ chối (hoặc bấm OK để dùng lý do mặc định):', 'Ảnh chụp bị mờ / Tên món không rõ ràng');
-        if (inputReason === null) return;
-        reason = inputReason || 'Ảnh chụp bị mờ / Tên món không rõ ràng';
+        const inputReason = prompt('Nhập lý do từ chối:', '');
+        if (inputReason === null || !inputReason.trim()) return;
+        reason = inputReason.trim();
       }
 
       try {
         const res = await fetch('/api/v1/admin/ocr-review', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ocr_id: ocrId, decision: action, reason: reason })
+          body: JSON.stringify({ ocr_id: ocrId, decision: action, reason, version, dish_id, price })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const resData = await res.json();
