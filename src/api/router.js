@@ -57,6 +57,8 @@ async function openPlacesForDish(repo, dishId, profile, radiusM) {
       place_name: p.name,
       address: p.address,
       distance_m: p.distance_m,
+      open_status: p.open_status,
+      is_currently_open: p.is_currently_open,
       price_vnd: item ? item.price : null,
       rating: p.rating,
       has_ac: p.has_ac,
