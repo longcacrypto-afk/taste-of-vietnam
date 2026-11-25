@@ -85,7 +85,9 @@ test('M2-S06: Recipe Dynamic Portion Scaler scales ingredient grams and calories
   assert.equal(res.data.requested_servings, 6);
   const banhPho = res.data.scaled_ingredients.find(i => i.name.includes('Bánh phở'));
   assert.equal(banhPho.scaled_amount, 1050);
-  assert.equal(res.data.scaled_calories_total, 480 * 3);
+  // TECHNICAL_HANDOFF_SPEC defines calories_per_serving, not per base recipe.
+  assert.equal(res.data.nutrition_basis, 'per_serving');
+  assert.equal(res.data.scaled_calories_total, 480 * 6);
 });
 
 test('M3-S04 & M3-S05: Vietnamese Natural Language Chat extracts party size, budget, kids & returns verified options', async () => {

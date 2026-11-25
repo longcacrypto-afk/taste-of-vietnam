@@ -1209,7 +1209,7 @@
   changeServings = function (delta) {
     appState.servings = Math.max(
       1,
-      Math.min(20, (appState.servings || 2) + delta),
+      Math.min(10, (appState.servings || 2) + delta),
     );
     load(appState.activeScreenId, true);
   };

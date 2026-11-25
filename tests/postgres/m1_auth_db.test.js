@@ -211,3 +211,33 @@ test('M1 PostgreSQL: M9 audit anonymization hook receives deletion transaction a
     await db.query('DROP TRIGGER IF EXISTS fail_audit_delete ON users; DROP FUNCTION IF EXISTS reject_audit_delete();');
   }
 });
+
+test('M1+M2 Google merge takes catalogue barrier first, filters stale IDs and survives concurrent deletion', { skip }, async t => {
+  google(t);
+  const original = await repo.getDish('DISH-101');
+  for (let n = 0; n < 8; n++) {
+    const id = 'DISH-GOOGLE-RACE-' + n;
+    await repo.createDish({ ...original, id });
+    const g = await guest();
+    await repo.saveCollections(g.data.guest_id, [{ id: 'col-1', name: 'Race', dish_ids: [id, 'DISH-101'] }]);
+    // Simulate legacy dangling references predating the M2 barrier.
+    await db.query("UPDATE saved_collections SET dish_ids=array_append(dish_ids, 'DISH-GONE') WHERE user_id=$1", [g.data.guest_id]);
+    const result = await Promise.all([login('catalogue-race-' + n, g), repo.deleteDish(id)]);
+    assert.equal(result[0].status, 200);
+    const cols = await repo.listCollections(result[0].data.user.id);
+    assert.deepEqual(cols[0].dish_ids, ['DISH-101']);
+    assert.equal((await rows('SELECT COUNT(*)::int n FROM saved_collections WHERE $1=ANY(dish_ids)', [id]))[0].n, 0);
+  }
+  // Instrument the actual transaction, not the source text: first statement in
+  // loginGoogle must acquire the shared barrier before identity/user row locks.
+  const tx = repo.tx.bind(repo);
+  let first;
+  t.mock.method(repo, 'tx', fn => tx(c => fn({ query: async (...args) => {
+    first ??= args[0];
+    return c.query(...args);
+  } })));
+  await repo.loginGoogle({ sub: 'lock-order-proof', email: null, identity_verified: false }, null, {
+    id: 'usr-lock-order', profile: { id: 'usr-lock-order' }, savedCollections: []
+  });
+  assert.match(first, /pg_advisory_xact_lock_shared.*m2-collections-catalogue/);
+});

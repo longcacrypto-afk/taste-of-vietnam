@@ -28,3 +28,9 @@ test('product bindings preserve original screen renderers, Google contract and r
  assert.doesNotMatch(runtime,/function adminHtml|P2\.saveDish|P2\.edit\(/,'no invented admin editor');
  assert.match(runtime,/\.grid-cols-2 > \.group/,'suggestion binding must not consume category buttons');
 });
+
+test('M2 product servings controls cannot exceed the API maximum of ten', () => {
+  const source = fs.readFileSync(new URL('../ui-design/src/product_runtime.js', import.meta.url), 'utf8');
+  assert.match(source, /Math\.min\(10, \(appState\.servings \|\| 2\) \+ delta\)/);
+  assert.doesNotMatch(source, /Math\.min\(20, \(appState\.servings/);
+});

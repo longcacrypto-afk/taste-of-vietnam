@@ -23,6 +23,7 @@ import { checkAccess } from './accessPolicy.js';
 import { requestOtp, verifyOtp, createGuest, authenticate, deleteUser, scopeStoreToUser } from '../services/authService.js';
 import { getRepository } from '../db/repository.js';
 import { handleFrozenRoute } from './frozenRoutes.js';
+import { handleDishRoutes } from './dishRoutes.js';
 
 // User-supplied text: drop HTML tags and stray angle brackets / control chars, trim, cap length.
 // (The UI also escapes on output; this keeps stored data clean for other clients like Flutter.)
@@ -188,34 +189,12 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ===========================================================================
   // MODULE M2: VIETNAMESE DISH LIBRARY & DYNAMIC RECIPE SCALER (M2-S01 .. M2-S08)
   // ===========================================================================
-  if (pathname === '/api/v1/dishes/categories' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        categories: [
-          { id: 'breakfast', name: 'Bữa sáng', count: 145, color: '#FEF3C7' },
-          { id: 'lunch', name: 'Cơm trưa', count: 190, color: '#DCFCE7' },
-          { id: 'dinner', name: 'Bữa tối', count: 165, color: '#EDE9FE' },
-          { id: 'snacks', name: 'Ăn vặt', count: 60, color: '#FFE4E6' },
-          { id: 'vegan', name: 'Món chay', count: 40, color: '#FCE7F3' }
-        ],
-        regions: ['Miền Bắc', 'Miền Trung', 'Miền Nam']
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/dishes' && method === 'GET') {
-    const q = searchParams.get('q') || '';
-    const region = searchParams.get('region') || '';
-    const safeOnly = searchParams.get('safe_only') !== 'false';
-    const items = (await repo.listDishes()).filter(d => {
-      if (safeOnly && !isDishSafeForUser(d, profile)) return false;
-      if (region && d.region !== region) return false;
-      if (q && !matchesVietnameseQuery(`${d.name} ${d.description} ${(d.tags || []).join(' ')}`, q)) return false;
-      return true;
-    });
-    return { status: 200, data: { total: items.length, items } };
-  }
+  const dishResponse = await handleDishRoutes({
+    repo, method, pathname, searchParams, body, userId, profile, cleanText,
+    openPlaces: id => openPlacesForDish(repo, id, profile, profile.radius_m),
+    bump: ev => bump(store, ev)
+  });
+  if (dishResponse) return dishResponse;
 
   if (pathname === '/api/v1/dishes/semantic-search' && method === 'GET') {
     const q = searchParams.get('q') || '';
@@ -226,7 +205,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   const storyMatch = pathname.match(/^\/api\/v1\/(?:dishes\/([^/]+)\/story|stories\/([^/]+))$/);
   if (storyMatch && method === 'GET') {
     const targetId = storyMatch[1] || storyMatch[2];
-    const dish = (await repo.getDish(targetId)) || (await repo.listDishes())[0];
+    const dish = await repo.getDish(targetId);
     if (!dish) return { status: 404, data: { error: 'Dish not found' } };
     return { status: 200, data: await generateDishStory(dish) };
   }
@@ -234,7 +213,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   const similarMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)\/similar$/);
   if (similarMatch && method === 'GET') {
     const dishes = await repo.listDishes();
-    const current = dishes.find(d => d.id === similarMatch[1]) || dishes[0];
+    const current = dishes.find(d => d.id === similarMatch[1]);
     if (!current) return { status: 404, data: { error: 'Dish not found' } };
     const items = dishes.filter(d => d.id !== current.id && isDishSafeForUser(d, profile)).slice(0, 3);
     return { status: 200, data: { base_dish: current.name, items } };
@@ -242,6 +221,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   const regionalVariantsMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)\/regional-variants$/);
   if (regionalVariantsMatch && method === 'GET') {
+    if (!await repo.getDish(regionalVariantsMatch[1])) return { status: 404, data: { error: 'Dish not found' } };
     return {
       status: 200,
       data: {
@@ -253,61 +233,6 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
         ]
       }
     };
-  }
-
-  const dishMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)$/);
-  if (dishMatch && method === 'GET') {
-    const dish = (await repo.getDish(dishMatch[1])) || (await repo.listDishes())[0];
-    if (!dish) return { status: 404, data: { error: 'Dish not found' } };
-    const servings = Math.max(1, parseInt(searchParams.get('servings') || dish.base_servings || 2, 10));
-    const scaleFactor = servings / (dish.base_servings || 2);
-
-    const scaledIngredients = (dish.ingredients || []).map(ing => ({
-      ...ing,
-      scaled_amount: ing.unit === 'lít'
-        ? Number((ing.amount * scaleFactor).toFixed(1))
-        : Math.round(ing.amount * scaleFactor)
-    }));
-
-    const places = await openPlacesForDish(repo, dish.id, profile, profile.radius_m);
-    bump(store, 'dish_view');
-
-    return {
-      status: 200,
-      data: {
-        ...dish,
-        requested_servings: servings,
-        scaled_calories_total: Math.round(dish.calories * scaleFactor),
-        scaled_market_cost_vnd: Math.round((dish.market_cost_base || 50000) * scaleFactor),
-        scaled_ingredients: scaledIngredients,
-        open_places: places
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/me/collections' && (method === 'GET' || method === 'POST')) {
-    const collections = await repo.listCollections(userId);
-    if (method === 'POST' && body.dish_id) {
-      const dishId = cleanText(body.dish_id, 32);
-      if (!collections.length) collections.push({ id: 'col-1', name: 'Món yêu thích', dish_ids: [] });
-      if (dishId && !collections[0].dish_ids.includes(dishId)) {
-        collections[0].dish_ids.push(dishId);
-        await repo.saveCollections(userId, collections);
-      }
-      bump(store, 'save_dish');
-    }
-    return { status: 200, data: { collections } };
-  }
-
-  const delColMatch = pathname.match(/^\/api\/v1\/me\/collections\/([^/]+)$/);
-  if (delColMatch && method === 'DELETE') {
-    const dishId = delColMatch[1];
-    const collections = await repo.listCollections(userId);
-    for (const col of collections) {
-      col.dish_ids = (col.dish_ids || []).filter(id => id !== dishId);
-    }
-    await repo.saveCollections(userId, collections);
-    return { status: 200, data: { removed: dishId, collections } };
   }
 
   // ===========================================================================
