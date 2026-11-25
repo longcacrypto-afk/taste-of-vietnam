@@ -6,11 +6,13 @@
 // ./frozenRoutes.js.
 // =============================================================================
 
+import { createHash } from 'node:crypto';
+import { buildCandidates } from '../services/candidatePipeline.js';
 import { matchesVietnameseQuery } from '../services/textUtils.js';
 import { getTodaySuggestions, isDishSafeForUser } from '../services/recommender.js';
 import { runAiFoodChat } from '../services/intentParser.js';
 import { updateMealReminderSchedule } from '../services/expansionServices.js';
-import { callGeminiChat, generateDishStory } from '../services/geminiService.js';
+import { generateDishStory } from '../services/geminiService.js';
 import { generateVietQrInvoice, verifyPaymentWebhookSignature } from '../services/paymentService.js';
 import { searchDishesSemantically } from '../services/semanticSearch.js';
 import { suggestionCache } from '../services/cacheService.js';
@@ -323,33 +325,33 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   if (pathname === '/api/v1/suggestions/today' && method === 'GET') {
     bump(store, 'suggestion_shown');
     const view = await buildView(repo, store, authUser);
-    const radiusM = searchParams.get('radius_m') || profile.radius_m;
-    const historyLen = (view.suggestionHistory || []).length;
-    const cacheKey = `sugg:${profile.id || 'default'}:${radiusM}:${profile.meal_slot}:${(profile.hard_allergies || []).join(',')}:${historyLen}`;
+    const opts = Object.fromEntries(['radius_m', 'mode', 'meal_slot', 'diet_mode', 'budget_min', 'budget_max', 'spice_max'].filter(k => searchParams.has(k)).map(k => [k, searchParams.get(k)]));
+    // Hash every gate input, catalogue and history so approval/menu/profile changes
+    // cannot replay an old unsafe result. Retain per-user cache invalidation prefix.
+    const version = createHash('sha256').update(JSON.stringify([profile, opts, view.dishes, view.places,
+      view.campaigns, view.suggestionHistory, process.env.REQUIRE_SAFETY_APPROVAL, Math.floor(Date.now() / 1000)])).digest('hex');
+    const cacheKey = `sugg:${profile.id || 'default'}:${version}`;
     const cached = suggestionCache.get(cacheKey);
     if (cached) {
       return { status: 200, data: { ...cached, from_cache: true } };
     }
-    const fresh = getTodaySuggestions(view, { radius_m: radiusM });
-    suggestionCache.set(cacheKey, fresh, 60);
+    const fresh = getTodaySuggestions(view, opts);
+    if (!fresh.context.valid) return { status: 400, data: fresh };
+    suggestionCache.set(cacheKey, fresh, 1);
     return { status: 200, data: fresh };
   }
 
-  if (pathname === '/api/v1/suggestions/spin' && method === 'GET') {
+  // Three existing decision animations share the same safe pool; never fake loot/vouchers.
+  if (['/api/v1/suggestions/spin', '/api/v1/suggestions/game', '/api/v1/suggestions/fortune', '/api/v1/suggestions/blind-box'].includes(pathname) && method === 'GET') {
     const view = await buildView(repo, store, authUser);
-    const today = getTodaySuggestions(view);
-    const candidates = view.dishes.filter(d => isDishSafeForUser(d, profile));
-    const pick = candidates[Math.floor(Math.random() * candidates.length)] || today.items[0];
-    if (!pick) return { status: 404, data: { error: 'Chưa có món nào phù hợp' } };
-    const places = await openPlacesForDish(repo, pick.id || pick.dish_id, profile, profile.radius_m);
-    return {
-      status: 200,
-      data: {
-        picked_dish: pick,
-        nearest_place: places[0] || null,
-        total_safe_candidates: candidates.length
-      }
-    };
+    const opts = Object.fromEntries(['radius_m', 'mode', 'meal_slot', 'diet_mode', 'budget_min', 'budget_max', 'spice_max'].filter(k => searchParams.has(k)).map(k => [k, searchParams.get(k)]));
+    const result = buildCandidates(view, opts);
+    const pick = result.candidates[Math.floor(Math.random() * result.candidates.length)];
+    return { status: result.context.valid ? 200 : 400, data: {
+      picked_dish: pick ? { ...pick.dish, dish_id: pick.dish_id } : null,
+      nearest_place: pick?.nearest_place || null, total_safe_candidates: result.candidates.length,
+      reasons: result.reasons, context: result.context, safety_approval_required: result.safety_approval_required
+    } };
   }
 
   if (pathname === '/api/v1/suggestions/feedback' && method === 'POST') {
@@ -380,18 +382,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   if (pathname === '/api/v1/chat' && method === 'POST') {
     bump(store, 'chat_query');
     const view = await buildView(repo, store, authUser);
-    // Try Gemini first, fall back to local engine
-    const aiResult = await callGeminiChat(body.query || 'Hôm nay ăn gì ngon?', profile);
-    const localResult = runAiFoodChat(view, body.query || 'Tối nay 4 người, ngân sách 300k, có trẻ nhỏ, muốn ăn gần nhà');
-    return {
-      status: 200,
-      data: {
-        intent: aiResult.intent,
-        ai_source: aiResult.source,
-        assistant_message: aiResult.response_vi || localResult.assistant_message,
-        options: localResult.options
-      }
-    };
+    const localResult = runAiFoodChat(view, cleanText(body.query || 'Hôm nay ăn gì?', 2000));
+    return { status: localResult.context.valid ? 200 : 400, data: localResult };
   }
 
   // ===========================================================================

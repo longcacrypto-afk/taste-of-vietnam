@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { removeVietnameseTones } from './textUtils.js';
-import { isDishSafeForUser, findOpenPlacesForDish } from './recommender.js';
+import { buildCandidates } from './candidatePipeline.js';
 
 export function extractVietnameseIntent(queryText = '', userProfile = {}) {
   const norm = removeVietnameseTones(queryText);
@@ -34,7 +34,7 @@ export function extractVietnameseIntent(queryText = '', userProfile = {}) {
   const noSpice = hasKids || norm.includes('khong cay') || norm.includes('it cay');
 
   // 4. Meal slot
-  let mealSlot = 'lunch';
+  let mealSlot = userProfile.meal_slot || 'lunch';
   if (norm.includes('sang') || norm.includes('an sang')) mealSlot = 'breakfast';
   else if (norm.includes('toi') || norm.includes('an toi')) mealSlot = 'dinner';
   else if (norm.includes('an vat') || norm.includes('xe chieu')) mealSlot = 'snack';
@@ -66,7 +66,8 @@ export function extractVietnameseIntent(queryText = '', userProfile = {}) {
     total_budget_vnd: totalBudgetVnd,
     per_person_budget_vnd: Math.round(totalBudgetVnd / partySize),
     has_kids: hasKids,
-    spice_max: noSpice ? 0 : (userProfile.spice_level ?? 2),
+    spice_max: noSpice ? 0 : userProfile.spice_max,
+    diet_mode: norm.includes('thuan chay') || norm.includes('vegan') ? 'vegan' : norm.includes('chay') ? 'vegetarian' : userProfile.diet_mode,
     meal_slot: mealSlot,
     mode,
     detected_ingredients: detectedIngredients,
@@ -74,41 +75,20 @@ export function extractVietnameseIntent(queryText = '', userProfile = {}) {
   };
 }
 
-export function runAiFoodChat(store, queryText) {
-  const user = store.userProfile;
-  const intent = extractVietnameseIntent(queryText, user);
-
-  // Build 3 verified options (NEVER hallucinating restaurants!)
-  const options = [];
-  for (const dish of store.dishes) {
-    if (!isDishSafeForUser(dish, user)) continue;
-    if (intent.has_kids && dish.spice_level > 1) continue;
-
-    const openPlaces = findOpenPlacesForDish(store, dish.id, user.lat, user.lng, user.radius_m || 3000);
-    const topPlace = openPlaces[0];
-    const unitPrice = topPlace ? topPlace.price_vnd : dish.ref_price;
-    const estGroupCost = unitPrice * intent.party_size;
-
-    if (estGroupCost <= intent.total_budget_vnd * 1.15) {
-      options.push({
-        option_type: topPlace ? 'verified_restaurant' : 'home_recipe',
-        dish_id: dish.id,
-        dish_name: dish.name,
-        img_key: dish.img_key,
-        tags: dish.tags,
-        prep_minutes: dish.prep_minutes,
-        estimated_group_cost_vnd: estGroupCost,
-        place: topPlace || null,
-        explanation: topPlace
-          ? `${topPlace.place_name} (cách ${topPlace.distance_m}m, đang mở) · Tổng ${intent.party_size} người ~${estGroupCost.toLocaleString('vi-VN')}đ${intent.has_kids ? ' · Có ghế trẻ em & không cay' : ''}`
-          : `Tự nấu tại nhà trong ${dish.prep_minutes} phút · Chi phí đi chợ ~${Math.round(dish.market_cost_base * (intent.party_size / dish.base_servings)).toLocaleString('vi-VN')}đ`
-      });
-    }
-  }
-
-  return {
-    intent,
-    assistant_message: `Măm đã phân tích yêu cầu (${intent.party_size} người · ngân sách ${intent.total_budget_vnd.toLocaleString('vi-VN')}đ${intent.has_kids ? ' · có trẻ nhỏ' : ''}) và lọc 3 phương án thực tế an toàn dị ứng:`,
-    options: options.slice(0, 3)
-  };
+export function runAiFoodChat(store, queryText, opts = {}) {
+  const intent = extractVietnameseIntent(queryText, store.userProfile);
+  const result = buildCandidates(store, {
+    ...opts, mode: intent.mode, meal_slot: intent.meal_slot, diet_mode: intent.diet_mode,
+    spice_max: intent.spice_max, party_size: intent.party_size,
+    budget_max: Math.min(Number(store.userProfile.budget_max ?? Infinity), intent.per_person_budget_vnd)
+  });
+  const options = result.candidates.slice(0, 3).map(c => ({
+    option_type: c.option_type, dish_id: c.dish_id, dish_name: c.dish.name,
+    img_key: c.dish.img_key, tags: c.dish.tags, prep_minutes: c.dish.prep_minutes,
+    estimated_group_cost_vnd: c.price_vnd * intent.party_size, place: c.nearest_place,
+    explanation: `${c.nearest_place ? c.nearest_place.place_name : 'Có công thức tự nấu'} · Tổng ${intent.party_size} người ~${Math.round(c.price_vnd * intent.party_size).toLocaleString('vi-VN')}đ`
+  }));
+  return { intent, context: result.context, reasons: result.reasons,
+    safety_approval_required: result.safety_approval_required, ai_source: 'local',
+    assistant_message: `Tìm được ${options.length} phương án phù hợp các điều kiện đã chọn. Kiểm tra thành phần với quán trước khi ăn.`, options };
 }
