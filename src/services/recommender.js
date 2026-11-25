@@ -111,6 +111,8 @@ export function getTodaySuggestions(store, opts = {}) {
     if (cmp.status !== 'active') continue;
     const dish = store.dishes.find(d => d.id === cmp.dish_id);
     if (!dish || usedDishIds.has(dish.id)) continue;
+    // 3-day cooldown applies to sponsored dishes too
+    if (recentEaten.has(dish.id)) continue;
     // CRITICAL RULE: Sponsored ads MUST NEVER bypass user hard allergy filters!
     if (!isDishSafeForUser(dish, user)) continue;
 
