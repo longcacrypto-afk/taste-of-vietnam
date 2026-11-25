@@ -72,3 +72,32 @@ eSMS yêu cầu đăng ký Brandname trước; API GENCODE còn yêu cầu templ
 | M1-5 M | S01–S02, S08–S10 | Gộp dữ liệu guest vào tài khoản khi login bằng transaction và quy tắc chống trùng; logout/expiry dọn token, không tự replay lệnh ghi | Khách lưu món → login vẫn còn; không trộn người khác, 401 không phát lệnh hai lần |
 | M1-6 M | S10 | Đồng ý theo mục đích/version/thời điểm, tối thiểu hóa vị trí; UI gọi export thật, phân trang đủ lịch sử, bỏ analytics chung; xóa/dọn cache/token, mô tả rõ dữ liệu tài chính giữ nhưng bỏ liên kết | Export chỉ dữ liệu mình và đủ >50 lịch sử; xóa xong token cũ 401; mở offline không lộ hồ sơ trước. **Cần nội dung chính sách/chủ thể chịu trách nhiệm dữ liệu** |
 
+## 2. M2 — Món, công thức, bộ sưu tập (45%)
+
+### Ý định và màn giữ lại
+
+S01 khám phá; S02 tìm/lọc; S03 danh mục/vùng; S04 chi tiết; S05 dinh dưỡng; S06 nguyên liệu/khẩu phần; S07 từng bước nấu; S08 đã lưu. Live App có `lpanel-explore`, `lpanel-recipe`; dùng chính card/ảnh/thành phần đó, không làm shell mới. Mục tiêu kho lớn 200–600 món là hướng đi cũ, không phải dữ liệu sẵn có hoặc điều kiện bắt buộc nhập hàng loạt trước thử nghiệm.
+
+### Hiện chạy được và còn giả
+
+- `/dishes?q=&region=&safe_only=`, `/dishes/:id?servings=`, `/dishes/categories`, `/dishes/semantic-search`, `/dishes/:id/similar`, `/me/collections` GET/POST và DELETE `/me/collections/:dishId` có thật. Danh sách/chi tiết/nguyên liệu/bước nấu lấy DB, bộ sưu tập theo người.
+- API chi tiết trả cả nguyên liệu đã scale, bước nấu, quán đang bán. Không có `/recipe`, `/ingredients`, `/steps`, `/me/favorites` riêng như nhãn trên mockup; UI nên đọc cùng đối tượng chi tiết.
+- Danh mục vẫn số cứng 145/190/165/60/40. Danh sách chỉ lọc q/region/an toàn, không thực thi `featured`, `budget_max`, loại bữa như mẫu. Tìm kiếm semantic là logic cục bộ, không phải pgvector được chứng minh.
+- ID món sai ở chi tiết/similar/story bị thay bằng món đầu tiên thay vì 404. `servings` chưa chặn NaN, số vô hạn/lớn, chưa giới hạn 1–10; cách làm tròn mọi đơn vị trừ lít dễ sai gia vị. Calo/macro chưa có quy ước rõ theo người hay cả công thức.
+- Collections có một nhóm mặc định; chưa CRUD nhiều nhóm, chưa kiểm món tồn tại trước lưu, chưa lưu quán. Màn mẫu còn dữ liệu viết sẵn; không coi click chuyển màn là đọc dữ liệu thật.
+- Ảnh base64/`img_key` có thể chỉ minh họa, không bảo đảm đúng món/quyền ảnh. Dị ứng chưa có trạng thái “chưa xác minh”; thiếu nhãn bị hiểu như an toàn.
+
+### Nghiên cứu dùng để hoàn thiện
+
+Cookpad công khai rằng công thức có thể không chính xác/an toàn; ảnh và công thức không mặc nhiên được lấy lại [R2]. Áp dụng: lưu nguồn/quyền của từng nội dung, có người duyệt thành phần và cảnh báo kiểm tra với quán; không hứa “an toàn dị ứng 100%” từ nhãn thiếu. Không sao chép kho công thức bên ngoài để đủ con số.
+
+### Việc theo thứ tự
+
+| ID / cỡ | Màn có sẵn | Logic/API + dữ liệu phải làm | Nghiệm thu / phụ thuộc |
+| --- | --- | --- | --- |
+| M2-1 M **P2** | S01–S04, S08 | Nối q/region/id thật, lưu/bỏ lưu bằng collections; S05–S07 đọc chi tiết chung, giữ selection khi chuyển màn; loading/rỗng/lỗi/thử lại | “bun bo hue” và “bún bò huế” cùng kết quả; bấm 3 món khác nhau mở đúng id; DB restart vẫn lưu; không còn số 542 giả |
+| M2-2 M | S01–S04 | Hợp đồng tìm/lọc rõ: enum vùng bac/trung/nam, meal_slot, diet, giá; count tính DB; phân trang, 404 thật, không lấy món đầu thay id sai | q không có → rỗng; id sai → 404; bộ lọc UI và tổng số đúng sau admin thêm/xóa |
+| M2-3 M | S04–S07 | Validate servings nguyên 1–10; đơn vị/độ chính xác/rounding; xác định macro/calo mỗi suất; bước nấu theo id và timer local có thể tiếp tục | 1/2/4/10 suất đúng; 0/-1/abc/1e9 trả 400; unit g/ml/thìa không mất lượng nhỏ; tạm dừng/tiếp tục timer không nhảy món |
+| M2-4 L | S03–S07 + M9-S02/S03 | Schema nội dung: tác giả/nguồn/license ảnh, định lượng, công thức, diet/allergen đã duyệt, published/version; importer có dry-run/chống trùng | Nhập thử bộ nhỏ, báo lỗi từng dòng; chỉ published được gợi ý; mọi món có ảnh đúng hoặc placeholder trung thực. **Cần nguồn dữ liệu và quyền sử dụng** |
+| M2-5 M | S08 | Kiểm dishId tồn tại; nếu giữ nhiều bộ sưu tập như mẫu: API đề xuất CRUD collections theo id, chống lost update, xử lý món bị gỡ | Hai tab lưu cùng lúc không mất món; không đọc/sửa nhóm người khác; xóa món không để link hỏng; nếu MVP chỉ 1 nhóm phải ghi rõ UI |
+| M2-6 M | S04–S07 | Cache chỉ nội dung công khai gần nhất; trạng thái offline/read-only; xuất bản URL chi tiết ổn định, meta/ảnh chia sẻ cho P3 | Offline đọc được công thức đã mở, không trả dữ liệu riêng người cũ; deep link reload đúng món; kiểm 360/768/1440 và phím/bộ đọc màn hình |
