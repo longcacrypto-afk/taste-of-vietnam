@@ -227,7 +227,7 @@
     if (config(appState.activeScreenId)?.[0] === key) paint();
   }
   function stateHtml(id, s) {
-    return `<div class="p-4 space-y-3.5 bg-white text-[#0F172A] text-xs">${K.mobileHeader(ALL_SCREENS[id].title.replace(/\([^)]*\)/g, ""), "", "M3-S01")}<div class="p-5 rounded-3xl bg-[#F8FAFC] border border-[#E2E8F0] text-center space-y-3" role="${s === "loading" ? "status" : "alert"}">${K.mascotSVG("mam", "w-20 h-24 mx-auto")}<div class="font-extrabold">${s === "loading" ? "Đang tải…" : s === "empty" ? "Chưa có kết quả phù hợp" : "Chưa tải được. Kiểm tra mạng hoặc đăng nhập rồi thử lại."}</div>${s === "loading" ? "" : `<button onclick="P2.reload()" class="w-full py-3 rounded-full bg-[#FBBF24] text-[#0F172A] font-extrabold">Thử lại</button><button onclick="goScreen('M1-S01')" class="w-full py-2 rounded-full bg-white border border-[#E2E8F0]">Đăng nhập</button>`}</div></div>`;
+    return `<div class="p-4 space-y-3.5 bg-white text-[#0F172A] text-xs">${K.mobileHeader(({M1:"Hồ sơ khẩu vị",M2:"Khám phá món ngon",M3:"Gợi ý bữa ăn",M4:"Quán quanh bạn",M5:"Thưởng thức",M9:"Quản trị nội dung"})[id.split("-")[0]], "", "M3-S01")}<div class="p-5 rounded-3xl bg-[#F8FAFC] border border-[#E2E8F0] text-center space-y-3" role="${s === "loading" ? "status" : "alert"}">${K.mascotSVG("mam", "w-20 h-24 mx-auto")}<div class="font-extrabold">${s === "loading" ? "Đang tải…" : s === "empty" ? "Chưa có kết quả phù hợp" : "Chưa tải được. Kiểm tra mạng hoặc đăng nhập rồi thử lại."}</div>${s === "loading" ? "" : `<button onclick="P2.reload()" class="w-full py-3 rounded-full bg-[#FBBF24] text-[#0F172A] font-extrabold">Thử lại</button><button onclick="goScreen('M1-S01')" class="w-full py-2 rounded-full bg-white border border-[#E2E8F0]">Đăng nhập</button>`}</div></div>`;
   }
   function rows(parent, template, items, bind) {
     parent.innerHTML = "";
@@ -613,8 +613,8 @@
         "Ngân sách " + money(p.budget_min) + " – " + money(p.budget_max),
       );
       const tags = $$(".grid-cols-2 b", root);
-      text(tags[0], (p.hard_allergies || []).join(", ") || "Chưa chọn dị ứng");
-      text(tags[1], "Mức cay " + p.spice_level + " · " + p.diet_mode);
+      text(tags[0], (p.hard_allergies || []).map(v => ({shrimp:"Tôm / hải sản",peanut:"Đậu phộng",milk:"Sữa",gluten:"Gluten",egg:"Trứng",soy:"Đậu nành"})[v] || v).join(", ") || "Chưa chọn dị ứng");
+      text(tags[1], "Mức cay " + p.spice_level + " · " + ({balanced:"Cân bằng",vegetarian:"Ăn chay",eat_clean:"Ăn sạch",high_protein:"Giàu đạm",low_fat:"Ít béo",low_carb:"Ít tinh bột"}[p.diet_mode] || "Chưa chọn chế độ"));
       const banner = $(".bg-\\[\\#18181B\\] span", root);
       if (banner && banner.textContent.includes("94%"))
         text(banner, "Khẩu vị đã lưu");
@@ -802,14 +802,15 @@
         ["name", "Tên món", a.name || ""],
         ["ref_price", "Giá tham khảo (đ)", a.ref_price || 0],
         ["calories", "Năng lượng (kcal)", a.calories || 0],
+        ["allergen_tags", "Thành phần gây dị ứng (mã, ngăn bằng dấu phẩy)", (a.allergen_tags || []).join(", ")],
       ]
         .map(
           ([key, label, v]) =>
-            `<label class="block font-bold">${label}<input required name="${key}" value="${H(v)}" class="block w-full p-3 mt-1 rounded-2xl border border-[#E2E8F0]"></label>`,
+            `<label class="block font-bold">${label}<input ${key === "allergen_tags" ? "" : "required"} name="${key}" value="${H(v)}" class="block w-full p-3 mt-1 rounded-2xl border border-[#E2E8F0]"></label>`,
         )
         .join(
           "",
-        )}${button("Lưu món", "")}${a.id ? button("Xóa món", `P2.deleteDish('${J(a.id)}')`) : ""}</form>`;
+        )}<p class="text-xs">Mã dị ứng dùng trong hồ sơ: shrimp (tôm/hải sản), peanut (đậu phộng), milk (sữa), gluten, egg (trứng), soy (đậu nành). Giữ nguyên các mã khác nếu có; cần kiểm tra nguồn nguyên liệu trước khi lưu.</p><label class="block font-bold">Vùng miền<select name="region" required class="block w-full p-3 mt-1 rounded-2xl border border-[#E2E8F0]">${[["bac","Miền Bắc"],["trung","Miền Trung"],["nam","Miền Nam"]].map(([v,l])=>`<option value="${v}" ${a.region===v?"selected":""}>${l}</option>`).join("")}</select></label><label class="flex gap-2 items-start"><input type="checkbox" name="allergens_checked" required> Tôi đã kiểm tra thông tin dị ứng; ô trống chỉ khi nguồn dữ liệu xác nhận không có thành phần cần đánh dấu.</label>${button("Lưu món", "")}${a.id ? button("Xóa món", `P2.deleteDish('${J(a.id)}')`) : ""}</form>`;
     }
     if (id === "M9-S05")
       body =
@@ -879,7 +880,11 @@
           "",
         )
         .replace(/Chào anh Long/g, "Chào bạn")
-        .replace(/AI Powered/g, "Gợi ý bữa ăn");
+        .replace(/AI Powered/g, "Gợi ý bữa ăn")
+        .replace(/Verified Merchant/g,"Thông tin quán")
+        .replace(/⭐ 4\.8 \(150\)/g, "Chưa có đánh giá thực tế")
+        .replace(/Chặn 100% dị ứng/g,"Lọc theo dị ứng đã khai báo")
+        .replace(/^Home$/, "Trang chủ").replace(/^Explore$/, "Khám phá").replace(/^Saved$/, "Đã lưu").replace(/^Profile$/, "Hồ sơ");
     }
     $$("img", root).forEach((i) => {
       if (!i.hasAttribute("alt")) i.alt = "Ảnh minh họa";
@@ -1176,6 +1181,8 @@
     saveDish(form) {
       const f = new FormData(form),
         payload = Object.fromEntries(f);
+      payload.allergen_tags = String(payload.allergen_tags || "").split(",").map(v=>v.trim()).filter(Boolean);
+      delete payload.allergens_checked;
       action(
         () =>
           api(
