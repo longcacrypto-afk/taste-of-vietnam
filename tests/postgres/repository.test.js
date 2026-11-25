@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { createInitialStore } from '../../src/data/seed.js';
 import { handleApiRequest } from '../../src/api/router.js';
 import { initRepository } from '../../src/db/repository.js';
-import { runMigrations } from '../../src/db/migrate.js';
+import { runMigrations, listMigrationFiles } from '../../src/db/migrate.js';
 import { haversineDistanceMeters } from '../../src/services/textUtils.js';
 import { signPayosData } from '../../src/services/paymentService.js';
 import { suggestionCache } from '../../src/services/cacheService.js';
@@ -61,7 +61,8 @@ after(async () => {
 
 test('Migrations: ordered, recorded once, re-running is a no-op; seed loaded 12 dishes / 8 places', { skip }, async () => {
   const applied = (await db.query('SELECT version, name FROM schema_migrations ORDER BY version')).rows.map(r => r.name);
-  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '004_m1_google_auth']);
+  assert.deepEqual(applied, listMigrationFiles().map(m => m.name));
+  assert.ok(applied.includes('004_m1_google_auth'));
   assert.deepEqual(await runMigrations(db, { log: () => {} }), []);
   assert.equal(await count('SELECT COUNT(*) n FROM dishes'), 12);
   assert.equal(await count('SELECT COUNT(*) n FROM places'), 8);
