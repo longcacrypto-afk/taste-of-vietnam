@@ -203,8 +203,8 @@ window.SCREENS_M3_M4_M5_M8 = {
             <div class="grid grid-cols-2 gap-3 text-xs">
               ${(() => {
                 const liveItems = (window.appState.liveToday && window.appState.liveToday.items) || [];
-                const c1 = liveItems[0] || { dish_id: 'DISH-101', dish_name: 'Phở Bò Tái Nạm', ref_price: 45000, calories: 480 };
-                const c2 = liveItems[1] || { dish_id: 'DISH-102', dish_name: 'Cơm Tấm Sườn Bì', ref_price: 40000, calories: 580 };
+                const c1 = window.toTodayCard(liveItems[0]) || { dish_id: 'DISH-101', dish_name: 'Phở Bò Tái Nạm', ref_price: 45000, calories: 480 };
+                const c2 = window.toTodayCard(liveItems[1]) || { dish_id: 'DISH-102', dish_name: 'Cơm Tấm Sườn Bì', ref_price: 40000, calories: 580 };
                 return `
                   <!-- Card 1 -->
                   <div class="bg-white rounded-2xl p-2 border border-[#F1F5F9] shadow-sm space-y-2 group">
@@ -215,12 +215,12 @@ window.SCREENS_M3_M4_M5_M8 = {
                       </span>
                     </div>
                     <div class="px-1 space-y-1">
-                      <div onclick="goScreen('M2-S04')" class="font-extrabold text-xs text-[#0F172A] truncate cursor-pointer">${c1.dish_name}</div>
+                      <div onclick="goScreen('M2-S04')" class="font-extrabold text-xs text-[#0F172A] truncate cursor-pointer">${escHtml(c1.dish_name)}</div>
                       <div class="flex items-center justify-between text-[10px] text-[#64748B]">
-                        <span class="inline-flex items-center gap-1">${window.UI_KIT.icon('clock', 'w-3 h-3')} ${c1.calories || 480} kcal</span>
+                        <span class="inline-flex items-center gap-1">${window.UI_KIT.icon('clock', 'w-3 h-3')} ${escHtml(c1.calories) || 480} kcal</span>
                         <span class="font-extrabold text-[#D97736]">${Number(c1.ref_price || 45000).toLocaleString('vi-VN')}đ</span>
                       </div>
-                      <button onclick="window.LIVE_APP && LIVE_APP.markDishEaten('${c1.dish_id}','${(c1.dish_name||'').replace(/'/g,'')}')" class="w-full py-1 rounded-lg bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold hover:bg-[#FBBF24] hover:text-[#0F172A]">✅ Đã ăn</button>
+                      <button onclick="window.LIVE_APP && LIVE_APP.markDishEaten('${escJs(c1.dish_id)}','${escJs(c1.dish_name)}')" class="w-full py-1 rounded-lg bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold hover:bg-[#FBBF24] hover:text-[#0F172A]">✅ Đã ăn</button>
                     </div>
                   </div>
 
@@ -233,12 +233,12 @@ window.SCREENS_M3_M4_M5_M8 = {
                       </span>
                     </div>
                     <div class="px-1 space-y-1">
-                      <div onclick="goScreen('M2-S04')" class="font-extrabold text-xs text-[#0F172A] truncate cursor-pointer">${c2.dish_name}</div>
+                      <div onclick="goScreen('M2-S04')" class="font-extrabold text-xs text-[#0F172A] truncate cursor-pointer">${escHtml(c2.dish_name)}</div>
                       <div class="flex items-center justify-between text-[10px] text-[#64748B]">
-                        <span class="inline-flex items-center gap-1">${window.UI_KIT.icon('clock', 'w-3 h-3')} ${c2.calories || 580} kcal</span>
+                        <span class="inline-flex items-center gap-1">${window.UI_KIT.icon('clock', 'w-3 h-3')} ${escHtml(c2.calories) || 580} kcal</span>
                         <span class="font-extrabold text-[#D97736]">${Number(c2.ref_price || 40000).toLocaleString('vi-VN')}đ</span>
                       </div>
-                      <button onclick="window.LIVE_APP && LIVE_APP.markDishEaten('${c2.dish_id}','${(c2.dish_name||'').replace(/'/g,'')}')" class="w-full py-1 rounded-lg bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold hover:bg-[#FBBF24] hover:text-[#0F172A]">✅ Đã ăn</button>
+                      <button onclick="window.LIVE_APP && LIVE_APP.markDishEaten('${escJs(c2.dish_id)}','${escJs(c2.dish_name)}')" class="w-full py-1 rounded-lg bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold hover:bg-[#FBBF24] hover:text-[#0F172A]">✅ Đã ăn</button>
                     </div>
                   </div>
                 `;
@@ -248,16 +248,16 @@ window.SCREENS_M3_M4_M5_M8 = {
             <!-- Card 3: Sponsored 1/3 Slot Horizontal Card -->
             ${(() => {
               const liveItems = (window.appState.liveToday && window.appState.liveToday.items) || [];
-              const c3 = liveItems[2] || { dish_id: 'DISH-103', dish_name: 'Bún Bò Huế O Xuân', ref_price: 50000, is_sponsored: true, reason: 'Cách 650m · Đang mở · Hợp khẩu vị cay nhẹ' };
+              const c3 = window.toTodayCard(liveItems[2]) || { dish_id: 'DISH-103', dish_name: 'Bún Bò Huế O Xuân', ref_price: 50000, is_sponsored: true, reason: 'Cách 650m · Đang mở · Hợp khẩu vị cay nhẹ' };
               return `
                 <div onclick="goScreen('M4-S03')" class="bg-[#F8FAFC] rounded-2xl p-2.5 border border-[#E2E8F0] flex items-center gap-3 cursor-pointer hover:border-[#FBBF24] transition">
                   <img data-img="310" class="w-14 h-14 rounded-xl object-cover shrink-0" />
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-1.5">
-                      <span class="font-extrabold text-xs text-[#0F172A] truncate">${c3.dish_name}</span>
+                      <span class="font-extrabold text-xs text-[#0F172A] truncate">${escHtml(c3.dish_name)}</span>
                       ${c3.is_sponsored !== false ? window.UI_KIT.tagPill('Tài trợ', 'orange') : ''}
                     </div>
-                    <div class="text-[10px] text-[#64748B] mt-0.5 truncate">${c3.reason || 'Cách 650m · Đang mở · Hợp khẩu vị cay nhẹ'}</div>
+                    <div class="text-[10px] text-[#64748B] mt-0.5 truncate">${escHtml(c3.reason) || 'Cách 650m · Đang mở · Hợp khẩu vị cay nhẹ'}</div>
                     <div class="text-xs font-extrabold text-[#D97736] mt-0.5">${Number(c3.ref_price || 50000).toLocaleString('vi-VN')}đ</div>
                   </div>
                   <span class="text-[#64748B]">${window.UI_KIT.icon('arrowRight', 'w-4 h-4')}</span>
@@ -460,7 +460,7 @@ window.SCREENS_M3_M4_M5_M8 = {
           </div>
           <div class="flex-1 bg-[#EFF6FF] border border-[#DBEAFE] rounded-2xl rounded-bl-sm p-3 text-[11px] text-[#1E293B] leading-relaxed shadow-sm">
             <div class="font-extrabold text-xs mb-0.5">${window.appState.liveChatQuery ? 'Măm AI trả lời:' : 'Chào anh Long! 👋'}</div>
-            ${window.appState.liveChatReply || 'Nhà mình đang có nguyên liệu gì, hay tối nay 4 người ngân sách 300k muốn ăn gần nhà? Măm tạo thực đơn ngay nhé!'}
+            ${escHtml(window.appState.liveChatReply) || 'Nhà mình đang có nguyên liệu gì, hay tối nay 4 người ngân sách 300k muốn ăn gần nhà? Măm tạo thực đơn ngay nhé!'}
           </div>
         </div>
 
@@ -468,7 +468,7 @@ window.SCREENS_M3_M4_M5_M8 = {
         <div class="bg-white rounded-3xl p-3.5 border border-[#E2E8F0] shadow-sm space-y-2.5">
           <div class="text-[11px] font-bold text-[#334155]">Nhập nguyên liệu sẵn có hoặc nhu cầu bữa ăn...</div>
           <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
-            <input id="mam-chat-inp" value="${window.appState.liveChatQuery || ''}" placeholder="VD: 4 người 300k, có trẻ nhỏ..." onkeydown="if(event.key==='Enter') window.LIVE_APP && LIVE_APP.sendMamChat()" class="flex-1 bg-transparent text-[11px] text-[#0F172A] focus:outline-none" />
+            <input id="mam-chat-inp" value="${escHtml(window.appState.liveChatQuery || '')}" placeholder="VD: 4 người 300k, có trẻ nhỏ..." onkeydown="if(event.key==='Enter') window.LIVE_APP && LIVE_APP.sendMamChat()" class="flex-1 bg-transparent text-[11px] text-[#0F172A] focus:outline-none" />
             <button onclick="window.LIVE_APP && LIVE_APP.sendMamChat()" class="px-2.5 py-1 rounded-lg bg-[#FBBF24] text-[#0F172A] font-extrabold text-[10px]">Gửi</button>
           </div>
           <div class="flex flex-wrap gap-1.5 justify-center pt-0.5">

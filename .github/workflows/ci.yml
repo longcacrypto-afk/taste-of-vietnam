@@ -48,6 +48,11 @@ jobs:
             });
           });"
 
+      - name: Build UI bundle and check it is committed in sync
+        run: |
+          npm run build:ui
+          git diff --exit-code --stat ui-design/index.html || (echo "❌ ui-design/index.html is out of date: run 'npm run build:ui' and commit it" && exit 1)
+
       - name: Check Web UI Studio 99-Screen Bundle Size
         run: |
           BUNDLE_SIZE=$(du -sk ui-design/index.html | cut -f1)
@@ -65,6 +70,11 @@ jobs:
   flutter-mobile:
     name: Flutter Mobile Syntax & Lint Validation (20 Screens)
     runs-on: ubuntu-latest
+    # Flutter is not the launch platform yet (web/PWA first) and the project still
+    # misses android/app/src/main/res and pubspec.lock. Analyze errors now FAIL this
+    # job (red ✗, visible on every PR) without blocking the Node backend checks.
+    # Remove continue-on-error once `flutter analyze` is clean.
+    continue-on-error: true
 
     steps:
       - name: Checkout Code
@@ -98,7 +108,13 @@ jobs:
       - name: Analyze Flutter Source (20 Screens & Theme)
         run: |
           cd mobile-flutter
-          flutter analyze --no-fatal-infos || true
-          echo "### 📱 Flutter Mobile Analysis Summary (v0.2)" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Flutter validation completed across all 20 screens & 20 modules." >> $GITHUB_STEP_SUMMARY
-          echo "✅ Flutter validation SUCCESS: zero fatal errors across all 20 screens!"
+          set +e
+          flutter analyze --no-fatal-infos
+          status=$?
+          echo "### 📱 Flutter Mobile Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          if [ $status -eq 0 ]; then
+            echo "✅ flutter analyze passed." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ flutter analyze found errors (exit $status). See the log above." >> $GITHUB_STEP_SUMMARY
+          fi
+          exit $status

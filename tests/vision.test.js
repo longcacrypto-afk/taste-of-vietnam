@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialStore } from '../src/data/seed.js';
-import { handleApiRequest } from '../src/api/router.js';
+import { call } from './helpers/auth.js';
 import { analyzeFoodImageWithGemini } from '../src/services/geminiService.js';
 
 test('VISION-01: analyzeFoodImageWithGemini identifies fridge contents in fallback mode', async () => {
@@ -28,7 +28,7 @@ test('VISION-03: POST /api/v1/vision/analyze endpoint handles both fridge & menu
   const store = createInitialStore();
 
   // Test fridge context
-  const fridgeRes = await handleApiRequest(store, 'POST', '/api/v1/vision/analyze', new URLSearchParams(), {
+  const fridgeRes = await call(store, 'POST', '/api/v1/vision/analyze', new URLSearchParams(), {
     context: 'fridge',
     image_base64: 'sample_base64'
   });
@@ -36,7 +36,7 @@ test('VISION-03: POST /api/v1/vision/analyze endpoint handles both fridge & menu
   assert.equal(Array.isArray(fridgeRes.data.detected_ingredients), true);
 
   // Test menu context
-  const menuRes = await handleApiRequest(store, 'POST', '/api/v1/vision/analyze', new URLSearchParams(), {
+  const menuRes = await call(store, 'POST', '/api/v1/vision/analyze', new URLSearchParams(), {
     context: 'menu',
     image_base64: 'sample_menu_base64'
   });

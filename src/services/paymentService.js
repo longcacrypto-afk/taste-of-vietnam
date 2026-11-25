@@ -25,6 +25,8 @@ export function generateVietQrInvoice({
   description = null,
 }) {
   const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  // PayOS yêu cầu orderCode là số nguyên dương (<= 9007199254740991)
+  const orderCode = Date.now() * 1000 + crypto.randomInt(0, 1000);
   const transferMemo = description || `HNAG ${campaignId} ${orderId.slice(-6)}`;
   
   // Format link VietQR chuẩn của Napas/Vietcombank
@@ -36,6 +38,7 @@ export function generateVietQrInvoice({
 
   return {
     order_id: orderId,
+    order_code: orderCode,
     campaign_id: campaignId,
     amount_vnd: amountVnd,
     bank_name: BANK_CONFIG.defaultBankName,
@@ -52,24 +55,46 @@ export function generateVietQrInvoice({
 }
 
 /**
- * Xác thực chữ ký webhook từ PayOS / Cổng thanh toán (HMAC SHA-256)
+ * Chuỗi ký PayOS: sắp xếp key theo alphabet, nối `key=value` bằng `&`.
+ * Giống hệt thư viện chính thức @payos/node (convertObjToQueryStr):
+ *  - key có giá trị undefined bị bỏ qua
+ *  - null / undefined / "null" / "undefined" -> chuỗi rỗng
+ *  - mảng -> JSON.stringify (từng phần tử object cũng được sắp xếp key)
+ * https://payos.vn/docs/tich-hop-webhook/kiem-tra-du-lieu-voi-signature/
  */
-export function verifyPaymentWebhookSignature(payload, signature, checksumKey = 'default_checksum_key') {
-  if (!signature) return false;
+function sortObjByKey(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  return Object.keys(obj).sort().reduce((acc, k) => { acc[k] = obj[k]; return acc; }, {});
+}
+
+export function buildPayosSignData(data) {
+  const sorted = sortObjByKey(data || {});
+  return Object.keys(sorted)
+    .filter(k => k !== 'signature' && sorted[k] !== undefined)
+    .map(k => {
+      let value = sorted[k];
+      if (value && Array.isArray(value)) value = JSON.stringify(value.map(v => sortObjByKey(v)));
+      if ([null, undefined, 'undefined', 'null'].includes(value)) value = '';
+      return `${k}=${value}`;
+    })
+    .join('&');
+}
+
+export function signPayosData(data, checksumKey) {
+  return crypto.createHmac('sha256', checksumKey).update(buildPayosSignData(data)).digest('hex');
+}
+
+/**
+ * Xác thực chữ ký webhook từ PayOS (HMAC-SHA256 trên các trường của `data`).
+ * Không có checksumKey => luôn trả false (fail closed).
+ */
+export function verifyPaymentWebhookSignature(payload, signature, checksumKey = process.env.PAYOS_CHECKSUM_KEY) {
+  if (!signature || typeof signature !== 'string' || !checksumKey) return false;
   try {
-    // Sắp xếp các trường alphabet theo chuẩn PayOS
-    const sortedKeys = Object.keys(payload).sort();
-    const signData = sortedKeys
-      .filter(k => k !== 'signature')
-      .map(k => `${k}=${payload[k]}`)
-      .join('&');
-
-    const expectedSignature = crypto
-      .createHmac('sha256', checksumKey)
-      .update(signData)
-      .digest('hex');
-
-    return crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signature));
+    const expected = Buffer.from(signPayosData(payload, checksumKey), 'utf8');
+    const given = Buffer.from(signature.toLowerCase(), 'utf8');
+    if (expected.length !== given.length) return false;
+    return crypto.timingSafeEqual(expected, given);
   } catch (err) {
     return false;
   }
@@ -110,7 +135,7 @@ export function processSuccessfulPayment(store, { orderId, campaignId, amountVnd
     campaign_balance_after: updatedCampaign ? updatedCampaign.balance_vnd : null,
   };
 
-  store.paymentOrders[orderId] = orderRecord;
+  store.paymentOrders[orderId] = { ...(store.paymentOrders[orderId] || {}), ...orderRecord };
 
   // Ghi nhận sự kiện Analytics
   store.analyticsEvents = store.analyticsEvents || {};

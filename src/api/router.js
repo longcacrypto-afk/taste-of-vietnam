@@ -25,61 +25,88 @@ import { generateVietQrInvoice, verifyPaymentWebhookSignature, processSuccessful
 import { searchDishesSemantically } from '../services/semanticSearch.js';
 import { suggestionCache } from '../services/cacheService.js';
 import { pushQueue } from '../services/queueService.js';
+import { checkAccess } from './accessPolicy.js';
+import { requestOtp, verifyOtp, createGuest, authenticate, deleteUser, scopeStoreToUser } from '../services/authService.js';
 
-export async function handleApiRequest(store, method, pathname, searchParams, body = {}) {
+// User-supplied text: drop HTML tags and stray angle brackets / control chars, trim, cap length.
+// (The UI also escapes on output; this keeps stored data clean for other clients like Flutter.)
+export function cleanText(value, maxLen = 200) {
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value)
+    .replace(/<\/?[a-zA-Z!][^>]*>?/g, '')
+    .replace(/[<>]/g, '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
+function cleanNumber(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+const UNAUTHORIZED = { status: 401, data: { error: 'Cần đăng nhập (Authorization: Bearer <token>)' } };
+
+export async function handleApiRequest(store, method, pathname, searchParams, body = {}, headers = {}) {
+  // Who is calling? (null = anonymous). With a token, userProfile / history /
+  // collections in `store` resolve to that user's own data.
+  const authUser = authenticate(store, headers);
+  const denied = checkAccess(method, pathname, authUser);
+  if (denied) return denied;
+  const sharedStore = store;
+  if (authUser) store = scopeStoreToUser(store, authUser);
+
   // ===========================================================================
   // MODULE M1: ACCOUNT, AUTH, ONBOARDING & TASTE PROFILE (M1-S01 .. M1-S10)
   // ===========================================================================
-  if (pathname === '/api/v1/auth/login' && method === 'POST') {
-    return {
-      status: 200,
-      data: {
-        provider: body.provider || 'apple_zalo_phone',
-        otp_sent: true,
-        phone: body.phone || '0909***889',
-        session_preview: 'jwt-homnayangi-v0.1'
-      }
-    };
+  // Request an OTP for a phone number (/auth/login kept as an alias)
+  if ((pathname === '/api/v1/auth/otp/request' || pathname === '/api/v1/auth/login') && method === 'POST') {
+    const res = await requestOtp(sharedStore, body.phone);
+    if (res.status === 200) res.data.provider = body.provider || 'phone_otp';
+    return res;
   }
 
   if (pathname === '/api/v1/auth/otp/verify' && method === 'POST') {
-    store.analyticsEvents.onboarding_complete = (store.analyticsEvents.onboarding_complete || 0) + 1;
-    return {
-      status: 200,
-      data: {
-        verified: true,
-        access_token: 'jwt-homnayangi-verified-token',
-        user: store.userProfile
-      }
-    };
+    const res = verifyOtp(sharedStore, body.phone, body.code ?? body.otp);
+    if (res.status === 200) {
+      sharedStore.analyticsEvents.onboarding_complete = (sharedStore.analyticsEvents.onboarding_complete || 0) + 1;
+    }
+    return res;
   }
 
   if (pathname === '/api/v1/auth/guest' && method === 'POST') {
-    return {
-      status: 200,
-      data: {
-        guest_mode: true,
-        guest_id: `guest-${Date.now()}`,
-        profile: { ...store.userProfile, name: 'Khách trải nghiệm (Guest)' }
-      }
-    };
+    return createGuest(sharedStore);
+  }
+
+  if (pathname === '/api/v1/auth/me' && method === 'GET') {
+    if (!authUser) return UNAUTHORIZED;
+    return { status: 200, data: { id: authUser.id, role: authUser.role, guest: authUser.guest, phone: authUser.phone } };
   }
 
   if (pathname === '/api/v1/me/profile' && method === 'GET') {
+    if (!authUser) return UNAUTHORIZED;
     return { status: 200, data: store.userProfile };
   }
 
   if (pathname === '/api/v1/me/profile' && (method === 'PUT' || method === 'PATCH')) {
-    Object.assign(store.userProfile, body);
-    suggestionCache.invalidateUser(store.userProfile.id || 'default');
+    if (!authUser) return UNAUTHORIZED;
+    const { id: _id, phone: _phone, role: _role, ...changes } = body || {};
+    Object.assign(store.userProfile, changes);
+    suggestionCache.invalidateUser(store.userProfile.id);
     return { status: 200, data: store.userProfile };
   }
 
   if (pathname === '/api/v1/me' && method === 'DELETE') {
+    if (!authUser) return UNAUTHORIZED;
+    suggestionCache.invalidateUser(authUser.id);
+    const deleted = deleteUser(sharedStore, authUser.id);
     return {
       status: 200,
       data: {
-        deleted: true,
+        deleted,
+        user_id: authUser.id,
         pdpd_compliance: 'Nghị định 13/2023/NĐ-CP — Đã xóa toàn bộ hồ sơ vị giác & lịch sử cá nhân ngay lập tức.'
       }
     };
@@ -87,6 +114,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   // M1-S09: PDPD Data Export (Nghị định 13/2023/NĐ-CP — Right to Data Portability)
   if (pathname === '/api/v1/me/export' && method === 'GET') {
+    if (!authUser) return UNAUTHORIZED;
     return {
       status: 200,
       data: {
@@ -570,17 +598,48 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       merchantName: body.merchant_name || 'Quán Ngon',
       description: body.description,
     });
+    // Ghi đơn chờ thanh toán: webhook chỉ nạp tiền cho đơn đã tạo ở đây
+    store.paymentOrders = store.paymentOrders || {};
+    store.paymentOrders[invoice.order_id] = {
+      order_id: invoice.order_id,
+      order_code: invoice.order_code,
+      campaign_id: invoice.campaign_id,
+      amount_vnd: Number(invoice.amount_vnd),
+      status: 'PENDING_PAYMENT',
+      created_at: invoice.created_at,
+    };
     return { status: 200, data: invoice };
   }
 
-  // Webhook từ cổng thanh toán PayOS / Ngân hàng NAPAS
+  // Webhook từ cổng thanh toán PayOS: { code, desc, success, data: {...}, signature }
+  // Chữ ký HMAC-SHA256 trên `data` bằng PAYOS_CHECKSUM_KEY. Không có key => từ chối (fail closed).
   if (pathname === '/api/v1/payments/webhook' && method === 'POST') {
-    const { orderId, campaignId, amountVnd } = body;
-    if (!orderId || !campaignId || !amountVnd) {
-      return { status: 400, data: { error: 'Missing required webhook fields' } };
+    const checksumKey = process.env.PAYOS_CHECKSUM_KEY;
+    if (!checksumKey) {
+      return { status: 503, data: { error: 'Payment webhook not configured (PAYOS_CHECKSUM_KEY missing)' } };
     }
-    const result = processSuccessfulPayment(store, { orderId, campaignId, amountVnd });
-    return { status: 200, data: result };
+    const data = body && typeof body.data === 'object' && body.data !== null ? body.data : null;
+    if (!data || !verifyPaymentWebhookSignature(data, body.signature, checksumKey)) {
+      return { status: 401, data: { error: 'Invalid webhook signature' } };
+    }
+    if (String(data.code) !== '00' || body.success === false) {
+      return { status: 200, data: { success: true, credited: false, reason: 'payment_not_successful' } };
+    }
+    store.paymentOrders = store.paymentOrders || {};
+    const pending = Object.values(store.paymentOrders).find(o => String(o.order_code) === String(data.orderCode));
+    if (!pending) {
+      // Đơn không do hệ thống tạo (vd. webhook thử của PayOS): xác nhận nhận, không nạp tiền
+      return { status: 200, data: { success: true, credited: false, reason: 'unknown_order' } };
+    }
+    if (Number(data.amount) !== Number(pending.amount_vnd)) {
+      return { status: 409, data: { error: 'Amount mismatch', expected: pending.amount_vnd, received: Number(data.amount) } };
+    }
+    const result = processSuccessfulPayment(store, {
+      orderId: pending.order_id,
+      campaignId: pending.campaign_id,
+      amountVnd: Number(data.amount)
+    });
+    return { status: 200, data: { ...result, credited: !result.already_processed } };
   }
 
   const paymentOrderMatch = pathname.match(/^\/api\/v1\/payments\/orders\/([^/]+)$/);
@@ -1049,18 +1108,22 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 200, data: getCommunityRecipes(store, Object.fromEntries(searchParams)) };
   }
   if (pathname === '/api/v1/community/recipes' && method === 'POST') {
+    const title = cleanText(body.title, 120);
+    if (title.length < 2) {
+      return { status: 400, data: { error: 'Tiêu đề công thức không hợp lệ (2–120 ký tự, không chứa HTML)' } };
+    }
     const newRecipe = {
       id: `CREC-${Date.now()}`,
-      title: body.title || 'Món Ngon Gia Đình',
-      author: body.author || 'Đầu Bếp Nghiệp Dư',
+      title,
+      author: cleanText(body.author, 60) || cleanText(store.userProfile && store.userProfile.name, 60) || 'Đầu Bếp Nghiệp Dư',
       author_avatar: '👨‍🍳',
-      prep_time_minutes: body.prep_time_minutes || 25,
-      difficulty: body.difficulty || 'Dễ',
-      calories: body.calories || 450,
+      prep_time_minutes: cleanNumber(body.prep_time_minutes, 1, 1440, 25),
+      difficulty: cleanText(body.difficulty, 20) || 'Dễ',
+      calories: cleanNumber(body.calories, 0, 10000, 450),
       likes_count: 1,
       tips_received_vnd: 0,
-      zero_waste_tag: body.zero_waste_tag || null,
-      ingredients: body.ingredients || []
+      zero_waste_tag: cleanText(body.zero_waste_tag, 40) || null,
+      ingredients: (Array.isArray(body.ingredients) ? body.ingredients : []).slice(0, 30).map(i => cleanText(i, 60)).filter(Boolean)
     };
     store.communityRecipes = store.communityRecipes || [];
     store.communityRecipes.unshift(newRecipe);
@@ -1087,10 +1150,14 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     store.communityRecipes = store.communityRecipes || [];
     const rec = store.communityRecipes.find(r => r.id === recipeCrudMatch[1]);
     if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
-    if (body.title !== undefined) rec.title = body.title;
-    if (body.prep_time_minutes !== undefined) rec.prep_time_minutes = Number(body.prep_time_minutes);
-    if (body.calories !== undefined) rec.calories = Number(body.calories);
-    if (body.zero_waste_tag !== undefined) rec.zero_waste_tag = body.zero_waste_tag;
+    if (body.title !== undefined) {
+      const title = cleanText(body.title, 120);
+      if (title.length < 2) return { status: 400, data: { error: 'Tiêu đề công thức không hợp lệ' } };
+      rec.title = title;
+    }
+    if (body.prep_time_minutes !== undefined) rec.prep_time_minutes = cleanNumber(body.prep_time_minutes, 1, 1440, rec.prep_time_minutes);
+    if (body.calories !== undefined) rec.calories = cleanNumber(body.calories, 0, 10000, rec.calories);
+    if (body.zero_waste_tag !== undefined) rec.zero_waste_tag = cleanText(body.zero_waste_tag, 40) || null;
     return { status: 200, data: rec };
   }
 
