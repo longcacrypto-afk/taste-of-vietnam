@@ -117,8 +117,23 @@ export function createAppServer() {
       }
     }
 
-    // 4. Serve 93-Screen UI/UX Studio at / and /studio (Streaming with no memory overhead)
+    // 4. Serve Clean Full-Screen Mobile PWA at /app (and auto-serve on mobile devices at /)
+    const mobileAppFile = path.join(__dirname, 'ui-design', 'app.html');
     const studioFile = path.join(__dirname, 'ui-design', 'index.html');
+    const ua = (req.headers['user-agent'] || '');
+    const isMobileUa = /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
+    const forceStudio = urlObj.searchParams.get('studio') === '1';
+
+    if (pathname === '/app' && fs.existsSync(mobileAppFile)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      return fs.createReadStream(mobileAppFile).pipe(res);
+    }
+
+    if (pathname === '/' && isMobileUa && !forceStudio && fs.existsSync(mobileAppFile)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      return fs.createReadStream(mobileAppFile).pipe(res);
+    }
+
     if ((pathname === '/' || pathname === '/studio') && fs.existsSync(studioFile)) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       return fs.createReadStream(studioFile).pipe(res);

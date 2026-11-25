@@ -3,7 +3,7 @@
   "name": "Hôm nay ăn gì · Taste of Vietnam",
   "short_name": "Ăn Gì?",
   "description": "AI-powered Vietnamese food discovery. Get personalized meal suggestions, discover local restaurants, 7-day meal plans & group polls.",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#18181B",
