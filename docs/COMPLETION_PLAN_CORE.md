@@ -101,3 +101,34 @@ Cookpad công khai rằng công thức có thể không chính xác/an toàn; �
 | M2-4 L | S03–S07 + M9-S02/S03 | Schema nội dung: tác giả/nguồn/license ảnh, định lượng, công thức, diet/allergen đã duyệt, published/version; importer có dry-run/chống trùng | Nhập thử bộ nhỏ, báo lỗi từng dòng; chỉ published được gợi ý; mọi món có ảnh đúng hoặc placeholder trung thực. **Cần nguồn dữ liệu và quyền sử dụng** |
 | M2-5 M | S08 | Kiểm dishId tồn tại; nếu giữ nhiều bộ sưu tập như mẫu: API đề xuất CRUD collections theo id, chống lost update, xử lý món bị gỡ | Hai tab lưu cùng lúc không mất món; không đọc/sửa nhóm người khác; xóa món không để link hỏng; nếu MVP chỉ 1 nhóm phải ghi rõ UI |
 | M2-6 M | S04–S07 | Cache chỉ nội dung công khai gần nhất; trạng thái offline/read-only; xuất bản URL chi tiết ổn định, meta/ảnh chia sẻ cho P3 | Offline đọc được công thức đã mở, không trả dữ liệu riêng người cũ; deep link reload đúng món; kiểm 360/768/1440 và phím/bộ đọc màn hình |
+
+## 3. M3 — Gợi ý, Măm AI và quyết định bữa ăn (35%)
+
+### Ý định và màn giữ lại
+
+S01 ba món; S02 lý do; S03 Decision Hub (quay/rút quẻ/túi mù); S04 chat; S05 kết quả; S06 phản hồi; S07 lịch sử. Giữ Today, chat, game của Live App, không thay bằng giao diện mới; sửa đầu vào/dữ liệu của các thành phần đó.
+
+### Hiện chạy được và còn giả
+
+- `/suggestions/today`, `/suggestions/spin`, POST `/chat`, POST `/suggestions/feedback`, GET `/suggestions/history` dùng catalogue/hồ sơ/history từ repository. Today loại nhãn dị ứng trùng tuyệt đối, disliked, món đã ăn 72 giờ; ưu tiên vùng/cay/thời tiết/quán gần. Quán của gợi ý dùng view DB nhưng khoảng cách ở recommender được tính Haversine, không phải truy vấn PostGIS cho từng lần Today.
+- Bộ lọc chỉ hiểu mã dị ứng đã gắn sẵn; không hiểu tên đồng nghĩa hoặc nguyên liệu thiếu. `diet_mode`, `meal_slots`, `budget_min` chưa được dùng làm điều kiện Today; spice chỉ cộng điểm. Giá tự nhiên được nới 25%; slot tài trợ không kiểm đủ ngân sách, có thể dùng bán kính campaign rộng hơn người dùng.
+- Tối đa một slot tài trợ theo số tuyệt đối, nhưng khi chỉ còn một món tài trợ và ít món tự nhiên thì tỷ lệ có thể vượt 1/3. M7 đóng băng nên cần tắt phân phối tài trợ cho MVP hoặc sửa chặt mẫu số, không mở chiến dịch.
+- Thời tiết luôn từ `seed.js`: 26°C/rain_cool/Biên Hòa. Lý do câu chữ cũng luôn “dịu mát”, không phản ánh trạng thái thật.
+- Gemini hardcode `gemini-2.0-flash`, key trên query URL, không timeout chat. Chat trả `intent` từ Gemini nhưng `options` lại tính riêng bằng regex; hai kết quả có thể mâu thuẫn. `mode`, `meal_slot`, `spice_max`, nguyên liệu và cooldown chưa được áp dụng đầy đủ cho options; câu “có ghế trẻ em & không cay” không kiểm ghế thực tế.
+- Spin API chỉ lọc safety/disliked, không cùng cooldown/ngân sách/bữa ăn Today. Live App còn `foodFortunes`, `blindBoxLoots` và voucher viết sẵn: không đi qua lọc dị ứng; không được giữ như kết quả món thật.
+- Feedback có thể báo thành công dù HTTP lỗi trong UI; skipped chưa thay đổi candidate/disliked và cache chưa bị xóa ở route feedback nên đổi món có thể hiện y nguyên, eaten có thể vẫn hiện do cache. History chỉ có phản hồi, không lưu đủ lần hiển thị/lý do theo spec; `next_cursor: null`.
+
+### Nghiên cứu dùng để hoàn thiện
+
+Tài liệu Gemini đã liệt kê dòng 2.0 Flash ngừng cung cấp [R4]; không chỉ đổi badge. Chọn model còn hỗ trợ tại lúc triển khai, cấu hình qua env và smoke test có hạn mức. Thời tiết cần nguồn có phép dùng thương mại: Open-Meteo phân biệt giấy phép dữ liệu và quyền dùng hosted API thương mại [R5]. Đề xuất chưa mua dịch vụ: có adapter/cache và trạng thái “chưa có thời tiết”, không giả là quan trắc thật.
+
+### Việc theo thứ tự
+
+| ID / cỡ | Màn có sẵn | Logic/API + dữ liệu phải làm | Nghiệm thu / phụ thuộc |
+| --- | --- | --- | --- |
+| M3-1 M | S01–S05 | Một pipeline candidate dùng chung Today/chat/spin/game: safety đã duyệt, diet, meal, spice khi là ràng buộc, budget, cooldown; eat_out chỉ quán đủ điều kiện, cook chỉ công thức | Matrix dị ứng × chay × ngân sách × giờ ăn × đã ăn; không đủ 3 thì trả 0–2 + lý do, không tự nới an toàn |
+| M3-2 M **P2 phần UI** | S01–S03, S06–S07 | Feedback kiểm id/action; invalidate cache theo người và context/version; skipped loại khỏi lần đổi; lưu suggestion id/lý do/context và phân trang history | Bấm đổi ra món khác hoặc báo hết lựa chọn; eaten ẩn ngay và qua restart; 72 giờ hết hạn thì quay lại; không bịa tên quán mặc định |
+| M3-3 M | S04–S05 | Parse/validate intent một lần rồi chạy pipeline; lời AI chỉ từ kết quả thật, không thêm quán/tiện ích; timeout/abort/circuit breaker; model config, key header, không lộ log | “4 người 300k không cay ăn chay gần đây” đúng tổng tiền và tất cả điều kiện; provider lỗi/JSON sai về fallback có nhãn; prompt injection không bỏ safety. **Cần key để xác minh AI thật** |
+| M3-4 M | S01–S02 | Weather adapter theo GPS/thành phố/timezone, TTL và observed_at/source; fallback trung thực; lý do lấy đúng dữ liệu | Giả lập nắng/mưa/mất nguồn bằng fixture; không ghi “26°C thật” khi thiếu nguồn. **Cần chọn nguồn/duyệt chi phí nếu thương mại** |
+| M3-5 M **P2 phần UI** | S03 | Giữ animation 3 game, nhận dishId từ API pipeline an toàn; bỏ loot/voucher giả; không đưa quảng cáo M7 vào lại | Dị ứng tôm không bao giờ quay/rút/mở ra món tôm; response rỗng dừng animation; giảm chuyển động có hiệu lực; không có voucher không tồn tại |
+| M3-6 M | S01–S07 | Tắt tài trợ MVP bằng cấu hình; vẫn test ≤1/3 trên kết quả thực và budget/radius khi bật lại; benchmark NLU bộ câu thật đã gán nhãn; đo p95 gồm DB/network thay vì một lần tính trong RAM | Test 0/1/2/3 candidate, campaign phạm vi rộng, nhiều người; đo phân vị và timeout; báo tỷ lệ thực, không dùng số 100% hardcode |
