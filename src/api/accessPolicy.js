@@ -38,6 +38,7 @@ const PERSONAL_PREFIXES = [
 // Non-GET routes that stay public (no stored data of other people changes)
 const PUBLIC_WRITES = new Set([
   'POST /api/v1/auth/login',
+  'POST /api/v1/auth/google',
   'POST /api/v1/auth/otp/request',
   'POST /api/v1/auth/otp/verify',
   'POST /api/v1/auth/guest',

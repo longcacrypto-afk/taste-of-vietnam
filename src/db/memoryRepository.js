@@ -1,3 +1,4 @@
+import { mergeProfile, mergeCollections } from '../services/profileService.js';
 // =============================================================================
 // IN-MEMORY REPOSITORY — tests and local dev only (DATABASE_URL unset).
 // Same interface as PostgresRepository; data lives in the `store` object from
@@ -14,6 +15,41 @@ export class MemoryRepository {
   constructor(store) {
     this.store = store;
     this.kind = 'memory';
+  }
+
+  // Link only by verified Google subject; email alone never links an account.
+  // Synchronous mutation block (no await): atomic in the in-memory adapter.
+  async loginGoogle(identity, guestId, fresh) {
+    const users = this.store.users ||= {};
+    let user = Object.values(users).find(u => u.google_sub === identity.sub && !u.guest);
+    const isNew = !user;
+    const guest = guestId && users[guestId]?.guest ? users[guestId] : null;
+    if (!user) user = { ...fresh, suggestionHistory: [], savedCollections: structuredClone(fresh.savedCollections) };
+    const next = { ...user, google_sub: identity.sub, email: identity.email, identity_verified: identity.identity_verified };
+    if (guest) {
+      next.profile = mergeProfile(next.profile, guest.profile, isNew);
+      next.savedCollections = mergeCollections(next.savedCollections, guest.savedCollections);
+      next.suggestionHistory = [...next.suggestionHistory, ...guest.suggestionHistory].sort((a,b) => b.created_at.localeCompare(a.created_at));
+    }
+    users[next.id] = next;
+    if (guest) {
+      for (const key of ['orderRedirects', 'userReports']) for (const row of this.store[key] || []) if (row.user_id === guestId) row.user_id = next.id;
+      for (const row of this.store.communityRecipes || []) if (row.author_id === guestId) row.author_id = next.id;
+      delete users[guestId];
+    }
+    return next;
+  }
+
+  async exportUserData(id) {
+    const user = await this.getUser(id);
+    return structuredClone({
+      account: { id: user.id, role: user.role, phone: user.phone, email: user.email || null, guest: user.guest, created_at: user.created_at },
+      profile: user.profile, suggestion_history: user.suggestionHistory, saved_collections: user.savedCollections,
+      order_redirects: (this.store.orderRedirects || []).filter(r => r.user_id === id),
+      place_reports: (this.store.userReports || []).filter(r => r.user_id === id),
+      community_recipes: (this.store.communityRecipes || []).filter(r => r.author_id === id),
+      payment_orders: Object.values(this.store.paymentOrders || {}).filter(r => r.created_by === id)
+    });
   }
 
   // ── users & OTP ────────────────────────────────────────────────────────────
@@ -60,6 +96,8 @@ export class MemoryRepository {
     this.store.communityRecipes = (this.store.communityRecipes || []).filter(r => r.author_id !== id);
     for (const r of this.store.userReports || []) if (r.user_id === id) r.user_id = null;
     for (const o of Object.values(this.store.paymentOrders || {})) if (o.created_by === id) o.created_by = null;
+    for (const r of this.store.campaigns || []) if (r.created_by === id) r.created_by = null;
+    for (const r of this.store.auditLogs || []) if (r.actor_id === id) { r.actor_id = null; r.actor = 'deleted-account'; }
     delete this.store.users[id];
     return true;
   }
