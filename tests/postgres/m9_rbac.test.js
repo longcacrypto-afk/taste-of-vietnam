@@ -90,3 +90,48 @@ test('M9 PostgreSQL: concurrent bootstrap grants exactly one super admin; allowl
   assert.equal((await repo.listUsers()).filter(u=>u.role==='super_admin').length,1);
   assert.equal((await repo.listAudit(100)).filter(r=>r.action==='BOOTSTRAP_SUPER_ADMIN').length,1);
 });
+
+test('M9 PostgreSQL: privacy cleanup is atomic, cannot erase audit evidence or change action fields',{skip},async t=>{
+  const {repo}=await setup(t);
+  await repo.createUser({id:'actor',role:'consumer',guest:false,phone:'+84900000999',profile:{}});
+  await repo.addAudit({actor:'actor',actor_id:'actor',role:'content_moderator',action:'CREATE_DISH',target:'DISH-101',reason:'Keep evidence',before:null,after:{name:'Phở'}});
+  await assert.rejects(repo.q("UPDATE rbac_audit_logs SET actor_id=NULL,actor_email='deleted-user',action='HIDDEN'"),/append-only/);
+  await repo.q(`CREATE FUNCTION fail_privacy_audit() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN IF NEW.action='ANONYMIZE_ACTOR' THEN RAISE EXCEPTION 'privacy audit unavailable'; END IF; RETURN NEW; END $$`);
+  await repo.q(`CREATE TRIGGER fail_privacy_audit BEFORE INSERT ON rbac_audit_logs FOR EACH ROW EXECUTE FUNCTION fail_privacy_audit()`);
+  await assert.rejects(repo.atomic(async tx=>{await tx.anonymizeAuditActor('actor');await tx.deleteUser('actor');}),/privacy audit unavailable/);
+  assert.ok(await repo.getUser('actor'));
+  assert.equal((await repo.listAudit(100))[0].actor_id,'actor');
+  await repo.q('DROP TRIGGER fail_privacy_audit ON rbac_audit_logs');
+  await repo.atomic(async tx=>{await tx.anonymizeAuditActor('actor');await tx.deleteUser('actor');});
+  const logs=await repo.listAudit(100);
+  assert.equal(logs.length,2);
+  assert.equal(logs.find(r=>r.action==='CREATE_DISH').actor_id,null);
+  assert.equal(logs.find(r=>r.action==='CREATE_DISH').reason,'Keep evidence');
+  await assert.rejects(repo.q('DELETE FROM rbac_audit_logs'),/append-only/);
+});
+
+test('M9 PostgreSQL: passed-client privacy cleanup shares DELETE transaction, including rollback under a user lock',{skip},async t=>{
+  const {repo}=await setup(t);
+  await repo.createUser({id:'actor',role:'consumer',guest:false,phone:'+84900000998',profile:{}});
+  await repo.addAudit({actor:'actor',actor_id:'actor',role:'consumer',action:'TEST_ACTOR',target:'dish',reason:'Business evidence'});
+  const client=await repo.pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT id FROM users WHERE id='actor' FOR UPDATE");
+    assert.equal(await repo.anonymizeAuditActor('actor',client),1);
+    await client.query("DELETE FROM users WHERE id='actor'");
+    await client.query('ROLLBACK');
+    assert.ok(await repo.getUser('actor'));
+    assert.equal((await repo.listAudit(100)).find(r=>r.action==='TEST_ACTOR').actor_id,'actor');
+    assert.equal((await repo.listAudit(100)).filter(r=>r.action==='ANONYMIZE_ACTOR').length,0);
+    await client.query('BEGIN');
+    await client.query("SELECT id FROM users WHERE id='actor' FOR UPDATE");
+    assert.equal(await repo.anonymizeAuditActor('actor',client),1);
+    await client.query("DELETE FROM users WHERE id='actor'");
+    await client.query('COMMIT');
+    assert.equal(await repo.getUser('actor'),null);
+    assert.equal((await repo.listAudit(100)).find(r=>r.action==='TEST_ACTOR').actor_id,null);
+    assert.equal((await repo.listAudit(100)).filter(r=>r.action==='ANONYMIZE_ACTOR').length,1);
+  } finally {await client.query('ROLLBACK');client.release();}
+});

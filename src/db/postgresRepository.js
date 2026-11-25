@@ -436,6 +436,7 @@ export class PostgresRepository {
       await c.query("SELECT pg_advisory_xact_lock(hashtext('m9-role-grants'))");
       const repo = new PostgresRepository(this.pool);
       repo.q = (text,params) => c.query(text,params);
+      repo.inAtomic = true;
       repo.tx = inner => inner(c);
       return fn(repo);
     });
@@ -646,6 +647,23 @@ export class PostgresRepository {
       `INSERT INTO rbac_audit_logs (actor_email, actor_id, role, action, target, ip_address,before_data,after_data,reason,request_id) VALUES ($1, $2, $3, $4, $5, $6,$7,$8,$9,$10) RETURNING *`,
       [String(e.actor || 'unknown').slice(0, 255), e.actor_id || null, e.role || 'unknown', e.action, e.target ? String(e.target).slice(0, 255) : null, String(e.ip || 'unknown').slice(0, 45),JSON.stringify(e.before ?? null),JSON.stringify(e.after ?? null),e.reason || null,e.requestId || crypto.randomUUID()]);
     return auditFromRow(r.rows[0]);
+  }
+
+  // Call through atomic() alongside account deletion. No business fields may change.
+  async anonymizeAuditActor(userId, client = null) {
+    if (client) {
+      const scoped=new PostgresRepository(this.pool);
+      scoped.q=(text,params)=>client.query(text,params);
+      scoped.inAtomic=true;
+      return scoped.anonymizeAuditActor(userId);
+    }
+    if (!this.inAtomic) return this.atomic(tx=>tx.anonymizeAuditActor(userId));
+    const n=Number((await this.q('SELECT COUNT(*) AS n FROM rbac_audit_logs WHERE actor_id=$1',[userId])).rows[0].n);
+    if (!n) return 0;
+    await this.addAudit({actor:'privacy-service',role:'system',action:'ANONYMIZE_ACTOR',target:'deleted-user',
+      before:{entries:n},after:{actor_id:null,actor:'deleted-user'},reason:'Account deletion'});
+    await this.q("UPDATE rbac_audit_logs SET actor_id=NULL,actor_email='deleted-user' WHERE actor_id=$1",[userId]);
+    return n;
   }
 
   async listAudit(limit = 100) {

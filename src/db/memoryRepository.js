@@ -350,6 +350,15 @@ export class MemoryRepository {
     return row;
   }
 
+  async anonymizeAuditActor(userId, _client = null) {
+    const rows=(this.store.auditLogs || []).filter(r=>r.actor_id===userId);
+    if (!rows.length) return 0;
+    await this.addAudit({actor:'privacy-service',role:'system',action:'ANONYMIZE_ACTOR',target:'deleted-user',
+      before:{entries:rows.length},after:{actor_id:null,actor:'deleted-user'},reason:'Account deletion'});
+    for(const r of rows) {r.actor_id=null;r.actor='deleted-user';}
+    return rows.length;
+  }
+
   async listAudit(limit = 100) {
     return (this.store.auditLogs || []).slice(0, limit);
   }

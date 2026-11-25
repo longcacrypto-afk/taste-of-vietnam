@@ -215,6 +215,22 @@ export function contracts(make,options={}) {
     assert.equal(q.data.total,2);
   });
 
+  test('M9 deleting an actor anonymizes identity, keeps business evidence and records a privacy receipt',options,async t=>{
+    const {api,repo}=await setup(t);
+    await api('POST','/api/v1/admin/rbac/users','super_admin',{user_id:'test-user',role:'content_moderator',reason:'Phân công'});
+    await api('POST','/api/v1/admin/dishes','user',{name:'Món do người sẽ xóa tạo',reason:'Nhập món'});
+    const before=structuredClone((await repo.listAudit(100)).find(r=>r.actor_id==='test-user'));
+    assert.ok(before);
+    assert.equal((await api('DELETE','/api/v1/me','user')).status,200);
+    assert.equal(await repo.getUser('test-user'),null);
+    const logs=await repo.listAudit(100);
+    const after=logs.find(r=>r.id===before.id);
+    assert.equal(after.actor_id,null);assert.equal(after.actor,'deleted-user');
+    for(const field of ['action','target','before','after','reason','timestamp','request_id']) assert.deepEqual(after[field],before[field],field);
+    assert.equal(logs.filter(r=>r.action==='ANONYMIZE_ACTOR').length,1);
+    assert.equal(await repo.atomic(tx=>tx.anonymizeAuditActor('test-user')),0,'idempotent privacy cleanup');
+  });
+
   test('M9 audit is filterable/paginated with real actor, target, reason, before-after and server request id',options,async t=>{
     const {api}=await setup(t);
     await api('POST','/api/v1/admin/dishes','content_moderator',{name:'Món mới A',reason:'Bổ sung món'});

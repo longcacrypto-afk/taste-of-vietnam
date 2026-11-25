@@ -27,6 +27,14 @@ CREATE INDEX IF NOT EXISTS idx_reports_closure_window ON place_reports(place_id,
 UPDATE places SET report_count = 0;
 -- Append-only audit at DB level too (a DB owner/superuser can still disable triggers).
 CREATE FUNCTION protect_admin_audit() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN RAISE EXCEPTION 'admin audit is append-only'; END $$;
+BEGIN
+  -- Sole privacy exception: unlink a deleted actor, never alter business evidence.
+  IF TG_OP = 'UPDATE' AND OLD.actor_id IS NOT NULL AND NEW.actor_id IS NULL
+     AND NEW.actor_email = 'deleted-user'
+     AND (to_jsonb(OLD) - 'actor_id' - 'actor_email') = (to_jsonb(NEW) - 'actor_id' - 'actor_email') THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'admin audit is append-only';
+END $$;
 CREATE TRIGGER protect_admin_audit BEFORE UPDATE OR DELETE ON rbac_audit_logs
 FOR EACH ROW EXECUTE FUNCTION protect_admin_audit();

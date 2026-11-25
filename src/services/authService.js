@@ -229,6 +229,7 @@ export async function deleteUser(repo, userId) {
     if (user?.role === 'super_admin' && (await tx.listUsers()).filter(u => u.role === 'super_admin').length <= 1) {
       return false;
     }
+    await tx.anonymizeAuditActor(userId);
     return tx.deleteUser(userId);
   });
 }
