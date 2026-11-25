@@ -75,7 +75,7 @@ test('M1 PostgreSQL: guest collections/history/redirects move atomically into Go
   await repo.saveCollections(gid, [{ id: 'col-1', name: 'Guest', dish_ids: ['DISH-101', 'DISH-102'] }]);
   await repo.addHistory(gid, { id: 'merge-history', dish_id: 'DISH-101', action: 'eaten', created_at: new Date().toISOString() });
   await repo.addHistory(other.data.guest_id, { id: 'other-private', action: 'eaten', created_at: new Date().toISOString() });
-  await repo.createOrderRedirect({ id: 'merge-redirect', user_id: gid, partner: 'grab', action_type: 'delivery', target_deeplink: 'https://example.test', loopback_confirmed_eaten: false, created_at: new Date().toISOString() });
+  await repo.createOrderRedirect({ id: 'merge-redirect', user_id: gid, partner: 'grab', action_type: 'order', clicked_at: new Date().toISOString(), target_deeplink: 'https://example.test', loopback_confirmed_eaten: false, created_at: new Date().toISOString() });
   const a = await login('merge-target', g);
   assert.equal(a.status, 200);
   assert.equal(a.data.user.name, 'Khách đã chọn');
@@ -154,7 +154,7 @@ test('M1 PostgreSQL: export has >200 own history rows, reports/orders/recipes; d
   const id = a.data.user.id;
   await db.query(`INSERT INTO suggestion_history(id,user_id,action) SELECT 'export-' || n,$1,'eaten' FROM generate_series(1,251) n`, [id]);
   await repo.addHistory(b.data.user.id, { id: 'private-b', action: 'eaten', created_at: new Date().toISOString() });
-  await repo.createOrderRedirect({ id: 'delete-redirect', user_id: id, partner: 'grab', action_type: 'delivery', target_deeplink: 'https://example.test', loopback_confirmed_eaten: false, created_at: new Date().toISOString() });
+  await repo.createOrderRedirect({ id: 'delete-redirect', user_id: id, partner: 'grab', action_type: 'order', clicked_at: new Date().toISOString(), target_deeplink: 'https://example.test', loopback_confirmed_eaten: false, created_at: new Date().toISOString() });
   await db.query("INSERT INTO place_reports(id,place_id,user_id,reason) VALUES('delete-report','PLACE-401',$1,'wrong price')", [id]);
   await db.query("INSERT INTO payment_orders(order_id,order_code,amount_vnd,created_by) VALUES('delete-payment',999991,10000,$1)", [id]);
   await db.query("INSERT INTO community_recipes(id,title,author_name,author_id) VALUES('delete-recipe','Recipe','Author',$1)", [id]);
