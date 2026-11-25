@@ -1,3 +1,4 @@
+import { publicRepository } from '../services/dataEntry.js';
 import { googleConfig, googleLogin } from '../services/googleAuthService.js';
 import { validateProfilePatch } from '../services/profileService.js';
 import { parsePlaceQuery, placeWithStatus, placeDistance } from '../services/placeQuery.js';
@@ -88,7 +89,6 @@ async function openPlacesForDish(repo, dishId, profile, radiusM) {
  * else falls through to the in-process store.
  */
 async function buildView(repo, store, authUser) {
-  if (repo.kind === 'memory') return authUser ? scopeStoreToUser(store, authUser) : store;
   const [dishes, places, campaigns, suggestionHistory, savedCollections] = await Promise.all([
     repo.listDishes(),
     repo.listPlaces(),
@@ -108,7 +108,7 @@ async function buildView(repo, store, authUser) {
 }
 
 export async function handleApiRequest(store, method, pathname, searchParams, body = {}, headers = {}) {
-  const repo = getRepository(store);
+  let repo = getRepository(store);
   // Who is calling? (null = anonymous)
   const authUser = await authenticate(repo, headers);
   const denied = checkAccess(method, pathname, authUser);
@@ -120,6 +120,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     try { return await handleAdminRoute(repo, authUser, method, pathname, searchParams, body, headers, store); }
     catch(e) { if(e instanceof PolicyError) return {status:e.status,data:{error:e.message}}; throw e; }
   }
+  repo = publicRepository(repo);
   const userId = authUser ? authUser.id : null;
   // The caller's taste profile; anonymous reads use the shared default profile.
   const profile = authUser ? authUser.profile : store.userProfile;

@@ -56,7 +56,7 @@ export function contracts(make,options={}) {
       }
     }
     for(const role of roles) for(const [method,path] of [
-      ['GET','new-admin-feature'],['DELETE','rbac/users'],['PUT','reports/NOPE'],['POST','audit-logs'],['GET','dishes/NOPE'],
+      ['GET','new-admin-feature'],['DELETE','rbac/users'],['PUT','reports/NOPE'],['POST','audit-logs'],['HEAD','dishes/NOPE'],
       ['HEAD','dashboard'],['POST','dashboard'],['GET','reports/NOPE/extra']
     ]) assert.equal((await api(method,`/api/v1/admin/${path}`,role)).status,403,`${role}: deny unregistered ${method} ${path}`);
   });

@@ -1,3 +1,4 @@
+import { publicDish, publicPlace } from './dataEntry.js';
 // One candidate gate for Today, chat and decision games. No network/provider calls.
 import { getPlaceOpenStatus, isPlaceEligible } from './placeHours.js';
 import { haversineDistanceMeters } from './textUtils.js';
@@ -43,7 +44,7 @@ export function candidateContext(profile = {}, opts = {}) {
 
 // Share M4's verified-hours policy; eligibility is not a claim of being open.
 export function placeEligibility(place, now = Date.now()) {
-  return (place?.closed_report_count ?? 0) < 3 && isPlaceEligible(place, now, {
+  return publicPlace(place) && (place?.closed_report_count ?? 0) < 3 && isPlaceEligible(place, now, {
     requireVerifiedHours: process.env.REQUIRE_VERIFIED_HOURS === 'true'
   });
 }
@@ -76,6 +77,7 @@ export function buildCandidates(store, opts = {}, { now = Date.now(), placePredi
   if (!Array.isArray(profile.hard_allergies ?? []) || !Array.isArray(profile.disliked_dish_ids ?? []) || !(profile.hard_allergies ?? []).every(t => typeof t === 'string')) context.valid = false;
   if (!context.valid) reject('invalid_context');
   else for (const dish of store.dishes || []) {
+    if(!publicDish(dish)) { reject('safety'); continue; }
     const allergens = dish.allergen_tags;
     const allergies = profile.hard_allergies || [];
     if (dish.safety_status === 'rejected' || (approvalRequired && dish.safety_status !== 'approved')

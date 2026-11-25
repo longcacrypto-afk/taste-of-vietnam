@@ -1,6 +1,7 @@
 // Backend for the existing M9 screens. All mutations and their audit rows share one
 // transaction; role is loaded again under the same lock used by role assignment.
 import crypto from 'node:crypto';
+import { handleAdminDataRoute } from './adminDataRoutes.js';
 import { ROLES, adminAllowed, PolicyError } from '../services/adminPolicy.js';
 import { cleanText } from './router.js';
 
@@ -38,6 +39,8 @@ const changed = (data,action,target,before,after,reason,status=200) =>
   ({status,data,audit:{action,target,before:structuredClone(before ?? null),after:structuredClone(after ?? null),reason:reason || 'M9 content update'}});
 
 async function dispatch(repo,actor,method,path,q,body,store) {
+  const content=await handleAdminDataRoute(repo,actor,method,path,q,body);
+  if(content) return content;
   if(path==='/api/v1/admin/dashboard') {
     const [dishes,places,ocr,reports,campaigns]=await Promise.all([
       repo.listDishes(),repo.listPlaces(),repo.listOcrQueue(),repo.listUserReports(),repo.listCampaigns()]);
