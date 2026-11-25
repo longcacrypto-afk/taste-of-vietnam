@@ -117,24 +117,9 @@ export function createAppServer() {
       }
     }
 
-    // 4. Serve Clean Full-Screen Live Mobile App at /app (and auto-serve on mobile devices at /), Full Studio at /studio & desktop /
-    const mobileAppFile = path.join(__dirname, 'ui-design', 'app.html');
+    // 4. Serve Exact 99-Screen UI/UX (1-Screen Full-Screen App Mode at /app & mobile /, Full Studio at /studio & desktop /)
     const studioFile = path.join(__dirname, 'ui-design', 'index.html');
-    const ua = (req.headers['user-agent'] || '');
-    const isMobileUa = /iPhone|iPad|iPod|Android|Mobile/i.test(ua);
-    const forceStudio = urlObj.searchParams.get('studio') === '1';
-
-    if (pathname === '/app' && fs.existsSync(mobileAppFile)) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-      return fs.createReadStream(mobileAppFile).pipe(res);
-    }
-
-    if (pathname === '/' && isMobileUa && !forceStudio && fs.existsSync(mobileAppFile)) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-      return fs.createReadStream(mobileAppFile).pipe(res);
-    }
-
-    if ((pathname === '/' || pathname === '/studio') && fs.existsSync(studioFile)) {
+    if ((pathname === '/' || pathname === '/app' || pathname === '/studio') && fs.existsSync(studioFile)) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       return fs.createReadStream(studioFile).pipe(res);
     }
