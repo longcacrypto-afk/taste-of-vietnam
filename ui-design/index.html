@@ -9068,6 +9068,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       const all = d.items || [];
       $$("[onclick]", root).forEach((n, i) => {
         const reg = ["bac", "trung", "nam"][i];
+        const overlay=$(".absolute.inset-0",n);if(overlay)overlay.style.backgroundColor="rgba(0,0,0,0.7)";
         click(n, `P2.region('${reg}')`);
         const pill = $("span", n);
         text(pill, all.filter((a) => a.region === reg).length + " món");
@@ -9133,6 +9134,8 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         if (heart) click(heart, `P2.save('${J(d.id)}')`);
       }
       if (id === "M2-S05") {
+        const tip=$(".bg-\\[\\#DCFCE7\\]",root);
+        if(tip){text($(".font-extrabold",tip),d.name);text($("p",tip),d.description||"");}
         text($(".text-2xl", root), d.calories ?? "—");
         const vals = $$(".grid-cols-3 b", root);
         [d.macros?.carbs, d.macros?.protein, d.macros?.fat].forEach((v, i) =>
@@ -9177,6 +9180,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         text($('b[class*="D97736"]', photo), money(d.ref_price));
       }
     }
+    if(id==="M3-S05" && !state.chat.length) return stateHtml(id,"empty");
     if (id === "M3-S04" || id === "M3-S05") {
       const list = $$(".space-y-2", root).find(
         (n) => n.querySelectorAll(':scope > [onclick*="M2-S04"]').length >= 2,
@@ -9243,31 +9247,11 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       $$("button",root).forEach(b=>{
         if(["Zalo","Apple"].includes(b.textContent.trim())) b.remove();
         else if(b.textContent.trim()==="Google") {
-          b.disabled=!state.google?.enabled;
+          b.disabled=!(state.google?.enabled && state.google?.ready);
           b.textContent=state.google?.enabled?"Google":"Google · Sắp có";
           click(b,"P2.google()");
         }
       });
-    }
-    if (id === "M1-S02") {
-      const tip = root.children[1];
-      if (tip) {
-        const title = $(".font-extrabold", tip);
-        text(title, "Nhập mã xác thực");
-        text($("p", tip), "Nhập 6 chữ số cho số điện thoại " + state.phone + ". Mã phát triển chỉ dùng để kiểm tra, không phải SMS thật.");
-      }
-      const grid = $(".grid-cols-6", root);
-      grid.innerHTML = Array.from(
-        { length: 6 },
-        (_, i) =>
-          `<input aria-label="Chữ số ${i + 1} của mã OTP" inputmode="numeric" pattern="[0-9]" maxlength="1" value="${H(state.otp[i] || "")}" class="min-w-0 h-12 rounded-2xl bg-[#F8FAFC] border-2 border-[#E2E8F0] text-center font-extrabold" oninput="if(this.value&&this.nextElementSibling)this.nextElementSibling.focus()">`,
-      ).join("");
-      click($('[onclick*="M1-S03"]', root), "P2.verifyOtp()");
-      const resend = $("span.font-extrabold", root);
-      if (resend) {
-        resend.outerHTML =
-          '<button onclick="P2.requestOtp(true)" class="font-extrabold text-[#B45309]">Gửi lại SMS</button>';
-      }
     }
     const choices = (holder, values, key, multi = false) => {
       if (!holder) return;
@@ -9479,6 +9463,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       });
     }
     if (id === "M5-S03") {
+      text($(".text-\\[10px\\]",root.firstElementChild),Math.round(place.distance_m)+"m");
       $$("button", root)
         .slice(-2)
         .forEach((b) => click(b, "P2.order('maps')"));
@@ -9499,20 +9484,6 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         text($(".font-extrabold", tip), "Bạn chưa đặt món trong ứng dụng này");
         text($("p", tip), "Mở dịch vụ bên ngoài để xem giá và xác nhận. Chỉ đánh dấu Đã ăn sau khi bạn thực sự dùng bữa.");
       }
-      const a = document.createElement("a"),
-        url = state.order?.target_deeplink;
-      try {
-        const u = new URL(url);
-        if (["https:", "tel:"].includes(u.protocol)) {
-          a.href = u.href;
-          a.target = "_blank";
-          a.rel = "noopener noreferrer";
-          a.className =
-            "block py-3 rounded-full bg-[#18181B] text-white font-extrabold";
-          a.textContent = "Tiếp tục sang dịch vụ bên ngoài";
-          root.insertBefore(a, root.lastElementChild);
-        }
-      } catch {}
       click(root.lastElementChild, "P2.confirmMeal()");
     }
   }
@@ -9603,13 +9574,14 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   function polish(root = document) {
     if (!root) return;
     // Darker shades from the existing palette keep small labels readable.
-    const contrast = {"#D97736":"#92400E","#F59E0B":"#92400E","#B45309":"#92400E","#22C55E":"#166534","#16A34A":"#15803D","#4ADE80":"#15803D","#60A5FA":"#1D4ED8","#F87171":"#B91C1C","#DB2777":"#BE185D"};
+    const contrast = {"#15803D":"#166534","#EF4444":"#B91C1C","#D97706":"#92400E","#D97736":"#92400E","#F59E0B":"#92400E","#B45309":"#92400E","#22C55E":"#166534","#16A34A":"#15803D","#4ADE80":"#15803D","#60A5FA":"#1D4ED8","#F87171":"#B91C1C","#DB2777":"#BE185D"};
     $$("[class]", root).forEach(el=>{
       for (const [from,to] of Object.entries(contrast))
         if (el.classList.contains("text-["+from+"]")) el.style.color=to;
       if (el.classList.contains("text-red-400")) el.style.color="#B91C1C";
       if (el.classList.contains("text-green-400")) el.style.color="#166534";
       if (el.classList.contains("text-blue-400")) el.style.color="#1D4ED8";
+      if (el.classList.contains("bg-[#EF4444]")) el.style.backgroundColor="#B91C1C";
       if (el.classList.contains("bg-[#22C55E]")) el.style.backgroundColor="#15803D";
       if (el.classList.contains("bg-[#00B14F]")) el.style.backgroundColor="#15803D";
       if (el.classList.contains("bg-[#EE4D2D]")) el.style.backgroundColor="#C2410C";
@@ -9667,7 +9639,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       for (const a of el.attributes) b.setAttribute(a.name, a.value);
       b.type = "button";
       b.style.textAlign = "inherit";
-      if (el.tagName === "DIV") b.style.width = "100%";
+      if (el.tagName === "DIV" && !el.classList.contains("absolute") && !el.classList.contains("fixed")) b.style.width = "100%";
       b.innerHTML = el.innerHTML;
       el.replaceWith(b);
     });
@@ -9701,7 +9673,10 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   window.P2 = {
     async google() {
       if(!state.google?.enabled || !window.google?.accounts?.id) return;
-      google.accounts.id.prompt();
+      google.accounts.id.prompt(notification=>{
+        if(notification.isNotDisplayed?.() || notification.isSkippedMoment?.())
+          status("Chưa mở được đăng nhập Google. Kiểm tra cài đặt trình duyệt rồi thử lại.");
+      });
     },
     state,
     retryWrite() {
@@ -9712,7 +9687,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     },
     dish(id, target = "M2-S04") {
       state.dish = id;
-      state.place = null;
+      if(target !== "M5-S01") state.place = null;
       appState.servings = 2;
       goScreen(target);
     },
@@ -9781,45 +9756,6 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         { timeout: 10000 },
       );
     },
-    requestOtp(resend = false) {
-      state.phone = resend
-        ? state.phone
-        : $("#stage-container input[type=tel]")?.value.trim();
-      action(
-        async () => {
-          const r = await TOV_AUTH.requestOtp(state.phone);
-          if (!r.ok)
-            throw Object.assign(new Error("Không gửi được mã"), {
-              status: r.status,
-            });
-          return r.data;
-        },
-        (d) => {
-          state.otp = d.dev_code || "";
-          goScreen("M1-S02");
-          if (d.dev_code) status("Máy phát triển: mã thử đã được điền sẵn.");
-        },
-      );
-    },
-    verifyOtp() {
-      const code = $$("#stage-container .grid-cols-6 input")
-        .map((i) => i.value)
-        .join("");
-      action(
-        async () => {
-          const r = await TOV_AUTH.verifyOtp(state.phone, code);
-          if (!r.ok)
-            throw Object.assign(new Error("Mã không đúng"), {
-              status: r.status,
-            });
-          return r.data;
-        },
-        (r) => {
-          state.cache = {};
-          goScreen(r.role === "admin" ? "M9-S01" : "M1-S03");
-        },
-      );
-    },
     save(id = selected()) {
       action(
         () => api("/me/collections", "POST", { dish_id: id }),
@@ -9846,10 +9782,8 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         state.cache["places:" + selected()]?.data.items.find(
           (p) => p.id === state.place,
         ) || state.cache["places:" + selected()]?.data.items[0];
-      const reason =
-        $(
-          "#stage-container input[name=r]:checked",
-        )?.parentElement.textContent.trim() || "Quán đóng cửa";
+      const radios=$$("#stage-container input[name=r]");
+      const reason=["closed","wrong_price","wrong_location"][radios.findIndex(r=>r.checked)]||"other";
       action(
         () =>
           api("/places/" + encodeURIComponent(p.id) + "/reports", "POST", {
@@ -9862,17 +9796,19 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       const items = state.cache["places:" + selected()]?.data.items || [],
         p = items.find((p) => p.id === state.place) || items[0];
       if (!p) return status("Chưa chọn được quán.");
+      const tab=window.open("about:blank","_blank");
+      if(!tab) return status("Trình duyệt đang chặn mở dịch vụ bên ngoài. Cho phép cửa sổ mới rồi thử lại.");
+      tab.opener=null;
       action(
-        () =>
-          api("/orders/redirect", "POST", {
-            dish_id: selected(),
-            place_id: p.id,
-            partner,
-          }),
-        (d) => {
-          state.order = d;
-          goScreen("M5-S05");
+        async()=>{
+          try {
+            const d=await api("/orders/redirect", "POST", {dish_id:selected(),place_id:p.id,partner});
+            const u=new URL(d.target_deeplink);
+            if(u.protocol!=="https:") throw new Error("Liên kết không hợp lệ");
+            return {...d,target_deeplink:u.href};
+          } catch(e){tab.close();throw e;}
         },
+        (d)=>{state.order=d;tab.location.replace(d.target_deeplink);goScreen("M5-S05");}
       );
     },
     call() {
@@ -9885,6 +9821,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         dish_id: selected(),
         place_id: p.id,
       };
+      location.href=state.order.target_deeplink;
       goScreen("M5-S05");
     },
     confirmMeal() {
@@ -10053,7 +9990,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   });
   $$("[data-ai-badge]").forEach((n) => n.remove());
   const style = document.createElement("style");
-  style.textContent = `.product-mode{--text-muted:#5B6A80}.product-mode #p2-action-status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;max-width:calc(100vw - 24px);width:420px;box-shadow:0 8px 30px #0003}.product-mode :focus-visible{outline:3px solid #B45309;outline-offset:3px}.product-mode input{min-width:0}.product-mode [onclick]{touch-action:manipulation}.product-mode .phone-frame .flex-1{min-width:0}.product-mode .phone-frame button{white-space:normal}.product-mode .phone-frame{overflow:hidden}.product-mode #main-liveapp{min-width:0}.product-mode [data-p2-layout]{min-width:0}@media(max-width:768px){.product-mode #stage-container .min-w-\\[1100px\\],.product-mode #stage-container .min-w-\\[1000px\\]{min-width:0!important}.product-mode #stage-container table{display:block;max-width:100%;overflow:auto}.product-mode #stage-container aside nav{display:flex;flex-wrap:wrap;max-height:none}.product-mode #stage-container aside nav button{width:auto}.product-mode #stage-container .grid-cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}.product-mode #stage-container .w-64{width:auto}.product-mode #stage-container .min-w-0{max-width:100%}}`;
+  style.textContent = `.product-mode{--text-muted:#5B6A80}.product-mode #p2-action-status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;max-width:calc(100vw - 24px);width:420px;box-shadow:0 8px 30px #0003}.product-mode :focus-visible{outline:3px solid #B45309;outline-offset:3px}.product-mode input{min-width:0}.product-mode [onclick]{touch-action:manipulation}.product-mode .phone-frame .flex-1{min-width:0}.product-mode .phone-frame{overflow:hidden}.product-mode #main-liveapp{min-width:0}.product-mode [data-p2-layout]{min-width:0}@media(max-width:768px){.product-mode #stage-container .min-w-\\[1100px\\],.product-mode #stage-container .min-w-\\[1000px\\]{min-width:0!important}.product-mode #stage-container table{display:block;max-width:100%;overflow:auto}.product-mode #stage-container aside nav{display:flex;flex-wrap:wrap;max-height:none}.product-mode #stage-container aside nav button{width:auto}.product-mode #stage-container .w-64{width:auto}.product-mode #stage-container .min-w-0{max-width:100%}}`;
   document.head.append(style);
   polish(document.body);
   // Existing dynamic live panels retain their original functions and markup.
@@ -10078,15 +10015,16 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       state.google=res.ok?await res.json():{enabled:false};
       if(state.google.enabled && state.google.client_id) {
         const script=document.createElement("script");script.src="https://accounts.google.com/gsi/client";script.async=true;
-        script.onload=()=>google.accounts.id.initialize({client_id:state.google.client_id,callback:credential=>action(
+        script.onload=()=>{google.accounts.id.initialize({client_id:state.google.client_id,callback:credential=>action(
           async()=>{const r=await TOV_AUTH.google(credential.credential);if(!r.ok)throw Object.assign(new Error("Đăng nhập chưa thành công"),{status:r.status});return r.data;},
-          ()=>{state.cache={};goScreen("M1-S03");}
-        )});
+          (d)=>{state.cache={};if(document.body.classList.contains("pwa-mobile-mode"))goScreen("M1-S03");else setLiveAppTab(d.role==="admin"?"admin":"profile");}
+        )});state.google.ready=true;$$("[onclick='P2.google()']").forEach(b=>b.disabled=false);};
+        script.onerror=()=>status("Chưa tải được đăng nhập Google. Kiểm tra mạng rồi thử lại.");
         document.head.append(script);
       }
     } catch {state.google={enabled:false};}
     if(appState.activeScreenId==="M1-S01")paint();
-    $$("[onclick='P2.google()']").forEach(b=>{b.disabled=!state.google?.enabled;b.textContent=state.google?.enabled?"Google":"Google · Sắp có";});
+    $$("[onclick='P2.google()']").forEach(b=>{b.disabled=!(state.google?.enabled && state.google?.ready);b.textContent=state.google?.enabled?"Google":"Google · Sắp có";});
   })();
   load("M1-S09");
   load(appState.activeScreenId);
