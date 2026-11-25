@@ -132,3 +132,32 @@ Tài liệu Gemini đã liệt kê dòng 2.0 Flash ngừng cung cấp [R4]; khô
 | M3-4 M | S01–S02 | Weather adapter theo GPS/thành phố/timezone, TTL và observed_at/source; fallback trung thực; lý do lấy đúng dữ liệu | Giả lập nắng/mưa/mất nguồn bằng fixture; không ghi “26°C thật” khi thiếu nguồn. **Cần chọn nguồn/duyệt chi phí nếu thương mại** |
 | M3-5 M **P2 phần UI** | S03 | Giữ animation 3 game, nhận dishId từ API pipeline an toàn; bỏ loot/voucher giả; không đưa quảng cáo M7 vào lại | Dị ứng tôm không bao giờ quay/rút/mở ra món tôm; response rỗng dừng animation; giảm chuyển động có hiệu lực; không có voucher không tồn tại |
 | M3-6 M | S01–S07 | Tắt tài trợ MVP bằng cấu hình; vẫn test ≤1/3 trên kết quả thực và budget/radius khi bật lại; benchmark NLU bộ câu thật đã gán nhãn; đo p95 gồm DB/network thay vì một lần tính trong RAM | Test 0/1/2/3 candidate, campaign phạm vi rộng, nhiều người; đo phân vị và timeout; báo tỷ lệ thực, không dùng số 100% hardcode |
+
+## 4. M4 — Quán, vị trí và bản đồ (30%)
+
+### Ý định và màn giữ lại
+
+S01 danh sách gần món; S02 bản đồ; S03 chi tiết quán; S04 menu/giá; S05 còn món; S06 báo sai. Live App `lpanel-places`, `loadLivePlaces`, bộ lọc all/ac/kids/high_rating đã có; tiếp tục dùng card/bộ lọc đó.
+
+### Hiện chạy được và còn giả
+
+- GET `/places?dish_id=&open_only=` gọi PostGIS ST_DWithin/ST_Distance theo tọa độ/bán kính trong **hồ sơ**, trả `distance_m`; chỉ hiển thị verified, không paused, report_count <3 khi open_only. Query `lat/lng/radius` trên URL mẫu không được route đọc.
+- “Đang mở” hiện thực chất là verified/not paused, **không tính lịch giờ mở cửa**, ngày nghỉ, qua nửa đêm; thiếu xác minh lại sau 90 ngày theo handoff.
+- Live App đọc `distance_meters || 500` trong khi API trả `distance_m`: nhiều card luôn 500m. Số review/rating/giờ có giá trị thay thế giả. Các tiện ích ac/kids/≥4.8 có lọc trong UI nhưng dữ liệu chưa được xác minh.
+- Không có API GET `/places/:id`, `/places/map`, `/places/:id/menu`, `/availability`, `/dishes/:id/places` như nhãn màn; `/places` đã trả dữ liệu menu và chi tiết đủ cho bước đầu. Bản đồ trong bộ màn là mock, chưa có map tương tác thật.
+- POST `/places/:id/reports` ghi DB thật và tạm dừng khi đếm đủ 3. Nhưng **mọi lý do đều tăng đếm đóng cửa, cùng một người gửi 3 lần cũng tạm dừng, không có cửa sổ thời gian/chống spam**. Admin mở lại xóa reports, mất bằng chứng xử lý.
+
+### Nghiên cứu dùng để hoàn thiện
+
+GrabFood yêu cầu địa chỉ để xác định các quán giao được tới đó [R6]; bán kính thẳng 3 km của ta chỉ là “gần bạn”, không chứng minh đối tác nhận giao hoặc còn món. Google Maps URLs cho phép mở chỉ đường đa nền tảng không cần nhúng map có phí [R7]. Chưa chọn nhà cung cấp tile/geocoding: không gọi tile công khai hàng loạt hoặc coi API Maps trả phí là miễn phí.
+
+### Việc theo thứ tự
+
+| ID / cỡ | Màn có sẵn | Logic/API + dữ liệu phải làm | Nghiệm thu / phụ thuộc |
+| --- | --- | --- | --- |
+| M4-1 M **P2 phần UI** | S01, S03–S05 | Dùng tọa độ M1, truyền dishId xuyên luồng; render `distance_m`, null thật; dùng data `/places` trước, thêm GET `/places/:id` đề xuất nếu cần deep link | Đổi vị trí đổi kết quả; 2.99km vào/3.01km ra; card không còn 500m mặc định; món đã chọn chỉ hiện quán có bán |
+| M4-2 L | S03–S05 + M9-S04 | Nhập quán có nguồn/quyền: tọa độ, menu mapping, giá, phone/link, tiện ích, giờ mở, ngày nghỉ, verified_at/by, status; thêm CRUD admin (xem M9) | Chọn mẫu quán và kiểm chéo thực địa/nguồn được phép; biết ai xác nhận lúc nào; không dùng địa chỉ/giá mẫu. **Cần thành phố + nguồn/quyền dữ liệu** |
+| M4-3 M | S01–S05 | Hàm giờ mở timezone Asia/Ho_Chi_Minh, giờ qua đêm/ngày nghỉ/override; staleness 90 ngày thành trạng thái cảnh báo/tạm loại theo chính sách; cùng predicate với M3 | Trước/sau đóng cửa, qua 00:00, nghỉ lễ, stale/paused không được nói “đang mở”; không có giờ → “chưa rõ”, không tự bịa |
+| M4-4 M | S02 | Gắn map tương tác vào khung sẵn, list↔marker, vị trí thủ công, attribution; adapter tile/geocoder và cấu hình khóa/hạn mức nếu có | Pan/zoom/chọn marker mở đúng S03; GPS bị từ chối vẫn dùng được; map lỗi có list. **Cần chọn nguồn map và duyệt phí nếu phát sinh** |
+| M4-5 M | S06 + M9-S06 | Enum lý do, dedupe user/place/time window, chỉ lý do đóng cửa tăng guard; chống guest tạo nhiều tài khoản; transaction/unique constraint; giữ evidence và trạng thái xử lý | 1 người gửi 3 lần không khóa; 3 người đủ điều kiện trong cửa sổ mới tạm ẩn; sai giá không khóa; admin phục hồi không xóa lịch sử. **Đề xuất cửa sổ 24 giờ, là thay đổi cần chủ sản phẩm duyệt** |
+| M4-6 S | S04–S05 | Availability có updated_at, stale label; M6 đóng băng thì admin cập nhật, không hứa realtime; quán không có món phù hợp có trạng thái rỗng | Hết món → không vào M3/redirect món đó; API/UI nhất quán sau refresh; ghi rõ lần cập nhật |
