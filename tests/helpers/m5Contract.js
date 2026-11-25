@@ -91,7 +91,7 @@ export function m5Contract(setup, options = {}) {
     for (const patch of [{ is_verified: false }, { is_open_override: false }, { is_paused: true },
       { status: 'pending_review' }, { menu: [] }, { menu: [{ dish_id: 'DISH-101', available: false }] }]) {
       Object.assign(place, structuredClone(original), patch);
-      assert.equal((await c.redirect()).status, 409, JSON.stringify(patch));
+      assert.equal((await c.redirect()).status, patch.is_verified===false ? 404 : 409, JSON.stringify(patch));
     }
     Object.assign(place, original);
     assert.equal((await c.redirect({ dish_id: 'DISH-102' })).status, 409);

@@ -44,7 +44,7 @@ async function dispatch(repo,actor,method,path,q,body,store) {
   if(path==='/api/v1/admin/dashboard') {
     const [dishes,places,ocr,reports,campaigns]=await Promise.all([
       repo.listDishes(),repo.listPlaces(),repo.listOcrQueue(),repo.listUserReports(),repo.listCampaigns()]);
-    return ok({total_dishes:dishes.length,total_verified_places:places.filter(p=>p.is_verified).length,
+    return ok({catalog:['content_moderator','super_admin'].includes(actor.role)?dishes:[],places:['ops_admin','super_admin'].includes(actor.role)?places:[],total_dishes:dishes.length,total_verified_places:places.filter(p=>p.is_verified).length,
       ocr_queue:ocr,user_reports:reports.map(publicReport),campaigns,events:store.analyticsEvents});
   }
   if(path==='/api/v1/admin/rbac/roles') return ok({roles:ROLES});

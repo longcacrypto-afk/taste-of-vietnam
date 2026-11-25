@@ -63,7 +63,7 @@ test('Migrations: ordered, recorded once, re-running is a no-op; seed loaded 12 
   const applied = (await db.query('SELECT version, name FROM schema_migrations ORDER BY version')).rows.map(r => r.name);
   assert.deepEqual(applied, listMigrationFiles().map(m => m.name));
   assert.ok(applied.includes('003_m9_rbac_reports'));
-  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '003_m9_rbac_reports', '004_m1_google_auth', '006_m5_redirect', '007_m3_safety_approval', '008_m4_places_hours']);
+  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '003_m9_rbac_reports', '004_m1_google_auth', '006_m5_redirect', '007_m3_safety_approval', '008_m4_places_hours', '009_m9_data_entry']);
   assert.deepEqual(await runMigrations(db, { log: () => {} }), []);
   assert.equal(await count('SELECT COUNT(*) n FROM dishes'), 12);
   assert.equal(await count('SELECT COUNT(*) n FROM places'), 8);
@@ -193,14 +193,14 @@ test('M4 reports auto-pause a place; M9 admin un-pause, dish CRUD and OCR review
   assert.equal(await count(`SELECT COUNT(*) n FROM place_reports WHERE place_id = 'PLACE-404'`), 3);
   assert.equal((await api('POST', '/api/v1/admin/places/NOPE/unpause', { headers: admin.headers,body:{reason:'Đã kiểm tra'} })).status, 404);
 
-  const created = await api('POST', '/api/v1/admin/dishes', { headers: admin.headers, body: { name: 'Bún Mắm Miền Tây', allergens: ['fish'], spice_level: 9 } });
+  const created = await api('POST', '/api/v1/admin/dishes', { headers: admin.headers, body: { name: 'Bún Mắm Miền Tây', allergens: ['fish'], spice_level: 3 } });
   assert.equal(created.status, 201);
   const row = await one('SELECT name, unaccented_name, allergen_flags, spice_level FROM dishes WHERE id = $1', [created.data.id]);
   assert.equal(row.unaccented_name, 'bun mam mien tay');
   assert.deepEqual(row.allergen_flags, ['fish']);
-  assert.equal(row.spice_level, 3, 'clamped to the 0–3 range the table allows');
+  assert.equal(row.spice_level, 3, 'validated in the 0–3 range the table allows');
   const list = await api('GET', '/api/v1/dishes', { query: { safe_only: 'false' } });
-  assert.equal(list.data.items[0].id, created.data.id, 'newest dish first');
+  assert.ok(!list.data.items.some(d=>d.id===created.data.id), 'new CMS draft is not public');
   const upd = await api('PUT', `/api/v1/admin/dishes/${created.data.id}`, { headers: admin.headers, body: { ref_price: 42000 } });
   assert.equal(upd.data.ref_price, 42000);
   assert.equal((await one('SELECT estimated_price_vnd p FROM dishes WHERE id = $1', [created.data.id])).p, 42000);

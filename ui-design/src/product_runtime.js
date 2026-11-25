@@ -198,7 +198,7 @@
           const d = await api("/admin/dashboard");
           return {
             ...d,
-            catalog: (await api("/dishes?safe_only=false")).items || [],
+            catalog: d.catalog || [],
           };
         },
       ];
@@ -767,7 +767,7 @@
     const reports=d.user_reports||[];
     $$("aside nav button",root).forEach(b=>{
       const code=b.getAttribute("onclick")||"";
-      if (!/M9-S0[12356]/.test(code)) b.remove();
+      if (!/M9-S0[123456]/.test(code)) b.remove();
       const badge=b.lastElementChild;
       if (badge?.tagName==="SPAN" && badge!==b.firstElementChild) {
         if(code.includes("M9-S05")) text(badge,queue.length);
@@ -813,6 +813,8 @@
       if(!a) content.innerHTML=stateHtml(id,"empty");
       else {
         const cards=[...content.firstElementChild.children];
+        text($("span",cards[0]),"Khẩu phần gốc: "+(a.base_servings??"—")+" người");
+        text($("span",cards[2]),({draft:"Bản nháp",published:"Đã xuất bản",archived:"Đã lưu trữ"})[a.cms?.status]||"Dữ liệu cũ · chưa qua CMS");
         text($(".font-extrabold",cards[0]),a.name);
         text($(".text-\\[\\#64748B\\]",cards[0]),(a.calories??"—")+" kcal");
         text($(".font-extrabold",cards[1]),(a.ingredients||[]).length+" Nhóm Nguyên liệu");
@@ -820,6 +822,20 @@
         text($(".font-extrabold",cards[2]),(a.steps||[]).length+" Bước Nấu Có Timer");
         text($(".text-\\[\\#64748B\\]",cards[2]),(a.steps||[]).map(x=>x.title).join(" · "));
       }
+    }
+    if(id==="M9-S04") {
+      const pending=(d.places||[]).filter(p=>!p.is_verified && p.cms?.status!=="archived");
+      if(title) text(title,"Duyệt Xác Minh Quán Ăn Thực Tế ("+pending.length+" Hồ sơ chờ)");
+      const tpl=content.firstElementChild.cloneNode(true);
+      if(!pending.length) content.innerHTML=stateHtml(id,"empty");
+      else rows(content,tpl,pending,(n,p)=>{
+        img($("img",n),p.img_key);text($("b",n),p.name+" · "+p.address);
+        text($("[class~='text-[11px]']",n),(p.cms?.evidence||"Chưa có bằng chứng xác minh")+" · "+(p.lat??"—")+", "+(p.lng??"—"));
+        const buttons=$$("button",n);
+        click(buttons[0],`P2.approvePlace('${J(p.id)}',${p.cms?.version||0})`);
+        buttons[0].disabled=!p.cms?.evidence;
+        buttons[1].disabled=true;buttons[1].title="Màn gốc chưa có ô nhập yêu cầu bổ sung.";
+      });
     }
     if(id==="M9-S05") {
       const holder=content.firstElementChild,tpl=holder.firstElementChild.cloneNode(true);
@@ -1172,6 +1188,11 @@
             status("Đã xóa tài khoản.");
           },
         );
+    },
+    approvePlace(id, version) {
+      if(!confirm("Duyệt dựa trên bằng chứng đã lưu? Thao tác này không mở lại quán đang tạm dừng.")) return;
+      action(()=>api("/admin/places/"+encodeURIComponent(id)+"/approve","POST",{version,reason:"Duyệt hồ sơ theo bằng chứng đã lưu"}),
+        ()=>{delete state.cache.admin;goScreen("M9-S04");});
     },
     review(id, decision) {
       action(

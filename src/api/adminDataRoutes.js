@@ -62,6 +62,7 @@ export async function handleAdminDataRoute(repo,actor,method,path,q,body) {
   }
   m=path.match(/^\/api\/v1\/admin\/places\/([^/]+)(?:\/(menu|hours|availability|approve|archive|versions))?$/);
   if(!m) return null;
+  if(method!=='GET') await repo.lockPlace(m[1]);
   const before=structuredClone(await repo.getPlace(m[1]));if(!before) missing();
   const action=m[2];
   if(method==='GET') return ok(action==='versions'?{items:await repo.listContentVersions('place',m[1])}:before);

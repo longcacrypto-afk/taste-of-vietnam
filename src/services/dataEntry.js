@@ -36,11 +36,15 @@ export function publicDish(d) {
   // Legacy compatibility is deliberate until REQUIRE_SAFETY_APPROVAL is enabled.
   return d && (!d.cms || (d.cms.status==='published' && d.safety_status==='approved' && d.cms.verified_at && d.cms.verified_by));
 }
-export const publicPlace = p => p && (!p.cms || (p.cms.status==='verified' && p.is_verified===true));
+export const publicPlace = p => p && p.is_verified===true && (!p.cms || p.cms.status==='verified');
 export function publicRepository(repo) {
   const out=Object.create(repo);
   out.listDishes=async()=> (await repo.listDishes()).filter(publicDish);
   out.getDish=async id=> {const d=await repo.getDish(id);return publicDish(d)?d:null;};
+  out.mutateCollection=async(id,op)=>{
+    if(['add','save_default'].includes(op.type)&&!await out.getDish(op.dishId)) return null;
+    return repo.mutateCollection(id,op);
+  };
   const filterMenu=async p=>{
     if(!p) return null;
     const ids=new Set((await out.listDishes()).map(d=>d.id));

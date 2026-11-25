@@ -495,7 +495,7 @@ export class PostgresRepository {
        opening_hours=EXCLUDED.opening_hours,verified_at=EXCLUDED.verified_at,is_verified=EXCLUDED.is_verified,
        is_paused=EXCLUDED.is_paused,report_count=EXCLUDED.report_count,has_ac=EXCLUDED.has_ac,
        has_kids_seat=EXCLUDED.has_kids_seat,phone=EXCLUDED.phone,links=EXCLUDED.links,img_key=EXCLUDED.img_key,cms=EXCLUDED.cms`,
-      [p.id,p.name,p.address,p.lat,p.lng,JSON.stringify(p.opening_hours),p.verified_at??null,p.is_verified,
+      [p.id,p.name,p.address,p.lat,p.lng,p.opening_hours==null?null:JSON.stringify(p.opening_hours),p.verified_at??null,p.is_verified,
        p.is_open_override===false,p.closed_report_count||0,p.rating||0,p.review_count||0,p.has_ac||false,p.has_kids_seat||false,
        p.phone||'',JSON.stringify(p.links||{}),p.img_key??null,JSON.stringify(p.cms)]);
     await this.q('DELETE FROM place_dishes WHERE place_id=$1',[p.id]);
