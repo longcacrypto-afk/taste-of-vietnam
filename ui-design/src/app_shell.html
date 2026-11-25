@@ -1344,7 +1344,7 @@
         let token = null;
         try { token = await ensureToken(); } catch (_) {}
         let res = await withAuth(input, init, token);
-        if (res.status === 401 && token) {
+        if (res.status === 401 && token && (!init || !init.method || init.method === 'GET')) {
           // expired token or server restarted (in-memory accounts): start a fresh guest session once
           ls.del(KEY); ls.del(ROLE_KEY);
           try { token = await ensureToken(); } catch (_) { token = null; }
@@ -4536,5 +4536,6 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       } catch (_) {}
     })();
   </script>
+<!--/*__PRODUCT_RUNTIME__*/-->
 </body>
 </html>
