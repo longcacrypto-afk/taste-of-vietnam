@@ -11,6 +11,7 @@ import { createInitialStore } from './src/data/seed.js';
 import { handleApiRequest } from './src/api/router.js';
 import { setupWebSocket, getWsTestPayload } from './src/services/websocketService.js';
 import { initDatabase, isPostgresConnected } from './src/db/connection.js';
+import { getJwtSecret } from './src/services/authService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const store = createInitialStore();
@@ -66,7 +67,7 @@ export function createAppServer() {
           try { body = JSON.parse(raw); } catch { body = {}; }
         }
       }
-      const result = await handleApiRequest(store, req.method, pathname, urlObj.searchParams, body);
+      const result = await handleApiRequest(store, req.method, pathname, urlObj.searchParams, body, req.headers);
       res.writeHead(result.status, {
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'no-store'
@@ -155,6 +156,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
       console.log(`   ✨ Gemini 2.0 Flash API: ACTIVE`);
     } else {
       console.log(`   ⚠️  Gemini API: Fallback mode (set GEMINI_API_KEY env to enable)`);
+    }
+    getJwtSecret(); // warns once if JWT_SECRET is missing
+    if (!process.env.PAYOS_CHECKSUM_KEY) {
+      console.log(`   ⚠️  PayOS webhook: DISABLED (set PAYOS_CHECKSUM_KEY to accept signed payment webhooks)`);
+    }
+    if (!process.env.SMS_API_KEY || !process.env.SMS_SECRET_KEY) {
+      console.log(process.env.NODE_ENV === 'production'
+        ? `   ⚠️  OTP SMS not configured: phone login disabled (guest mode still works)`
+        : `   🔐 OTP dev mode: codes are logged here and returned in the API response`);
     }
   });
 }

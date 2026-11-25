@@ -25,61 +25,66 @@ import { generateVietQrInvoice, verifyPaymentWebhookSignature, processSuccessful
 import { searchDishesSemantically } from '../services/semanticSearch.js';
 import { suggestionCache } from '../services/cacheService.js';
 import { pushQueue } from '../services/queueService.js';
+import { requestOtp, verifyOtp, createGuest, authenticate, deleteUser, scopeStoreToUser } from '../services/authService.js';
 
-export async function handleApiRequest(store, method, pathname, searchParams, body = {}) {
+const UNAUTHORIZED = { status: 401, data: { error: 'Cần đăng nhập (Authorization: Bearer <token>)' } };
+
+export async function handleApiRequest(store, method, pathname, searchParams, body = {}, headers = {}) {
+  // Who is calling? (null = anonymous). With a token, userProfile / history /
+  // collections in `store` resolve to that user's own data.
+  const authUser = authenticate(store, headers);
+  const sharedStore = store;
+  if (authUser) store = scopeStoreToUser(store, authUser);
+
   // ===========================================================================
   // MODULE M1: ACCOUNT, AUTH, ONBOARDING & TASTE PROFILE (M1-S01 .. M1-S10)
   // ===========================================================================
-  if (pathname === '/api/v1/auth/login' && method === 'POST') {
-    return {
-      status: 200,
-      data: {
-        provider: body.provider || 'apple_zalo_phone',
-        otp_sent: true,
-        phone: body.phone || '0909***889',
-        session_preview: 'jwt-homnayangi-v0.1'
-      }
-    };
+  // Request an OTP for a phone number (/auth/login kept as an alias)
+  if ((pathname === '/api/v1/auth/otp/request' || pathname === '/api/v1/auth/login') && method === 'POST') {
+    const res = await requestOtp(sharedStore, body.phone);
+    if (res.status === 200) res.data.provider = body.provider || 'phone_otp';
+    return res;
   }
 
   if (pathname === '/api/v1/auth/otp/verify' && method === 'POST') {
-    store.analyticsEvents.onboarding_complete = (store.analyticsEvents.onboarding_complete || 0) + 1;
-    return {
-      status: 200,
-      data: {
-        verified: true,
-        access_token: 'jwt-homnayangi-verified-token',
-        user: store.userProfile
-      }
-    };
+    const res = verifyOtp(sharedStore, body.phone, body.code ?? body.otp);
+    if (res.status === 200) {
+      sharedStore.analyticsEvents.onboarding_complete = (sharedStore.analyticsEvents.onboarding_complete || 0) + 1;
+    }
+    return res;
   }
 
   if (pathname === '/api/v1/auth/guest' && method === 'POST') {
-    return {
-      status: 200,
-      data: {
-        guest_mode: true,
-        guest_id: `guest-${Date.now()}`,
-        profile: { ...store.userProfile, name: 'Khách trải nghiệm (Guest)' }
-      }
-    };
+    return createGuest(sharedStore);
+  }
+
+  if (pathname === '/api/v1/auth/me' && method === 'GET') {
+    if (!authUser) return UNAUTHORIZED;
+    return { status: 200, data: { id: authUser.id, role: authUser.role, guest: authUser.guest, phone: authUser.phone } };
   }
 
   if (pathname === '/api/v1/me/profile' && method === 'GET') {
+    if (!authUser) return UNAUTHORIZED;
     return { status: 200, data: store.userProfile };
   }
 
   if (pathname === '/api/v1/me/profile' && (method === 'PUT' || method === 'PATCH')) {
-    Object.assign(store.userProfile, body);
-    suggestionCache.invalidateUser(store.userProfile.id || 'default');
+    if (!authUser) return UNAUTHORIZED;
+    const { id: _id, phone: _phone, role: _role, ...changes } = body || {};
+    Object.assign(store.userProfile, changes);
+    suggestionCache.invalidateUser(store.userProfile.id);
     return { status: 200, data: store.userProfile };
   }
 
   if (pathname === '/api/v1/me' && method === 'DELETE') {
+    if (!authUser) return UNAUTHORIZED;
+    suggestionCache.invalidateUser(authUser.id);
+    const deleted = deleteUser(sharedStore, authUser.id);
     return {
       status: 200,
       data: {
-        deleted: true,
+        deleted,
+        user_id: authUser.id,
         pdpd_compliance: 'Nghị định 13/2023/NĐ-CP — Đã xóa toàn bộ hồ sơ vị giác & lịch sử cá nhân ngay lập tức.'
       }
     };
@@ -87,6 +92,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   // M1-S09: PDPD Data Export (Nghị định 13/2023/NĐ-CP — Right to Data Portability)
   if (pathname === '/api/v1/me/export' && method === 'GET') {
+    if (!authUser) return UNAUTHORIZED;
     return {
       status: 200,
       data: {
