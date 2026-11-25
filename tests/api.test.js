@@ -635,3 +635,59 @@ test('PHASE-D: Collections (M2-S07), Spin (M3-S03), Vouchers (M13-S02) & Communi
   assert.equal(createRecRes.status, 201);
   assert.equal(createRecRes.data.title, 'Canh Chua Cá Lóc Miền Tây');
 });
+
+test('CRUD-FULL: M6 Menu, M7 Campaign Patch, M9 Dish CRUD, M11 MealPlan PUT, M13 Booking Cancel, M18 Fridge CRUD, M20 Like/Delete', async () => {
+  const store = createInitialStore();
+
+  // M6 Menu CRUD
+  const addMenu = await handleApiRequest(store, 'POST', '/api/v1/merchant/menu', new URLSearchParams(), { name: 'Bún Riêu Cua', price_vnd: 48000 });
+  assert.equal(addMenu.status, 201);
+  const editMenu = await handleApiRequest(store, 'PUT', `/api/v1/merchant/menu/${addMenu.data.id}`, new URLSearchParams(), { price_vnd: 52000 });
+  assert.equal(editMenu.status, 200);
+  assert.equal(editMenu.data.price_vnd, 52000);
+  const delMenu = await handleApiRequest(store, 'DELETE', `/api/v1/merchant/menu/${addMenu.data.id}`, new URLSearchParams());
+  assert.equal(delMenu.status, 200);
+
+  // M7 Campaign PATCH
+  const cmpRes = await handleApiRequest(store, 'PATCH', `/api/v1/ads/campaigns/${store.campaigns[0].id}`, new URLSearchParams(), { status: 'paused' });
+  assert.equal(cmpRes.status, 200);
+  assert.equal(cmpRes.data.status, 'paused');
+
+  // M9 Admin Dish CRUD
+  const addDish = await handleApiRequest(store, 'POST', '/api/v1/admin/dishes', new URLSearchParams(), { name: 'Cao Lầu Hội An', region: 'Miền Trung', calories: 510, ref_price: 55000 });
+  assert.equal(addDish.status, 201);
+  const editDish = await handleApiRequest(store, 'PUT', `/api/v1/admin/dishes/${addDish.data.id}`, new URLSearchParams(), { ref_price: 60000 });
+  assert.equal(editDish.status, 200);
+  assert.equal(editDish.data.ref_price, 60000);
+  const delDish = await handleApiRequest(store, 'DELETE', `/api/v1/admin/dishes/${addDish.data.id}`, new URLSearchParams());
+  assert.equal(delDish.status, 200);
+
+  // M11 Meal Plan PUT & Groceries POST/PATCH
+  const putPlan = await handleApiRequest(store, 'PUT', '/api/v1/meal-plans/weekly', new URLSearchParams(), { days: [{ day: 'Thứ 2', dish_name: 'Phở Gà' }] });
+  assert.equal(putPlan.status, 200);
+  assert.equal(putPlan.data.days[0].dish_name, 'Phở Gà');
+
+  // M13 Booking GET & Cancel
+  const bkPost = await handleApiRequest(store, 'POST', '/api/v1/bookings', new URLSearchParams(), { place_id: 'PLACE-401', party_size: 4 });
+  assert.equal(bkPost.status, 200);
+  const bkDel = await handleApiRequest(store, 'DELETE', `/api/v1/bookings/${bkPost.data.booking_id}`, new URLSearchParams());
+  assert.equal(bkDel.status, 200);
+  assert.equal(bkDel.data.cancelled, true);
+
+  // M18 Fridge CRUD
+  const addFridge = await handleApiRequest(store, 'POST', '/api/v1/fridge/inventory', new URLSearchParams(), { name: 'Ức gà tươi', quantity: '500g', compartment: 'chill', expires_in_days: 2 });
+  assert.equal(addFridge.status, 201);
+  assert.equal(addFridge.data.is_expiring_soon, true);
+  const putFridge = await handleApiRequest(store, 'PUT', `/api/v1/fridge/inventory/${addFridge.data.id}`, new URLSearchParams(), { quantity: '250g', expires_in_days: 5 });
+  assert.equal(putFridge.status, 200);
+  assert.equal(putFridge.data.is_expiring_soon, false);
+  const delFridge = await handleApiRequest(store, 'DELETE', `/api/v1/fridge/inventory/${addFridge.data.id}`, new URLSearchParams());
+  assert.equal(delFridge.status, 200);
+
+  // M20 Recipe Like & Delete
+  const recId = store.communityRecipes[0].id;
+  const oldLikes = store.communityRecipes[0].likes_count;
+  const likeRes = await handleApiRequest(store, 'POST', `/api/v1/community/recipes/${recId}/like`, new URLSearchParams());
+  assert.equal(likeRes.status, 200);
+  assert.equal(likeRes.data.likes_count, oldLikes + 1);
+});

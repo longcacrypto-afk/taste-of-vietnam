@@ -323,6 +323,11 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.goldenAmber),
+            tooltip: 'Thêm nguyên liệu thủ công',
+            onPressed: () => _openAddOrEditFridgeModal(),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
             tooltip: 'Làm mới kho',
             onPressed: _loadInventory,
@@ -537,6 +542,25 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white70),
+                              tooltip: 'Chỉnh sửa',
+                              onPressed: () => _openAddOrEditFridgeModal(existing: item as Map<String, dynamic>),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                              tooltip: 'Đã dùng hết / Xóa',
+                              onPressed: () async {
+                                final id = (item['id'] as String?) ?? '';
+                                setState(() => _inventory.removeWhere((x) => x['id'] == id));
+                                if (id.isNotEmpty) await ApiService.deleteFridgeItem(id);
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('🗑️ Đã xóa "${item['name']}" khỏi tủ lạnh')),
+                                );
+                              },
+                            ),
                           ],
                         ),
                       );
@@ -544,6 +568,147 @@ class _FridgeScannerScreenState extends State<FridgeScannerScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  void _openAddOrEditFridgeModal({Map<String, dynamic>? existing}) {
+    final nameCtrl = TextEditingController(text: existing?['name'] ?? '');
+    final qtyCtrl = TextEditingController(text: existing?['quantity'] ?? '200g');
+    final daysCtrl = TextEditingController(text: '${existing?['expires_in_days'] ?? 3}');
+    String comp = (existing?['compartment'] as String?) ?? 'chill';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.charcoalHero,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setMState) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(existing == null ? '➕ Thêm Nguyên Liệu Tủ Lạnh' : '✏️ Chỉnh Sửa Nguyên Liệu',
+                  style: AppTheme.titleMedium.copyWith(color: AppTheme.goldenAmber, fontSize: 16)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Tên nguyên liệu',
+                  labelStyle: const TextStyle(color: Colors.white54),
+                  filled: true,
+                  fillColor: const Color(0xFF27272A),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: qtyCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        labelText: 'Số lượng',
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        filled: true,
+                        fillColor: const Color(0xFF27272A),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: daysCtrl,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        labelText: 'Hạn dùng (ngày)',
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        filled: true,
+                        fillColor: const Color(0xFF27272A),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                children: ['chill', 'freeze', 'door', 'vegetable'].map((k) {
+                  final sel = comp == k;
+                  return ChoiceChip(
+                    label: Text(_compartmentLabels[k] ?? k, style: const TextStyle(fontSize: 11)),
+                    selected: sel,
+                    selectedColor: AppTheme.goldenAmber.withOpacity(0.25),
+                    onSelected: (_) => setMState(() => comp = k),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.goldenAmber,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    if (name.isEmpty) return;
+                    final qty = qtyCtrl.text.trim().isEmpty ? '1 phần' : qtyCtrl.text.trim();
+                    final days = int.tryParse(daysCtrl.text.trim()) ?? 3;
+                    Navigator.pop(ctx);
+                    if (existing == null) {
+                      final created = await ApiService.addFridgeItem(
+                        name: name,
+                        quantity: qty,
+                        compartment: comp,
+                        expiresInDays: days,
+                      );
+                      if (!mounted) return;
+                      setState(() {
+                        _inventory.insert(0, created ?? {
+                          'id': 'FRIDGE-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                          'name': name,
+                          'quantity': qty,
+                          'compartment': comp,
+                          'expires_in_days': days,
+                          'is_expiring_soon': days <= 2,
+                        });
+                      });
+                    } else {
+                      final id = (existing['id'] as String?) ?? '';
+                      await ApiService.updateFridgeItem(id, {
+                        'name': name,
+                        'quantity': qty,
+                        'compartment': comp,
+                        'expires_in_days': days,
+                      });
+                      if (!mounted) return;
+                      setState(() {
+                        existing['name'] = name;
+                        existing['quantity'] = qty;
+                        existing['compartment'] = comp;
+                        existing['expires_in_days'] = days;
+                        existing['is_expiring_soon'] = days <= 2;
+                      });
+                    }
+                  },
+                  child: Text(existing == null ? 'Lưu Vào Tủ Lạnh' : 'Cập Nhật Nguyên Liệu',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

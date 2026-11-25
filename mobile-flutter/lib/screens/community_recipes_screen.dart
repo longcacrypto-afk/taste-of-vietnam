@@ -630,15 +630,37 @@ class _CommunityRecipesScreenState extends State<CommunityRecipesScreen> {
                             ],
 
                             const SizedBox(height: 14),
-                            // Actions Row: Like & VietQR Tip
+                            // Actions Row: Like, Delete & VietQR Tip
                             Row(
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.favorite, color: Colors.redAccent, size: 18),
-                                    const SizedBox(width: 4),
-                                    Text('$likes', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                                  ],
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () async {
+                                    setState(() {
+                                      recipe['likes_count'] = ((recipe['likes_count'] as int?) ?? 0) + 1;
+                                    });
+                                    await ApiService.likeCommunityRecipe((recipe['id'] as String?) ?? '');
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.favorite, color: Colors.redAccent, size: 18),
+                                        const SizedBox(width: 4),
+                                        Text('$likes', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.white38),
+                                  tooltip: 'Xóa công thức',
+                                  onPressed: () async {
+                                    final id = (recipe['id'] as String?) ?? '';
+                                    setState(() => _recipes.removeWhere((r) => r['id'] == id));
+                                    if (id.isNotEmpty) await ApiService.deleteCommunityRecipe(id);
+                                  },
                                 ),
                                 const Spacer(),
                                 ElevatedButton.icon(

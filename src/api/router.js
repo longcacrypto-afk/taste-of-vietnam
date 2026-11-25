@@ -210,10 +210,22 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       { id: 'col-2', name: 'Thực đơn cuối tuần cho gia đình', dish_ids: ['DISH-102', 'DISH-106'] }
     ];
     if (method === 'POST' && body.dish_id) {
-      store.savedCollections[0].dish_ids.push(body.dish_id);
+      if (!store.savedCollections[0].dish_ids.includes(body.dish_id)) {
+        store.savedCollections[0].dish_ids.push(body.dish_id);
+      }
       store.analyticsEvents.save_dish = (store.analyticsEvents.save_dish || 0) + 1;
     }
     return { status: 200, data: { collections: store.savedCollections } };
+  }
+
+  const delColMatch = pathname.match(/^\/api\/v1\/me\/collections\/([^/]+)$/);
+  if (delColMatch && method === 'DELETE') {
+    const dishId = delColMatch[1];
+    store.savedCollections = store.savedCollections || [];
+    for (const col of store.savedCollections) {
+      col.dish_ids = (col.dish_ids || []).filter(id => id !== dishId);
+    }
+    return { status: 200, data: { removed: dishId, collections: store.savedCollections } };
   }
 
   // ===========================================================================
@@ -408,19 +420,68 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     };
   }
 
+  // M6-S04: Quản lý Thực đơn thủ công (GET / POST / PUT / DELETE)
+  if (pathname === '/api/v1/merchant/menu' && method === 'GET') {
+    store.merchantMenu = store.merchantMenu || [
+      { id: 'MENU-01', name: 'Phở Bò Tái Nạm', price_vnd: 55000, available: true, category: 'Món nước' },
+      { id: 'MENU-02', name: 'Phở Gà Ta Lá Chanh', price_vnd: 50000, available: true, category: 'Món nước' },
+      { id: 'MENU-03', name: 'Quẩy Giòn', price_vnd: 10000, available: true, category: 'Món thêm' }
+    ];
+    return { status: 200, data: { items: store.merchantMenu } };
+  }
+
+  if (pathname === '/api/v1/merchant/menu' && method === 'POST') {
+    store.merchantMenu = store.merchantMenu || [];
+    const newItem = {
+      id: `MENU-${Date.now()}`,
+      name: body.name || 'Món mới',
+      price_vnd: Number(body.price_vnd || 45000),
+      available: body.available !== false,
+      category: body.category || 'Món chính'
+    };
+    store.merchantMenu.unshift(newItem);
+    return { status: 201, data: newItem };
+  }
+
+  const merchantMenuItemMatch = pathname.match(/^\/api\/v1\/merchant\/menu\/([^/]+)$/);
+  if (merchantMenuItemMatch && (method === 'PUT' || method === 'PATCH')) {
+    store.merchantMenu = store.merchantMenu || [];
+    const item = store.merchantMenu.find(i => i.id === merchantMenuItemMatch[1]);
+    if (!item) return { status: 404, data: { error: 'Menu item not found' } };
+    if (body.name !== undefined) item.name = body.name;
+    if (body.price_vnd !== undefined) item.price_vnd = Number(body.price_vnd);
+    if (body.available !== undefined) item.available = Boolean(body.available);
+    if (body.category !== undefined) item.category = body.category;
+    return { status: 200, data: item };
+  }
+
+  if (merchantMenuItemMatch && method === 'DELETE') {
+    store.merchantMenu = (store.merchantMenu || []).filter(i => i.id !== merchantMenuItemMatch[1]);
+    return { status: 200, data: { deleted: true, id: merchantMenuItemMatch[1] } };
+  }
+
   if (pathname === '/api/v1/merchant/menu/ocr' && method === 'POST') {
     const res = parseMenuOcrText(store, body.place_id || 'PLACE-401', body.raw_text || '1. Phở bò tái nạm - 45k\n2. Bún bò Huế đặc biệt - 50k');
     return { status: 200, data: res };
   }
 
+  if (pathname === '/api/v1/merchant/promotions' && method === 'GET') {
+    store.merchantPromotions = store.merchantPromotions || [
+      { id: 'PROMO-101', place_id: 'PLACE-401', title: 'Combo Sáng: Phở Bò + Quẩy + Trà Đá', discount_pct: 15, status: 'active' }
+    ];
+    return { status: 200, data: { promotions: store.merchantPromotions } };
+  }
+
   if (pathname === '/api/v1/merchant/promotions' && method === 'POST') {
+    store.merchantPromotions = store.merchantPromotions || [];
     const promo = {
       id: `PROMO-${Date.now()}`,
       place_id: body.place_id || 'PLACE-401',
       title: body.title || 'Combo Sáng: Phở Bò + Quẩy Giòn + Trà Đá chỉ 49.000đ',
-      discount_pct: body.discount_pct || 15,
+      discount_pct: Number(body.discount_pct || 15),
       status: 'active'
     };
+    store.merchantPromotions.unshift(promo);
     return { status: 200, data: promo };
   }
 
@@ -467,6 +528,16 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     };
     store.campaigns.unshift(newCmp);
     return { status: 200, data: newCmp };
+  }
+
+  const adPatchMatch = pathname.match(/^\/api\/v1\/ads\/campaigns\/([^/]+)$/);
+  if (adPatchMatch && (method === 'PATCH' || method === 'PUT')) {
+    const cmp = store.campaigns.find(c => c.id === adPatchMatch[1]);
+    if (!cmp) return { status: 404, data: { error: 'Campaign not found' } };
+    if (body.status !== undefined) cmp.status = body.status;
+    if (body.budget_vnd !== undefined) cmp.budget_vnd = Number(body.budget_vnd);
+    if (body.radius_m !== undefined) cmp.radius_m = Math.min(3000, Number(body.radius_m));
+    return { status: 200, data: cmp };
   }
 
   const adClickMatch = pathname.match(/^\/api\/v1\/ads\/campaigns\/([^/]+)\/click$/);
@@ -559,6 +630,40 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
         events: store.analyticsEvents
       }
     };
+  }
+
+  // M9-S02: Admin CRUD Thư viện Món ăn Toàn quốc
+  if (pathname === '/api/v1/admin/dishes' && method === 'POST') {
+    const newDish = {
+      id: `DISH-${Date.now()}`,
+      name: body.name || 'Món Việt Mới',
+      region: body.region || 'Miền Nam',
+      calories: Number(body.calories || 450),
+      ref_price: Number(body.ref_price || 50000),
+      spice_level: Number(body.spice_level || 1),
+      allergens: body.allergens || [],
+      tags: body.tags || ['Đặc sản'],
+      description: body.description || 'Món ăn mới từ Admin CMS'
+    };
+    store.dishes.unshift(newDish);
+    return { status: 201, data: newDish };
+  }
+
+  const adminDishMatch = pathname.match(/^\/api\/v1\/admin\/dishes\/([^/]+)$/);
+  if (adminDishMatch && (method === 'PUT' || method === 'PATCH')) {
+    const dish = store.dishes.find(d => d.id === adminDishMatch[1]);
+    if (!dish) return { status: 404, data: { error: 'Dish not found' } };
+    if (body.name !== undefined) dish.name = body.name;
+    if (body.calories !== undefined) dish.calories = Number(body.calories);
+    if (body.ref_price !== undefined) dish.ref_price = Number(body.ref_price);
+    if (body.allergens !== undefined) dish.allergens = body.allergens;
+    if (body.region !== undefined) dish.region = body.region;
+    return { status: 200, data: dish };
+  }
+
+  if (adminDishMatch && method === 'DELETE') {
+    store.dishes = store.dishes.filter(d => d.id !== adminDishMatch[1]);
+    return { status: 200, data: { deleted: true, id: adminDishMatch[1] } };
   }
 
   if (pathname === '/api/v1/admin/ocr-review' && method === 'POST') {
@@ -689,7 +794,31 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ===========================================================================
   if ((pathname === '/api/v1/meal-plans/weekly' || pathname === '/api/v1/meal-planner/weekly' || pathname === '/api/v1/groceries/consolidated') && method === 'GET') {
     const fridge = (searchParams.get('fridge') || 'Hành tím,Nước mắm').split(',').map(s => s.trim());
-    return { status: 200, data: generateWeeklyMealPlanAndGroceries(store, fridge) };
+    return { status: 200, data: store.customMealPlan || generateWeeklyMealPlanAndGroceries(store, fridge) };
+  }
+
+  if (pathname === '/api/v1/meal-plans/weekly' && (method === 'PUT' || method === 'POST')) {
+    store.customMealPlan = {
+      ...(store.customMealPlan || generateWeeklyMealPlanAndGroceries(store)),
+      days: body.days || (store.customMealPlan ? store.customMealPlan.days : []),
+      updated_at: new Date().toISOString()
+    };
+    return { status: 200, data: store.customMealPlan };
+  }
+
+  if (pathname === '/api/v1/groceries/items' && method === 'POST') {
+    store.customGroceries = store.customGroceries || [];
+    const item = { id: `GROC-${Date.now()}`, name: body.name || 'Nguyên liệu mới', amount: body.amount || '1 gói', bought: false };
+    store.customGroceries.unshift(item);
+    return { status: 201, data: item };
+  }
+
+  const grocMatch = pathname.match(/^\/api\/v1\/groceries\/items\/([^/]+)$/);
+  if (grocMatch && method === 'PATCH') {
+    store.customGroceries = store.customGroceries || [];
+    const item = store.customGroceries.find(g => g.id === grocMatch[1]);
+    if (item && body.bought !== undefined) item.bought = Boolean(body.bought);
+    return { status: 200, data: item || { id: grocMatch[1], bought: Boolean(body.bought) } };
   }
 
   // ===========================================================================
@@ -713,20 +842,44 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ===========================================================================
   // MODULE M13: TABLE BOOKING & DINE-IN QR VOUCHERS (M13-S01 .. M13-S02)
   // ===========================================================================
+  if (pathname === '/api/v1/bookings' && method === 'GET') {
+    store.bookings = store.bookings || [];
+    return { status: 200, data: { bookings: store.bookings } };
+  }
+
   if (pathname === '/api/v1/bookings' && method === 'POST') {
+    store.bookings = store.bookings || [];
     const place = store.places.find(p => p.id === body.place_id) || store.places[0];
-    return {
-      status: 200,
-      data: {
-        booking_id: `BK-${Date.now()}`,
-        place_id: place.id,
-        place_name: place.name,
-        party_size: body.party_size || 4,
-        time_slot: body.time_slot || '19:00 Hôm nay',
-        has_baby_chair: body.has_baby_chair !== false,
-        status: 'confirmed_instant'
-      }
+    const booking = {
+      booking_id: `BK-${Date.now()}`,
+      place_id: place.id,
+      place_name: place.name,
+      party_size: body.party_size || 4,
+      time_slot: body.time_slot || '19:00 Hôm nay',
+      has_baby_chair: body.has_baby_chair !== false,
+      note: body.note || '',
+      status: 'confirmed_instant'
     };
+    store.bookings.unshift(booking);
+    return { status: 200, data: booking };
+  }
+
+  const bookingMatch = pathname.match(/^\/api\/v1\/bookings\/([^/]+)$/);
+  if (bookingMatch && (method === 'PATCH' || method === 'PUT')) {
+    store.bookings = store.bookings || [];
+    const bk = store.bookings.find(b => b.booking_id === bookingMatch[1]);
+    if (!bk) return { status: 404, data: { error: 'Booking not found' } };
+    if (body.party_size !== undefined) bk.party_size = Number(body.party_size);
+    if (body.time_slot !== undefined) bk.time_slot = body.time_slot;
+    if (body.status !== undefined) bk.status = body.status;
+    return { status: 200, data: bk };
+  }
+
+  if (bookingMatch && method === 'DELETE') {
+    store.bookings = store.bookings || [];
+    const bk = store.bookings.find(b => b.booking_id === bookingMatch[1]);
+    if (bk) bk.status = 'cancelled';
+    return { status: 200, data: { cancelled: true, booking_id: bookingMatch[1] } };
   }
 
   if (pathname === '/api/v1/vouchers' && method === 'GET') {
@@ -839,6 +992,42 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     };
   }
 
+  if (pathname === '/api/v1/fridge/inventory' && method === 'POST') {
+    store.fridgeInventory = store.fridgeInventory || [];
+    const days = Number(body.expires_in_days ?? 3);
+    const newItem = {
+      id: `FRIDGE-${Date.now()}`,
+      name: body.name || 'Nguyên liệu mới',
+      quantity: body.quantity || '1 phần',
+      compartment: body.compartment || 'chill',
+      expires_in_days: days,
+      is_expiring_soon: days <= 2,
+      category: body.category || 'Tươi sống'
+    };
+    store.fridgeInventory.unshift(newItem);
+    return { status: 201, data: newItem };
+  }
+
+  const fridgeItemMatch = pathname.match(/^\/api\/v1\/fridge\/inventory\/([^/]+)$/);
+  if (fridgeItemMatch && (method === 'PUT' || method === 'PATCH')) {
+    store.fridgeInventory = store.fridgeInventory || [];
+    const item = store.fridgeInventory.find(i => i.id === fridgeItemMatch[1]);
+    if (!item) return { status: 404, data: { error: 'Fridge item not found' } };
+    if (body.name !== undefined) item.name = body.name;
+    if (body.quantity !== undefined) item.quantity = body.quantity;
+    if (body.compartment !== undefined) item.compartment = body.compartment;
+    if (body.expires_in_days !== undefined) {
+      item.expires_in_days = Number(body.expires_in_days);
+      item.is_expiring_soon = item.expires_in_days <= 2;
+    }
+    return { status: 200, data: item };
+  }
+
+  if (fridgeItemMatch && method === 'DELETE') {
+    store.fridgeInventory = (store.fridgeInventory || []).filter(i => i.id !== fridgeItemMatch[1]);
+    return { status: 200, data: { deleted: true, id: fridgeItemMatch[1] } };
+  }
+
   // M19: Smart Dietitian & Health Wearables Sync (Apple Health / Google Fit)
   if (pathname === '/api/v1/health/sync' && method === 'POST') {
     return { status: 200, data: syncHealthWearables(store, body) };
@@ -874,6 +1063,32 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   if (tipMatch && method === 'POST') {
     const res = tipCommunityRecipe(store, tipMatch[1], body.amount_vnd || 50000);
     return { status: res.success ? 200 : 404, data: res };
+  }
+
+  const likeRecipeMatch = pathname.match(/^\/api\/v1\/community\/recipes\/([^/]+)\/like$/);
+  if (likeRecipeMatch && method === 'POST') {
+    store.communityRecipes = store.communityRecipes || [];
+    const rec = store.communityRecipes.find(r => r.id === likeRecipeMatch[1]);
+    if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
+    rec.likes_count = (rec.likes_count || 0) + 1;
+    return { status: 200, data: { id: rec.id, likes_count: rec.likes_count } };
+  }
+
+  const recipeCrudMatch = pathname.match(/^\/api\/v1\/community\/recipes\/([^/]+)$/);
+  if (recipeCrudMatch && (method === 'PATCH' || method === 'PUT')) {
+    store.communityRecipes = store.communityRecipes || [];
+    const rec = store.communityRecipes.find(r => r.id === recipeCrudMatch[1]);
+    if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
+    if (body.title !== undefined) rec.title = body.title;
+    if (body.prep_time_minutes !== undefined) rec.prep_time_minutes = Number(body.prep_time_minutes);
+    if (body.calories !== undefined) rec.calories = Number(body.calories);
+    if (body.zero_waste_tag !== undefined) rec.zero_waste_tag = body.zero_waste_tag;
+    return { status: 200, data: rec };
+  }
+
+  if (recipeCrudMatch && method === 'DELETE') {
+    store.communityRecipes = (store.communityRecipes || []).filter(r => r.id !== recipeCrudMatch[1]);
+    return { status: 200, data: { deleted: true, id: recipeCrudMatch[1] } };
   }
 
   // Production Health Check & Monitoring

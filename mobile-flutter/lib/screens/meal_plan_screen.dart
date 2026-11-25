@@ -178,8 +178,11 @@ class _MealPlanScreenState extends State<MealPlanScreen>
                 );
               }
             });
+            ApiService.saveWeeklyMealPlan(
+              _week.map((m) => {'day': m.day, 'dish_name': m.dish, 'calories': m.cal, 'est_market_cost_vnd': m.price}).toList(),
+            );
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('✅ Đã đổi món ${meal.day} sang "$name"')),
+              SnackBar(content: Text('✅ Đã đổi món ${meal.day} sang "$name" & lưu lên Cloud')),
             );
           },
           child: const Text('Chọn món này', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),

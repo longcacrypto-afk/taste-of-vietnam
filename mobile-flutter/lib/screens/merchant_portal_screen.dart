@@ -26,6 +26,12 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
     {'name': 'Trứng Chần Nước Béo', 'priceRaw': '15.000đ', 'priceVnd': 15000, 'confidence': 96.5, 'matched': 'SIDE-202'},
   ];
 
+  final List<Map<String, dynamic>> _campaigns = [
+    {'id': 'CMP-701', 'name': 'Ưu tiên gợi ý bữa trưa (Bán kính 3km)', 'cpc': '4.500đ / click', 'clicks': '128 clicks', 'total': '576.000đ', 'active': true},
+    {'id': 'CMP-702', 'name': 'Tài trợ vị trí món Phở Bò Tái', 'cpc': '3.800đ / click', 'clicks': '94 clicks', 'total': '357.200đ', 'active': true},
+    {'id': 'CMP-703', 'name': 'Flash Sale 15:00 - 17:00 Xế chiều', 'cpc': '2.500đ / click', 'clicks': '0 clicks', 'total': 'Tạm dừng', 'active': false},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -571,12 +577,92 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
         const SizedBox(height: 16),
         _buildAntiFraudNotice(),
         const SizedBox(height: 16),
-        Text('Chiến Dịch Đang Chạy', style: AppTheme.titleMedium.copyWith(fontSize: 14)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Chiến Dịch (${_campaigns.length})', style: AppTheme.titleMedium.copyWith(fontSize: 14)),
+            TextButton.icon(
+              onPressed: _showCreateCampaignModal,
+              icon: const Icon(Icons.add_circle_outline_rounded, size: 16, color: AppTheme.goldenAmber),
+              label: const Text('Tạo Chiến Dịch', style: TextStyle(color: AppTheme.goldenAmber, fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
-        _buildCampaignItem('Ưu tiên gợi ý bữa trưa (Bán kính 3km)', '4.500đ / click', '128 clicks', '576.000đ', true),
-        _buildCampaignItem('Tài trợ vị trí món Phở Bò Tái', '3.800đ / click', '94 clicks', '357.200đ', true),
-        _buildCampaignItem('Flash Sale 15:00 - 17:00 Xế chiều', '2.500đ / click', '0 clicks', 'Tạm dừng', false),
+        ..._campaigns.map((c) => _buildCampaignItem(c)),
       ],
+    );
+  }
+
+  void _showCreateCampaignModal() {
+    final nameCtrl = TextEditingController(text: 'Đẩy Top Bữa Trưa Phở Bò');
+    final budgetCtrl = TextEditingController(text: '500000');
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.charcoalHero,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('🎯 Tạo Chiến Dịch Tài Trợ Mới (M7)', style: TextStyle(color: AppTheme.goldenAmber, fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nameCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Tên chiến dịch / Món quảng bá',
+                labelStyle: const TextStyle(color: Colors.white54),
+                filled: true,
+                fillColor: const Color(0xFF27272A),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: budgetCtrl,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Ngân sách (VNĐ)',
+                labelStyle: const TextStyle(color: Colors.white54),
+                filled: true,
+                fillColor: const Color(0xFF27272A),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.goldenAmber, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 14)),
+                onPressed: () async {
+                  final title = nameCtrl.text.trim();
+                  final budget = int.tryParse(budgetCtrl.text.trim()) ?? 500000;
+                  if (title.isEmpty) return;
+                  Navigator.pop(ctx);
+                  final created = await ApiService.createAdCampaign(placeId: 'PLACE-401', dishId: 'DISH-101', budgetVnd: budget);
+                  if (!mounted) return;
+                  setState(() {
+                    _campaigns.insert(0, {
+                      'id': (created?['id'] as String?) ?? 'CMP-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                      'name': title,
+                      'cpc': '3.500đ / click',
+                      'clicks': '0 clicks',
+                      'total': '${_fmt(budget)}đ',
+                      'active': true,
+                    });
+                  });
+                },
+                child: const Text('Kích Hoạt Chiến Dịch', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -653,36 +739,40 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
         ),
       );
 
-  Widget _buildCampaignItem(String name, String cpc, String clicks, String total, bool active) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceElevated,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name, style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
-                  const SizedBox(height: 2),
-                  Text('CPC: $cpc · Lượt click: $clicks', style: AppTheme.labelSmall.copyWith(fontSize: 11)),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+  Widget _buildCampaignItem(Map<String, dynamic> c) {
+    final bool active = c['active'] == true;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(total, style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.bold, fontSize: 13)),
-                Text(active ? 'Chạy' : 'Tắt',
-                    style: TextStyle(color: active ? AppTheme.emeraldBadge : AppTheme.textSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text(c['name'] as String, style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 2),
+                Text('CPC: ${c['cpc']} · Lượt click: ${c['clicks']} · ${c['total']}',
+                    style: AppTheme.labelSmall.copyWith(fontSize: 11)),
               ],
             ),
-          ],
-        ),
-      );
+          ),
+          Switch(
+            value: active,
+            activeColor: AppTheme.emeraldBadge,
+            onChanged: (val) async {
+              setState(() => c['active'] = val);
+              await ApiService.toggleCampaignStatus(c['id'] as String, val ? 'active' : 'paused');
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   String _fmt(int n) {
     final s = n.toString();
