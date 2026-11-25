@@ -161,3 +161,32 @@ GrabFood yêu cầu địa chỉ để xác định các quán giao được t�
 | M4-4 M | S02 | Gắn map tương tác vào khung sẵn, list↔marker, vị trí thủ công, attribution; adapter tile/geocoder và cấu hình khóa/hạn mức nếu có | Pan/zoom/chọn marker mở đúng S03; GPS bị từ chối vẫn dùng được; map lỗi có list. **Cần chọn nguồn map và duyệt phí nếu phát sinh** |
 | M4-5 M | S06 + M9-S06 | Enum lý do, dedupe user/place/time window, chỉ lý do đóng cửa tăng guard; chống guest tạo nhiều tài khoản; transaction/unique constraint; giữ evidence và trạng thái xử lý | 1 người gửi 3 lần không khóa; 3 người đủ điều kiện trong cửa sổ mới tạm ẩn; sai giá không khóa; admin phục hồi không xóa lịch sử. **Đề xuất cửa sổ 24 giờ, là thay đổi cần chủ sản phẩm duyệt** |
 | M4-6 S | S04–S05 | Availability có updated_at, stale label; M6 đóng băng thì admin cập nhật, không hứa realtime; quán không có món phù hợp có trạng thái rỗng | Hết món → không vào M3/redirect món đó; API/UI nhất quán sau refresh; ghi rõ lần cập nhật |
+
+## 5. M5 — Chuyển sang đặt món, chỉ đường, gọi điện (35%)
+
+### Ý định và màn giữ lại
+
+S01 hub bốn hành động; S02 chọn GrabFood/ShopeeFood; S03 bản đồ/chỉ đường; S04 gọi; S05 xác nhận đã ăn. M5 là **chuyển sang ứng dụng ngoài**, không phải hệ thống giỏ hàng/thanh toán/giao vận. beFood/Xanh SM chỉ hiện khi có link hợp lệ được kiểm, không tự mở rộng tích hợp.
+
+### Hiện chạy được và còn giả
+
+- POST `/orders/redirect` ghi user/place/dish/partner/link vào `order_redirects`; POST `/orders/:id/confirm-eaten` kiểm quyền người sở hữu, ghi history và áp cooldown, cache bị invalidate. Đã có test DB.
+- Live App hiện bấm anchor đối tác trực tiếp; không gọi `/orders/redirect`, không giữ redirect id, không có vòng quay về đúng đơn. Các màn thiết kế S02–S05 chủ yếu `goScreen`. Vì vậy API tốt hơn luồng UI thực tế.
+- ID quán/món sai bị thay bằng bản ghi đầu tiên. Partner chỉ kiểm regex, không allowlist; không kiểm món thuộc menu/còn bán/quán mở. Link thiếu thì tự thay bằng Maps rồi vẫn đếm order_click.
+- Route nối `?utm_...` vào mọi `baseLink`, có thể phá `tel:`; phone lấy từ `place.phone` chưa được xử lý riêng. Link mẫu chỉ là trang chủ/search hoặc link minh họa, không chứng minh mở đúng cửa hàng.
+- Confirm lại nhiều lần thêm nhiều history; id redirect không tồn tại cũng tạo log từ body hoặc món/quán mặc định. Thiếu idempotency và sự phân biệt “tôi tự xác nhận đã ăn” với “đơn được đối tác xác nhận”.
+- Counters order/direction/call vẫn ở RAM toàn cục; row redirect là bền vững. Không có quyền truy cập trạng thái đơn thật của đối tác.
+
+### Nghiên cứu dùng để hoàn thiện
+
+Grab có hướng dẫn link bán hàng rút gọn của quán, nhưng bài hướng dẫn là từ 2022, không phải API/affiliate contract hiện hành [R8]. Đề xuất lưu link được chủ quán cung cấp rồi thử trên thiết bị, không tự ghép scheme không công bố. Trong tìm kiếm này chưa xác minh được hợp đồng public deep-link/affiliate hiện hành của ShopeeFood; điều khoản merchant không trao quyền tự lấy dữ liệu [R9]. Google Maps hỗ trợ URL `https://www.google.com/maps/dir/?api=1&destination=lat,lng` [R7]. Không cần key thanh toán để hoàn tất M5.
+
+### Việc theo thứ tự
+
+| ID / cỡ | Màn có sẵn | Logic/API + dữ liệu phải làm | Nghiệm thu / phụ thuộc |
+| --- | --- | --- | --- |
+| M5-1 M **P2 phần UI** | S01–S04 | Cùng action handler cho card Today/quán/chi tiết: gọi redirect với id thật, giữ redirectId theo user, sau thành công mới mở link; popup-block có nút tiếp tục | Bấm mỗi hành động tạo đúng 1 row, mở đúng quán/món; API lỗi không giả thành công; không tự mở tab ngoài trong test tự động |
+| M5-2 M | S01–S04 | Builder theo partner allowlist: HTTPS đối tác được duyệt, maps URL chuẩn, `tel:` chỉ số; encode query đúng; id sai 404, menu/availability/status validate | Javascript/data URL bị chặn; unknown partner 400; phone không UTM; không chuyển Maps giả làm Grab. **Cần link cửa hàng xác minh/quyền đối tác** |
+| M5-3 M **P2 phần UI** | S05 | Return/resume chỉ hỏi “Bạn đã ăn món này chưa?” theo redirect đang pending; xác nhận server idempotent/transaction; bỏ fallback id tùy ý, self-report riêng qua feedback | Reload/xác nhận 2 lần/concurrent chỉ 1 history; người B không xác nhận đơn A; đóng app rồi mở vẫn đúng món; không khẳng định đơn giao thành công |
+| M5-4 M | S01–S05 | Test hợp đồng với fixture + thử link thực Android/iOS/desktop có/không app; thiếu app → web fallback; link chết → báo lỗi, có gọi/chỉ đường thay | Mỗi đối tác ít nhất một link quán thật mở đúng trên ma trận máy; không test đặt/mua thật khi chưa xin phép; thiếu link thì ẩn/khóa nút có giải thích |
+| M5-5 S | S01–S05 + M9-S01 | Sự kiện tối thiểu của luồng từ redirect row, có action_type/clicked_at/confirmed_at và chống trùng; chỉ báo click và self-report, không doanh thu/đơn đối tác | Restart không mất số liệu, 3 hành động không lẫn; không gửi phone/GPS thô sang UTM; M10 đầy đủ vẫn đóng băng |
