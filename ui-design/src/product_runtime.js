@@ -155,8 +155,7 @@
           api(
             "/dishes?q=" +
               encodeURIComponent(state.query) +
-              "&region=" +
-              encodeURIComponent(state.region),
+              (state.region ? "&region=" + encodeURIComponent(state.region) : ""),
           ),
       ];
     if (/^M2-S0[4-7]$/.test(id) || ["M3-S02", "M3-S06"].includes(id))

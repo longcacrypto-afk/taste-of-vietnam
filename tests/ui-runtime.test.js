@@ -34,3 +34,23 @@ test('M2 product servings controls cannot exceed the API maximum of ten', () => 
   assert.match(source, /Math\.min\(10, \(appState\.servings \|\| 2\) \+ delta\)/);
   assert.doesNotMatch(source, /Math\.min\(20, \(appState\.servings/);
 });
+
+
+test('original Explore query is accepted by strict M2 API with no region and with selected filters', async () => {
+  const runtime = fs.readFileSync('ui-design/src/product_runtime.js','utf8');
+  const config = runtime.slice(runtime.indexOf('  function config(id)'), runtime.indexOf('  let originalStage'));
+  const state={query:'',region:''};
+  const context=vm.createContext({state,api:path=>path});
+  vm.runInContext(config,context);
+  const {handleApiRequest}=await import('../src/api/router.js');
+  const {createInitialStore}=await import('../src/data/seed.js');
+  for(const [query,region] of [['',''],['cơm',''],['','nam']]) {
+    Object.assign(state,{query,region});
+    const path=context.config('M2-S01')[1]();
+    const url=new URL(path,'http://local');
+    assert.equal(url.searchParams.has('region'),Boolean(region),'never send an invalid empty enum');
+    const r=await handleApiRequest(createInitialStore(),'GET','/api/v1'+url.pathname,url.searchParams);
+    assert.equal(r.status,200);
+    assert.ok(r.data.items.length>0);
+  }
+});
