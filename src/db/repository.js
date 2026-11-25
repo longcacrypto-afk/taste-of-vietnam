@@ -18,6 +18,7 @@ import { query, isPostgresConnected, createPool } from './connection.js';
 import { MemoryRepository } from './memoryRepository.js';
 import { PostgresRepository } from './postgresRepository.js';
 import { migrationStatus, runMigrations } from './migrate.js';
+import { seedCatalog } from './seedCatalog.js';
 
 export { MemoryRepository, PostgresRepository };
 
@@ -36,7 +37,8 @@ export function getRepository(store) {
 
 /**
  * Boot-time setup. Without a database URL: memory mode. With one: connect, make sure
- * every migration is applied (or apply them when autoMigrate), attach the Postgres
+ * every migration is applied (or apply them when autoMigrate, and seed the demo
+ * catalogue if the dishes table is empty), attach the Postgres
  * repository to the store. Throws when the database is unreachable or behind on
  * migrations, so the server never silently falls back to memory and loses data.
  */
@@ -62,7 +64,12 @@ export async function initRepository(store, {
       await runMigrations(pool, { log });
     }
     const dishCount = Number((await pool.query('SELECT COUNT(*)::int AS n FROM dishes')).rows[0].n);
-    if (dishCount === 0) log('⚠️  The dishes table is empty. Load the demo catalogue with "npm run db:seed".');
+    if (dishCount === 0 && autoMigrate) {
+      // DB_AUTO_MIGRATE on a fresh database: also load the demo catalogue (insert-only, never overwrites)
+      await seedCatalog(pool, { log });
+    } else if (dishCount === 0) {
+      log('⚠️  The dishes table is empty. Load the demo catalogue with "npm run db:seed".');
+    }
   } catch (err) {
     await pool.end().catch(() => {});
     throw err;

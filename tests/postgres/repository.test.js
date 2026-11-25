@@ -79,7 +79,13 @@ test('Server refuses to use a database with pending migrations (no silent fallba
     const s = createInitialStore();
     const repo = await initRepository(s, { databaseUrl: scratch.url, autoMigrate: true, log: () => {} });
     assert.equal(repo.kind, 'postgres');
+    assert.equal((await repo.listDishes()).length, 12, 'empty catalogue gets the demo seed when auto-migrating');
+    await repo.updateDish('DISH-101', { name: 'Phở đã sửa' });
     await repo.pool.end();
+    // a second boot neither re-runs migrations nor overwrites edited rows
+    const again = await initRepository(createInitialStore(), { databaseUrl: scratch.url, autoMigrate: true, log: () => {} });
+    assert.equal((await again.getDish('DISH-101')).name, 'Phở đã sửa');
+    await again.pool.end();
   } finally {
     await scratch.drop();
   }
