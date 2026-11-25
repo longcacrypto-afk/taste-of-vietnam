@@ -1,4 +1,9 @@
 -- =============================================================================
+-- MIGRATION 001 — BASELINE SCHEMA (formerly src/db/schema.sql)
+-- Idempotent (IF NOT EXISTS everywhere): on a database where schema.sql was
+-- already applied by hand this migration changes nothing and is only recorded.
+-- =============================================================================
+-- =============================================================================
 -- POSTGRESQL + POSTGIS + PGVECTOR SCHEMA
 -- Hôm nay ăn gì · Taste of Vietnam (Phase E Production Database Specification)
 -- Tuân thủ PDPD Nghị định 13/2023/NĐ-CP & Quy tắc nghiệp vụ Non-Negotiable
@@ -8,7 +13,15 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 CREATE EXTENSION IF NOT EXISTS "unaccent";
-CREATE EXTENSION IF NOT EXISTS "vector";
+-- pgvector is optional: the postgis/postgis image used in CI and docker-compose does not ship it.
+-- When it is missing, dishes.embedding is simply not created (semantic search runs in-process).
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS "vector";
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pgvector not available (%), skipping dishes.embedding', SQLERRM;
+END
+$$;
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- 2. BẢNG MÓN ĂN & CÔNG THỨC (M2 DISH LIBRARY)
@@ -26,10 +39,17 @@ CREATE TABLE IF NOT EXISTS dishes (
     estimated_price_vnd INT NOT NULL DEFAULT 50000,
     ingredients JSONB NOT NULL DEFAULT '[]', -- [{name, amount, unit, is_allergen}]
     recipe_steps JSONB NOT NULL DEFAULT '[]', -- [{step, instruction, duration_min}]
-    embedding vector(768), -- pgvector embedding for semantic dish search (Gemini 768-dim)
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+    EXECUTE 'ALTER TABLE dishes ADD COLUMN IF NOT EXISTS embedding vector(768)'; -- Gemini 768-dim
+  END IF;
+END
+$$;
 
 -- Index tìm kiếm & bộ lọc
 CREATE INDEX IF NOT EXISTS idx_dishes_unaccented ON dishes USING gin(unaccented_name gin_trgm_ops);
