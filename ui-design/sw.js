@@ -3,7 +3,7 @@
 // Strategy: Network First with graceful offline fallback & precache (Never crashes)
 // =============================================================================
 
-const CACHE_NAME = 'hnag-v10';
+const CACHE_NAME = 'hnag-v11';
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.json',

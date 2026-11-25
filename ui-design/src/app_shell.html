@@ -4330,6 +4330,53 @@ export async function load${activeScr.id.replace('-','')}() {
     // Boot
     document.getElementById('total-screen-counter').textContent = `${ORDERED_IDS.length}/${ORDERED_IDS.length}`;
     renderSidebar();
+
+    window.LIVE_APP = {
+      async loadToday() {
+        try {
+          const r = await fetch('/api/v1/suggestions/today');
+          const d = await r.json();
+          if (d && Array.isArray(d.items)) {
+            window.appState.liveToday = d;
+            renderStage();
+            hydrateImages();
+          }
+        } catch (_) {}
+      },
+      async markDishEaten(dishId, dishName) {
+        try {
+          await fetch('/api/v1/suggestions/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dish_id: dishId, action: 'eaten' })
+          });
+          if (typeof showStudioToast === 'function') {
+            showStudioToast(`✅ Đã ăn "${dishName}" · Cooldown 3 ngày!`);
+          }
+          await this.loadToday();
+        } catch (_) {}
+      },
+      async sendMamChat(prefill) {
+        const inp = document.getElementById('mam-chat-inp');
+        const q = (prefill || (inp ? inp.value : '')).trim();
+        if (!q) return;
+        window.appState.liveChatQuery = q;
+        window.appState.liveChatReply = '⏳ Măm AI đang phân tích khẩu vị & tìm quán thực tế...';
+        renderStage(); hydrateImages();
+        try {
+          const r = await fetch('/api/v1/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: q })
+          });
+          const d = await r.json();
+          window.appState.liveChatReply = d.reply || 'Măm gợi ý cho anh các lựa chọn phù hợp nhất:';
+          window.appState.liveChatOptions = d.options || [];
+          renderStage(); hydrateImages();
+        } catch (_) {}
+      }
+    };
+
     (function initPwaMobileMode() {
       const params = new URLSearchParams(window.location.search);
       const isAppRoute = window.location.pathname === '/app' || params.get('mode') === 'app';
@@ -4348,6 +4395,7 @@ export async function load${activeScr.id.replace('-','')}() {
     renderStage();
     hydrateImages();
     initLiveApp();
+    window.LIVE_APP.loadToday();
   </script>
 </body>
 </html>

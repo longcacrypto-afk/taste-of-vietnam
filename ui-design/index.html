@@ -2625,54 +2625,69 @@ window.SCREENS_M3_M4_M5_M8 = {
             </div>
 
             <div class="grid grid-cols-2 gap-3 text-xs">
-              <!-- Card 1 -->
-              <div onclick="goScreen('M2-S04')" class="bg-white rounded-2xl p-2 border border-[#F1F5F9] shadow-sm space-y-2 cursor-pointer group">
-                <div class="relative h-24 rounded-xl overflow-hidden">
-                  <img data-img="298" class="w-full h-full object-cover group-hover:scale-105 transition" />
-                  <span class="w-6 h-6 rounded-full bg-white/90 text-[#0F172A] flex items-center justify-center absolute top-1.5 right-1.5 shadow">
-                    ${window.UI_KIT.icon('heart', 'w-3.5 h-3.5')}
-                  </span>
-                </div>
-                <div class="px-1 space-y-1">
-                  <div class="font-extrabold text-xs text-[#0F172A] truncate">Phở Bò Tái Nạm</div>
-                  <div class="flex items-center justify-between text-[10px] text-[#64748B]">
-                    <span class="inline-flex items-center gap-1">${window.UI_KIT.icon('clock', 'w-3 h-3')} 15p</span>
-                    <span class="font-extrabold text-[#D97736]">45.000đ</span>
+              ${(() => {
+                const liveItems = (window.appState.liveToday && window.appState.liveToday.items) || [];
+                const c1 = liveItems[0] || { dish_id: 'DISH-101', dish_name: 'Phở Bò Tái Nạm', ref_price: 45000, calories: 480 };
+                const c2 = liveItems[1] || { dish_id: 'DISH-102', dish_name: 'Cơm Tấm Sườn Bì', ref_price: 40000, calories: 580 };
+                return `
+                  <!-- Card 1 -->
+                  <div class="bg-white rounded-2xl p-2 border border-[#F1F5F9] shadow-sm space-y-2 group">
+                    <div onclick="goScreen('M2-S04')" class="relative h-24 rounded-xl overflow-hidden cursor-pointer">
+                      <img data-img="298" class="w-full h-full object-cover group-hover:scale-105 transition" />
+                      <span class="w-6 h-6 rounded-full bg-white/90 text-[#0F172A] flex items-center justify-center absolute top-1.5 right-1.5 shadow">
+                        ${window.UI_KIT.icon('heart', 'w-3.5 h-3.5')}
+                      </span>
+                    </div>
+                    <div class="px-1 space-y-1">
+                      <div onclick="goScreen('M2-S04')" class="font-extrabold text-xs text-[#0F172A] truncate cursor-pointer">${c1.dish_name}</div>
+                      <div class="flex items-center justify-between text-[10px] text-[#64748B]">
+                        <span class="inline-flex items-center gap-1">${window.UI_KIT.icon('clock', 'w-3 h-3')} ${c1.calories || 480} kcal</span>
+                        <span class="font-extrabold text-[#D97736]">${Number(c1.ref_price || 45000).toLocaleString('vi-VN')}đ</span>
+                      </div>
+                      <button onclick="window.LIVE_APP && LIVE_APP.markDishEaten('${c1.dish_id}','${(c1.dish_name||'').replace(/'/g,'')}')" class="w-full py-1 rounded-lg bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold hover:bg-[#FBBF24] hover:text-[#0F172A]">✅ Đã ăn</button>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              <!-- Card 2 -->
-              <div onclick="goScreen('M2-S04')" class="bg-white rounded-2xl p-2 border border-[#F1F5F9] shadow-sm space-y-2 cursor-pointer group">
-                <div class="relative h-24 rounded-xl overflow-hidden">
-                  <img data-img="304" class="w-full h-full object-cover group-hover:scale-105 transition" />
-                  <span class="w-6 h-6 rounded-full bg-white/90 text-[#0F172A] flex items-center justify-center absolute top-1.5 right-1.5 shadow">
-                    ${window.UI_KIT.icon('heart', 'w-3.5 h-3.5')}
-                  </span>
-                </div>
-                <div class="px-1 space-y-1">
-                  <div class="font-extrabold text-xs text-[#0F172A] truncate">Cơm Tấm Sườn Bì</div>
-                  <div class="flex items-center justify-between text-[10px] text-[#64748B]">
-                    <span class="inline-flex items-center gap-1">${window.UI_KIT.icon('clock', 'w-3 h-3')} 20p</span>
-                    <span class="font-extrabold text-[#D97736]">40.000đ</span>
+                  <!-- Card 2 -->
+                  <div class="bg-white rounded-2xl p-2 border border-[#F1F5F9] shadow-sm space-y-2 group">
+                    <div onclick="goScreen('M2-S04')" class="relative h-24 rounded-xl overflow-hidden cursor-pointer">
+                      <img data-img="304" class="w-full h-full object-cover group-hover:scale-105 transition" />
+                      <span class="w-6 h-6 rounded-full bg-white/90 text-[#0F172A] flex items-center justify-center absolute top-1.5 right-1.5 shadow">
+                        ${window.UI_KIT.icon('heart', 'w-3.5 h-3.5')}
+                      </span>
+                    </div>
+                    <div class="px-1 space-y-1">
+                      <div onclick="goScreen('M2-S04')" class="font-extrabold text-xs text-[#0F172A] truncate cursor-pointer">${c2.dish_name}</div>
+                      <div class="flex items-center justify-between text-[10px] text-[#64748B]">
+                        <span class="inline-flex items-center gap-1">${window.UI_KIT.icon('clock', 'w-3 h-3')} ${c2.calories || 580} kcal</span>
+                        <span class="font-extrabold text-[#D97736]">${Number(c2.ref_price || 40000).toLocaleString('vi-VN')}đ</span>
+                      </div>
+                      <button onclick="window.LIVE_APP && LIVE_APP.markDishEaten('${c2.dish_id}','${(c2.dish_name||'').replace(/'/g,'')}')" class="w-full py-1 rounded-lg bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold hover:bg-[#FBBF24] hover:text-[#0F172A]">✅ Đã ăn</button>
+                    </div>
                   </div>
-                </div>
-              </div>
+                `;
+              })()}
             </div>
 
             <!-- Card 3: Sponsored 1/3 Slot Horizontal Card -->
-            <div onclick="goScreen('M4-S03')" class="bg-[#F8FAFC] rounded-2xl p-2.5 border border-[#E2E8F0] flex items-center gap-3 cursor-pointer hover:border-[#FBBF24] transition">
-              <img data-img="310" class="w-14 h-14 rounded-xl object-cover shrink-0" />
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-1.5">
-                  <span class="font-extrabold text-xs text-[#0F172A] truncate">Bún Bò Huế O Xuân</span>
-                  ${window.UI_KIT.tagPill('Tài trợ', 'orange')}
+            ${(() => {
+              const liveItems = (window.appState.liveToday && window.appState.liveToday.items) || [];
+              const c3 = liveItems[2] || { dish_id: 'DISH-103', dish_name: 'Bún Bò Huế O Xuân', ref_price: 50000, is_sponsored: true, reason: 'Cách 650m · Đang mở · Hợp khẩu vị cay nhẹ' };
+              return `
+                <div onclick="goScreen('M4-S03')" class="bg-[#F8FAFC] rounded-2xl p-2.5 border border-[#E2E8F0] flex items-center gap-3 cursor-pointer hover:border-[#FBBF24] transition">
+                  <img data-img="310" class="w-14 h-14 rounded-xl object-cover shrink-0" />
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-extrabold text-xs text-[#0F172A] truncate">${c3.dish_name}</span>
+                      ${c3.is_sponsored !== false ? window.UI_KIT.tagPill('Tài trợ', 'orange') : ''}
+                    </div>
+                    <div class="text-[10px] text-[#64748B] mt-0.5 truncate">${c3.reason || 'Cách 650m · Đang mở · Hợp khẩu vị cay nhẹ'}</div>
+                    <div class="text-xs font-extrabold text-[#D97736] mt-0.5">${Number(c3.ref_price || 50000).toLocaleString('vi-VN')}đ</div>
+                  </div>
+                  <span class="text-[#64748B]">${window.UI_KIT.icon('arrowRight', 'w-4 h-4')}</span>
                 </div>
-                <div class="text-[10px] text-[#64748B] mt-0.5">Cách 650m · Đang mở · Hợp khẩu vị cay nhẹ</div>
-                <div class="text-xs font-extrabold text-[#D97736] mt-0.5">50.000đ</div>
-              </div>
-              <span class="text-[#64748B]">${window.UI_KIT.icon('arrowRight', 'w-4 h-4')}</span>
-            </div>
+              `;
+            })()}
           </div>
         </div>
       `;
@@ -2868,28 +2883,28 @@ window.SCREENS_M3_M4_M5_M8 = {
             ${window.UI_KIT.mascotSVG('mam', 'w-20 h-24')}
           </div>
           <div class="flex-1 bg-[#EFF6FF] border border-[#DBEAFE] rounded-2xl rounded-bl-sm p-3 text-[11px] text-[#1E293B] leading-relaxed shadow-sm">
-            <div class="font-extrabold text-xs mb-0.5">Chào anh Long! 👋</div>
-            Nhà mình đang có nguyên liệu gì, hay tối nay 4 người ngân sách 300k muốn ăn gần nhà? Măm tạo thực đơn ngay nhé!
+            <div class="font-extrabold text-xs mb-0.5">${window.appState.liveChatQuery ? 'Măm AI trả lời:' : 'Chào anh Long! 👋'}</div>
+            ${window.appState.liveChatReply || 'Nhà mình đang có nguyên liệu gì, hay tối nay 4 người ngân sách 300k muốn ăn gần nhà? Măm tạo thực đơn ngay nhé!'}
           </div>
         </div>
 
-        <!-- Tell Me What Ingredients / Prompt Card with Mic & 3 Quick Pills -->
+        <!-- Tell Me What Ingredients / Live Prompt Card -->
         <div class="bg-white rounded-3xl p-3.5 border border-[#E2E8F0] shadow-sm space-y-2.5">
           <div class="text-[11px] font-bold text-[#334155]">Nhập nguyên liệu sẵn có hoặc nhu cầu bữa ăn...</div>
-          <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-[11px] text-[#64748B]">
-            <span class="truncate">VD: thịt bò, trứng, cà chua, hoặc 4 người 300k...</span>
-            <span class="text-[#334155] shrink-0 ml-1">${window.UI_KIT.icon('mic', 'w-4 h-4')}</span>
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+            <input id="mam-chat-inp" value="${window.appState.liveChatQuery || ''}" placeholder="VD: 4 người 300k, có trẻ nhỏ..." onkeydown="if(event.key==='Enter') window.LIVE_APP && LIVE_APP.sendMamChat()" class="flex-1 bg-transparent text-[11px] text-[#0F172A] focus:outline-none" />
+            <button onclick="window.LIVE_APP && LIVE_APP.sendMamChat()" class="px-2.5 py-1 rounded-lg bg-[#FBBF24] text-[#0F172A] font-extrabold text-[10px]">Gửi</button>
           </div>
           <div class="flex flex-wrap gap-1.5 justify-center pt-0.5">
-            <button onclick="goScreen('M11-S01')" class="px-3 py-1.5 rounded-full border border-[#E2E8F0] hover:border-[#FBBF24] text-[10px] font-bold text-[#1E293B] bg-white">
-              Tủ lạnh có gì
+            <button onclick="window.LIVE_APP && LIVE_APP.sendMamChat('Tối nay 4 người ngân sách 300k có trẻ nhỏ')" class="px-3 py-1.5 rounded-full border border-[#E2E8F0] hover:border-[#FBBF24] text-[10px] font-bold text-[#1E293B] bg-white">
+              4 người 300k
             </button>
             <button onclick="goScreen('M3-S03')" class="px-3 py-1.5 rounded-full border border-[#E2E8F0] hover:border-[#FBBF24] text-[10px] font-bold text-[#1E293B] bg-white">
               Quay món ngẫu nhiên
             </button>
-            <button onclick="goScreen('M1-S06')" class="px-3 py-1.5 rounded-full border border-[#E2E8F0] hover:border-[#22C55E] text-[10px] font-bold text-[#15803D] bg-white inline-flex items-center gap-1">
+            <button onclick="window.LIVE_APP && LIVE_APP.sendMamChat('Món chay thanh đạm')" class="px-3 py-1.5 rounded-full border border-[#E2E8F0] hover:border-[#22C55E] text-[10px] font-bold text-[#15803D] bg-white inline-flex items-center gap-1">
               ${window.UI_KIT.icon('leaf', 'w-3 h-3')}
-              <span>Chế độ Healthy</span>
+              <span>Món Healthy</span>
             </button>
           </div>
         </div>
@@ -8389,6 +8404,53 @@ export async function load${activeScr.id.replace('-','')}() {
     // Boot
     document.getElementById('total-screen-counter').textContent = `${ORDERED_IDS.length}/${ORDERED_IDS.length}`;
     renderSidebar();
+
+    window.LIVE_APP = {
+      async loadToday() {
+        try {
+          const r = await fetch('/api/v1/suggestions/today');
+          const d = await r.json();
+          if (d && Array.isArray(d.items)) {
+            window.appState.liveToday = d;
+            renderStage();
+            hydrateImages();
+          }
+        } catch (_) {}
+      },
+      async markDishEaten(dishId, dishName) {
+        try {
+          await fetch('/api/v1/suggestions/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dish_id: dishId, action: 'eaten' })
+          });
+          if (typeof showStudioToast === 'function') {
+            showStudioToast(`✅ Đã ăn "${dishName}" · Cooldown 3 ngày!`);
+          }
+          await this.loadToday();
+        } catch (_) {}
+      },
+      async sendMamChat(prefill) {
+        const inp = document.getElementById('mam-chat-inp');
+        const q = (prefill || (inp ? inp.value : '')).trim();
+        if (!q) return;
+        window.appState.liveChatQuery = q;
+        window.appState.liveChatReply = '⏳ Măm AI đang phân tích khẩu vị & tìm quán thực tế...';
+        renderStage(); hydrateImages();
+        try {
+          const r = await fetch('/api/v1/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: q })
+          });
+          const d = await r.json();
+          window.appState.liveChatReply = d.reply || 'Măm gợi ý cho anh các lựa chọn phù hợp nhất:';
+          window.appState.liveChatOptions = d.options || [];
+          renderStage(); hydrateImages();
+        } catch (_) {}
+      }
+    };
+
     (function initPwaMobileMode() {
       const params = new URLSearchParams(window.location.search);
       const isAppRoute = window.location.pathname === '/app' || params.get('mode') === 'app';
@@ -8407,6 +8469,7 @@ export async function load${activeScr.id.replace('-','')}() {
     renderStage();
     hydrateImages();
     initLiveApp();
+    window.LIVE_APP.loadToday();
   </script>
 </body>
 </html>
