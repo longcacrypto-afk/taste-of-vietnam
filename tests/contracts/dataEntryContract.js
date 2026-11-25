@@ -135,6 +135,15 @@ export function contracts(make,options={}) {
     assert.equal(r.status,200);assert.equal(r.data.name,d.name);assert.equal(r.data.cms.version,3);assert.equal(r.data.cms.status,'draft');
     assert.equal(r.data.cms.verified_at,null);
   });
+  test('CMS: restoring an earlier snapshot clears later image and macro fields',options,async t=>{
+    const {api,create}=await setup(t);const d=await create();
+    const r=await api('PATCH',`/admin/dishes/${d.id}`,{img_key:'298',macros:{fat:10},image_source:source});
+    assert.equal(r.status,200);
+    const restored=await api('POST',`/admin/dishes/${d.id}/restore`,{restore_version:1});
+    assert.equal(restored.status,200,JSON.stringify(restored));assert.equal(restored.data.img_key,'');
+    assert.ok(!restored.data.macros || !Object.keys(restored.data.macros).length);
+    assert.ok(!restored.data.cms.image_source);
+  });
   test('CMS: invalid typed recipe/ingredient/unit/macro/numbers/source fail without writes',options,async t=>{
     const {api,repo}=await setup(t);const before=(await repo.listDishes()).length;
     for(const patch of [{spice_level:9},{ref_price:-1},{base_servings:0},{calories:'450'},{diet_flags:'vegan'},

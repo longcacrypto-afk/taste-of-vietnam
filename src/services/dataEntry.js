@@ -66,7 +66,7 @@ export function dishInput(body,before=null) {
   const d=before ? structuredClone(before) : {
     id:`DISH-${crypto.randomUUID().slice(0,20)}`,region:'Miền Nam',meal_slots:['lunch','dinner'],
     calories:450,ref_price:50000,spice_level:1,allergen_tags:[],diet_flags:[],weather_fit:['any'],tags:[],
-    description:'',ingredients:[],steps:[],base_servings:2,market_cost_base:0
+    description:'',ingredients:[],steps:[],base_servings:2,market_cost_base:0,img_key:'',macros:{},prep_minutes:25,difficulty:'easy'
   };
   for(const k of ['name','region','description','difficulty','img_key']) if(own(body,k)) d[k]=text(body[k],k==='description'?4000:120);
   if(!d.name) fail('Cần tên món');
@@ -160,6 +160,7 @@ export function verifyPlace(p,actor,body) {
   if(![p.lat,p.lng].every(Number.isFinite)||!p.menu?.length) fail('Cần tọa độ và menu');
   validateHours(p.opening_hours);
   if(!p.cms?.source) fail('Cần nguồn/quyền sử dụng');
+  if(p.img_key && !p.cms.image_source) fail('Thiếu quyền sử dụng ảnh');
   p.cms={...p.cms,status:'verified',version:p.cms.version+1,verified_by:actor.id,evidence:required(body.evidence||p.cms.evidence,4000)};
   p.is_verified=true;p.verified_at=new Date().toISOString();
   // Approve never clears a pause, count or report.

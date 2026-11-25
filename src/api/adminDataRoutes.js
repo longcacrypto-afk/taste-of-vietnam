@@ -2,9 +2,10 @@ import { PolicyError } from '../services/adminPolicy.js';
 import { dishInput, placeInput, checkVersion, verifyDish, verifyPlace, importPlaces } from '../services/dataEntry.js';
 
 const ok=data=>({status:200,data});
-const changed=(data,action,target,before,after,reason='CMS update',status=200)=>({
-  status,data,audit:{action,target,before:structuredClone(before??null),after:structuredClone(after??null),reason}
-});
+const changed=(data,action,target,before,after,reason='CMS update',status=200)=>{
+  if(typeof reason!=='string'||reason.length>1000) throw new PolicyError(400,'Lý do không hợp lệ');
+  return {status,data,audit:{action,target,before:structuredClone(before??null),after:structuredClone(after??null),reason}};
+};
 const missing=()=>{throw new PolicyError(404,'Không tìm thấy bản ghi');};
 async function saveDish(repo,d,before) {
   // Preserve repository safety revocation for actual edits, not lifecycle-only writes.
@@ -45,7 +46,8 @@ export async function handleAdminDataRoute(repo,actor,method,path,q,body) {
       const revision=(await repo.listContentVersions('dish',m[1])).find(v=>v.version===body.restore_version);
       if(!revision) missing();
       // Restoring old content is a new draft and MUST be re-reviewed.
-      d=dishInput({...revision.snapshot,...(revision.snapshot.cms?.source?{source:revision.snapshot.cms.source}:{}),...(revision.snapshot.cms?.image_source?{image_source:revision.snapshot.cms.image_source}:{})},before);
+      d=dishInput({...revision.snapshot,...(revision.snapshot.cms?.source?{source:revision.snapshot.cms.source}:{}),...(revision.snapshot.cms?.image_source?{image_source:revision.snapshot.cms.image_source}:{})});
+      d.id=before.id;d.cms.version=before.cms.version+1;
     } else return null;
     const saved=await saveDish(repo,d,before);
     return changed({...saved,allergens:saved.allergen_tags},action?`${action.toUpperCase()}_DISH`:'UPDATE_DISH',saved.id,before,saved,body.reason);
