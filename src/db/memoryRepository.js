@@ -121,11 +121,13 @@ export class MemoryRepository {
   async getDish(id) { return this.store.dishes.find(d => d.id === id) || null; }
 
   async createDish(dish) {
+    dish = { safety_status: 'pending', ...dish };
     this.store.dishes.unshift(dish);
     return dish;
   }
 
   async updateDish(id, patch) {
+    if (['allergen_tags', 'diet_flags', 'ingredients', 'steps'].some(k => patch[k] !== undefined)) patch = { ...patch, safety_status: 'pending' };
     const dish = await this.getDish(id);
     if (!dish) return null;
     Object.assign(dish, patch);

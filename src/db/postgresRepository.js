@@ -337,6 +337,7 @@ export class PostgresRepository {
   }
 
   async updateDish(id, patch) {
+    if (['allergen_tags', 'diet_flags', 'ingredients', 'steps'].some(k => patch[k] !== undefined)) patch = { ...patch, safety_status: 'pending' };
     const cols = dishColumns(patch);
     const keys = Object.keys(cols);
     if (!keys.length) return this.getDish(id);

@@ -64,7 +64,7 @@ export function extractVietnameseIntent(queryText = '', userProfile = {}) {
     raw_query: queryText,
     party_size: partySize,
     total_budget_vnd: totalBudgetVnd,
-    per_person_budget_vnd: Math.round(totalBudgetVnd / partySize),
+    per_person_budget_vnd: Math.floor(totalBudgetVnd / partySize),
     has_kids: hasKids,
     spice_max: noSpice ? 0 : userProfile.spice_max,
     diet_mode: norm.includes('thuan chay') || norm.includes('vegan') ? 'vegan' : norm.includes('chay') ? 'vegetarian' : userProfile.diet_mode,

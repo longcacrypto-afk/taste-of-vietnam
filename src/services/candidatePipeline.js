@@ -14,11 +14,10 @@ export const REJECTION_MESSAGES = {
   invalid_context: 'Điều kiện lựa chọn không hợp lệ.',
   insufficient_candidates: 'Không đủ 3 món phù hợp; không tự nới điều kiện.'
 };
-const finite = value => value !== null && value !== '' && value !== undefined && Number.isFinite(Number(value));
+const finite = value => (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value));
 const number = (value, fallback) => value === undefined ? fallback : finite(value) ? Number(value) : NaN;
 const MODES = ['both', 'eat_out', 'cook'];
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
-const DIETS = ['balanced', 'normal', 'none', 'vegetarian', 'vegan', 'low_carb', 'high_protein', 'healthy', 'keto', 'halal'];
 
 export function candidateContext(profile = {}, opts = {}) {
   const diets = [...new Set([profile.diet_mode, opts.diet_mode].filter(d => d && !['balanced', 'normal', 'none'].includes(d)))];
@@ -33,7 +32,7 @@ export function candidateContext(profile = {}, opts = {}) {
     party_size: number(opts.party_size, 1)
   };
   context.valid = MODES.includes(context.mode) && MEALS.includes(context.meal_slot)
-    && diets.every(d => DIETS.includes(d)) && context.budget_min >= 0
+    && diets.every(d => typeof d === 'string' && /^[a-z][a-z0-9_]{0,39}$/.test(d)) && context.budget_min >= 0
     && Number.isFinite(context.budget_max) && context.budget_max >= context.budget_min
     && context.radius_m > 0 && context.radius_m <= 100000
     && Number.isInteger(context.party_size) && context.party_size >= 1 && context.party_size <= 100
@@ -72,23 +71,24 @@ export function buildCandidates(store, opts = {}, { now = Date.now(), placePredi
   const reject = reason => { excluded[reason] = (excluded[reason] || 0) + 1; };
   const candidates = [];
   const approvalRequired = process.env.REQUIRE_SAFETY_APPROVAL === 'true';
+  if (!Array.isArray(profile.hard_allergies ?? []) || !Array.isArray(profile.disliked_dish_ids ?? []) || !(profile.hard_allergies ?? []).every(t => typeof t === 'string')) context.valid = false;
   if (!context.valid) reject('invalid_context');
   else for (const dish of store.dishes || []) {
     const allergens = dish.allergen_tags;
     const allergies = profile.hard_allergies || [];
     if (dish.safety_status === 'rejected' || (approvalRequired && dish.safety_status !== 'approved')
-      || (allergies.length > 0 && (!Array.isArray(allergens) || allergens.some(t => typeof t !== 'string')))) { reject('safety'); continue; }
+      || ((allergies.length > 0 || approvalRequired || allergens !== undefined) && (!Array.isArray(allergens) || allergens.some(t => typeof t !== 'string')))) { reject('safety'); continue; }
     if ((allergens || []).some(t => allergies.includes(t))) { reject('allergy'); continue; }
     if ((profile.disliked_dish_ids || []).includes(dish.id)) { reject('disliked'); continue; }
-    const flags = dish.diet_flags || [];
+    const flags = Array.isArray(dish.diet_flags) ? dish.diet_flags : [];
     if (!context.diets.every(d => flags.includes(d) || (d === 'vegetarian' && flags.includes('vegan')))) { reject('diet'); continue; }
-    if (!(dish.meal_slots || []).includes(context.meal_slot)) { reject('meal'); continue; }
+    if (!Array.isArray(dish.meal_slots) || !dish.meal_slots.includes(context.meal_slot)) { reject('meal'); continue; }
     if (context.spice_max !== null && (!finite(dish.spice_level) || Number(dish.spice_level) > context.spice_max)) { reject('spice'); continue; }
     if ((store.suggestionHistory || []).some(h => h.dish_id === dish.id && h.action === 'eaten'
       && Number.isFinite(Date.parse(h.created_at)) && Date.parse(h.created_at) > now - 72 * 3600000)) { reject('cooldown'); continue; }
     const places = context.mode === 'cook' ? [] : eligiblePlaces(store, dish.id, context, now, placePredicate);
-    const recipe = Array.isArray(dish.ingredients) && dish.ingredients.length > 0
-      && Array.isArray(dish.steps) && dish.steps.length > 0 && finite(dish.base_servings) && Number(dish.base_servings) > 0
+    const recipe = Array.isArray(dish.ingredients) && dish.ingredients.length > 0 && dish.ingredients.every(i => i && typeof i.name === 'string' && i.name.trim())
+      && Array.isArray(dish.steps) && dish.steps.length > 0 && dish.steps.every(s => s && (s.title || s.text)) && finite(dish.base_servings) && Number(dish.base_servings) > 0
       && finite(dish.market_cost_base) && Number(dish.market_cost_base) >= 0;
     const canCook = context.mode !== 'eat_out' && recipe;
     if (!places.length && !canCook) { reject('mode'); continue; }

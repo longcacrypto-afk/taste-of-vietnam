@@ -329,7 +329,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     // Hash every gate input, catalogue and history so approval/menu/profile changes
     // cannot replay an old unsafe result. Retain per-user cache invalidation prefix.
     const version = createHash('sha256').update(JSON.stringify([profile, opts, view.dishes, view.places,
-      view.campaigns, view.suggestionHistory, process.env.REQUIRE_SAFETY_APPROVAL, Math.floor(Date.now() / 1000)])).digest('hex');
+      view.campaigns, view.weather, view.suggestionHistory, (view.suggestionHistory || []).filter(h => h.action === 'eaten' && Date.parse(h.created_at) > Date.now() - 72 * 3600000).map(h => h.id || h.dish_id), process.env.REQUIRE_SAFETY_APPROVAL])).digest('hex');
     const cacheKey = `sugg:${profile.id || 'default'}:${version}`;
     const cached = suggestionCache.get(cacheKey);
     if (cached) {
@@ -337,7 +337,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     }
     const fresh = getTodaySuggestions(view, opts);
     if (!fresh.context.valid) return { status: 400, data: fresh };
-    suggestionCache.set(cacheKey, fresh, 1);
+    suggestionCache.set(cacheKey, fresh, 60);
     return { status: 200, data: fresh };
   }
 
