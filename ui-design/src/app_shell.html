@@ -1276,6 +1276,91 @@
       m3State: 'success',
       searchQuery: ''
     };
+    // ===== Auth client (P0) =====
+    // Every same-origin /api/v1 call carries a token. Without a login the app
+    // silently gets its own guest token (own profile, history, collections).
+    // Admin / merchant screens ask for a phone OTP login (TOV_AUTH.renderLoginRequired).
+    (function () {
+      const KEY = 'tov_token', ROLE_KEY = 'tov_role';
+      const nativeFetch = window.fetch.bind(window);
+      const mem = {};
+      const ls = {
+        get(k) { try { return localStorage.getItem(k); } catch (_) { return mem[k] || null; } },
+        set(k, v) { try { localStorage.setItem(k, v); } catch (_) { mem[k] = v; } },
+        del(k) { try { localStorage.removeItem(k); } catch (_) { delete mem[k]; } }
+      };
+      let guestPromise = null;
+      const pathOf = (url) => { try { const u = new URL(url, location.href); return u.origin === location.origin ? u.pathname : null; } catch (_) { return null; } };
+      function save(d) { if (d && d.access_token) { ls.set(KEY, d.access_token); ls.set(ROLE_KEY, d.role || 'guest'); } return d; }
+      function ensureToken() {
+        const t = ls.get(KEY);
+        if (t) return Promise.resolve(t);
+        if (!guestPromise) {
+          guestPromise = nativeFetch('/api/v1/auth/guest', { method: 'POST' })
+            .then(r => r.json()).then(d => save(d) && d.access_token)
+            .finally(() => { guestPromise = null; });
+        }
+        return guestPromise;
+      }
+      function withAuth(input, init, token) {
+        const headers = new Headers((init && init.headers) || (input instanceof Request ? input.headers : undefined));
+        if (token && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + token);
+        return nativeFetch(input, Object.assign({}, init || {}, { headers }));
+      }
+      window.fetch = async function (input, init) {
+        const p = pathOf(typeof input === 'string' ? input : (input && input.url) || '');
+        if (!p || !p.startsWith('/api/v1/') || p.startsWith('/api/v1/auth/')) return nativeFetch(input, init);
+        let token = null;
+        try { token = await ensureToken(); } catch (_) {}
+        let res = await withAuth(input, init, token);
+        if (res.status === 401 && token) {
+          // expired token or server restarted (in-memory accounts): start a fresh guest session once
+          ls.del(KEY); ls.del(ROLE_KEY);
+          try { token = await ensureToken(); } catch (_) { token = null; }
+          if (token) res = await withAuth(input, init, token);
+        }
+        return res;
+      };
+      async function postJson(url, body) {
+        const r = await nativeFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
+      }
+      window.TOV_AUTH = {
+        role: () => ls.get(ROLE_KEY) || 'guest',
+        requestOtp: (phone) => postJson('/api/v1/auth/otp/request', { phone }),
+        async verifyOtp(phone, code) { const r = await postJson('/api/v1/auth/otp/verify', { phone, code }); if (r.ok) save(r.data); return r; },
+        logout() { ls.del(KEY); ls.del(ROLE_KEY); },
+        // Shows a phone + OTP form in `container` (used when an API answers 401/403).
+        renderLoginRequired(container, status, retry) {
+          const need = status === 403 ? 'Tài khoản hiện tại không có quyền xem mục này.' : 'Mục này cần đăng nhập.';
+          container.innerHTML = `
+            <div class="max-w-sm mx-auto my-8 p-5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-3 text-xs">
+              <div class="font-black text-sm">🔐 Đăng nhập quản trị / chủ quán</div>
+              <div class="text-[var(--text-muted)]">${need} Nhập số điện thoại đã được cấp quyền để nhận mã OTP.</div>
+              <input data-auth="phone" type="tel" inputmode="tel" aria-label="Số điện thoại" placeholder="VD: 0912 345 678" class="w-full p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] outline-none focus:border-[#FBBF24]" />
+              <button data-auth="send" type="button" class="w-full py-2 rounded-xl bg-[#FBBF24] text-[#0F172A] font-extrabold">Gửi mã OTP</button>
+              <input data-auth="code" type="text" inputmode="numeric" maxlength="6" aria-label="Mã OTP 6 số" placeholder="Mã 6 số" class="hidden w-full p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] outline-none focus:border-[#FBBF24]" />
+              <button data-auth="verify" type="button" class="hidden w-full py-2 rounded-xl bg-[#22C55E] text-white font-extrabold">Đăng nhập</button>
+              <div data-auth="msg" class="text-[11px] text-[var(--text-muted)]"></div>
+            </div>`;
+          const $ = (k) => container.querySelector(`[data-auth="${k}"]`);
+          const msg = (t) => { $('msg').textContent = t; };
+          $('send').onclick = async () => {
+            const r = await window.TOV_AUTH.requestOtp($('phone').value);
+            if (!r.ok) return msg(r.data.error || 'Không gửi được mã.');
+            $('code').classList.remove('hidden'); $('verify').classList.remove('hidden');
+            if (r.data.dev_code) { $('code').value = r.data.dev_code; msg('Chế độ phát triển: mã thử nghiệm đã được điền sẵn.'); }
+            else msg('Đã gửi mã qua SMS.');
+          };
+          $('verify').onclick = async () => {
+            const r = await window.TOV_AUTH.verifyOtp($('phone').value, $('code').value);
+            if (!r.ok) return msg(r.data.error || 'Mã không đúng.');
+            if (r.data.role !== 'admin' && r.data.role !== 'merchant') msg('Đăng nhập thành công, nhưng số này chưa có quyền quản trị.');
+            if (typeof retry === 'function') retry();
+          };
+        }
+      };
+    })();
   </script>
   <!--/*__SCREENS_JS_PLACEHOLDER__*/-->
   <script>
@@ -2695,6 +2780,10 @@ export async function load${activeScr.id.replace('-','')}() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ campaign_id: 'CMP-701', amount_vnd: amount })
         });
+        if (!res.ok) {
+          showFloatingToast('Cần đăng nhập chủ quán', 'Nạp tiền quảng cáo chỉ dành cho tài khoản chủ quán hoặc quản trị.', '🔐');
+          return;
+        }
         const data = await res.json();
         if (data) {
           const img = document.getElementById('live-vietqr-img');
@@ -2918,7 +3007,7 @@ export async function load${activeScr.id.replace('-','')}() {
     async function loadLiveInsights() {
       try {
         const res = await fetch('/api/v1/enterprise/tourism-insights');
-        const data = await res.json();
+        const data = res.ok ? await res.json() : null; // admin-only since P0
         if (data) {
           const qEl = document.getElementById('insight-queries');
           if (qEl && data.local_specialty_queries_30d) qEl.textContent = Number(data.local_specialty_queries_30d).toLocaleString('vi-VN');
@@ -3224,6 +3313,7 @@ export async function load${activeScr.id.replace('-','')}() {
 
       try {
         const res = await fetch('/api/v1/admin/dashboard');
+        if (res.status === 401 || res.status === 403) return window.TOV_AUTH.renderLoginRequired(c, res.status, loadLiveAdmin);
         const data = await res.json();
         if (!data) return;
 
@@ -3438,6 +3528,7 @@ export async function load${activeScr.id.replace('-','')}() {
           fetch('/api/v1/analytics/funnel'),
           fetch('/api/v1/analytics/ai-benchmark')
         ]);
+        if ([resFunnel.status, resBm.status].some(s => s === 401 || s === 403)) return window.TOV_AUTH.renderLoginRequired(c, resFunnel.status === 200 ? resBm.status : resFunnel.status, loadLiveAnalytics);
         const fData = await resFunnel.json();
         const bData = await resBm.json();
 

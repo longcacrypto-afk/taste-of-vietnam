@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { createInitialStore } from '../src/data/seed.js';
 import { handleApiRequest } from '../src/api/router.js';
+import { loginMerchant } from './helpers/auth.js';
 import { buildPayosSignData, signPayosData, verifyPaymentWebhookSignature } from '../src/services/paymentService.js';
 
 const KEY = 'unit-test-checksum-key';
@@ -15,11 +16,12 @@ const q = () => new URLSearchParams();
 async function setup() {
   process.env.PAYOS_CHECKSUM_KEY = KEY;
   const store = createInitialStore();
-  const inv = await handleApiRequest(store, 'POST', '/api/v1/ads/payments/vietqr/create', q(), { campaign_id: 'CMP-701', amount_vnd: 300000 }, { admin: true });
+  const merchant = await loginMerchant(store);
+  const inv = await handleApiRequest(store, 'POST', '/api/v1/ads/payments/vietqr/create', q(), { campaign_id: 'CMP-701', amount_vnd: 300000 }, merchant.headers);
   const campaign = store.campaigns.find(c => c.id === 'CMP-701');
   const balanceBefore = campaign.balance_vnd; // may be undefined: first top-up starts from budget_monthly_vnd
   const data = { orderCode: inv.data.order_code, amount: 300000, description: inv.data.transfer_memo, code: '00', desc: 'Thành công' };
-  return { store, inv: inv.data, campaign, balanceBefore, data };
+  return { store, inv: inv.data, campaign, balanceBefore, data, merchant };
 }
 
 test('PayOS sign data: sorted keys, null -> empty, undefined skipped, arrays JSON', () => {
@@ -69,7 +71,7 @@ test('No PAYOS_CHECKSUM_KEY configured -> webhook rejected (fail closed)', async
 });
 
 test('Valid signed webhook credits the pending order once; unknown order and wrong amount credit nothing', async () => {
-  const { store, inv, campaign, balanceBefore, data } = await setup();
+  const { store, inv, campaign, balanceBefore, data, merchant } = await setup();
   const signature = signPayosData(data, KEY);
   const ok = await handleApiRequest(store, 'POST', '/api/v1/payments/webhook', q(), { code: '00', success: true, data, signature });
   assert.equal(ok.status, 200);
@@ -87,7 +89,7 @@ test('Valid signed webhook credits the pending order once; unknown order and wro
   assert.equal(r3.status, 200);
   assert.equal(r3.data.credited, false);
 
-  const inv2 = await handleApiRequest(store, 'POST', '/api/v1/ads/payments/vietqr/create', q(), { campaign_id: 'CMP-701', amount_vnd: 100000 }, { admin: true });
+  const inv2 = await handleApiRequest(store, 'POST', '/api/v1/ads/payments/vietqr/create', q(), { campaign_id: 'CMP-701', amount_vnd: 100000 }, merchant.headers);
   const cheap = { ...data, orderCode: inv2.data.order_code, amount: 1000 };
   const r4 = await handleApiRequest(store, 'POST', '/api/v1/payments/webhook', q(), { code: '00', success: true, data: cheap, signature: signPayosData(cheap, KEY) });
   assert.equal(r4.status, 409);

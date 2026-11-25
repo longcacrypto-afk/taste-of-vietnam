@@ -25,6 +25,7 @@ import { generateVietQrInvoice, verifyPaymentWebhookSignature, processSuccessful
 import { searchDishesSemantically } from '../services/semanticSearch.js';
 import { suggestionCache } from '../services/cacheService.js';
 import { pushQueue } from '../services/queueService.js';
+import { checkAccess } from './accessPolicy.js';
 import { requestOtp, verifyOtp, createGuest, authenticate, deleteUser, scopeStoreToUser } from '../services/authService.js';
 
 const UNAUTHORIZED = { status: 401, data: { error: 'Cần đăng nhập (Authorization: Bearer <token>)' } };
@@ -33,6 +34,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // Who is calling? (null = anonymous). With a token, userProfile / history /
   // collections in `store` resolve to that user's own data.
   const authUser = authenticate(store, headers);
+  const denied = checkAccess(method, pathname, authUser);
+  if (denied) return denied;
   const sharedStore = store;
   if (authUser) store = scopeStoreToUser(store, authUser);
 

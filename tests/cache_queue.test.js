@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialStore } from '../src/data/seed.js';
-import { handleApiRequest } from '../src/api/router.js';
+import { call } from './helpers/auth.js';
 import { suggestionCache } from '../src/services/cacheService.js';
 import { pushQueue } from '../src/services/queueService.js';
 
@@ -31,13 +31,13 @@ test('CACHE-02: GET /api/v1/suggestions/today leverages cache on repeated reques
   const store = createInitialStore();
 
   // First call: Cache Miss
-  const res1 = await handleApiRequest(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
+  const res1 = await call(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
   assert.equal(res1.status, 200);
   assert.equal(res1.data.items.length, 3);
   assert.equal(res1.data.from_cache, undefined);
 
   // Second call: Cache Hit
-  const res2 = await handleApiRequest(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
+  const res2 = await call(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
   assert.equal(res2.status, 200);
   assert.equal(res2.data.from_cache, true);
   assert.equal(res2.data.items.length, 3);
@@ -48,17 +48,17 @@ test('CACHE-03: Order confirmation (M5 loopback) invalidates suggestion cache', 
   const store = createInitialStore();
 
   // Populate cache
-  await handleApiRequest(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
+  await call(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
 
   // Confirm eaten order -> triggers invalidation
-  const confirmRes = await handleApiRequest(store, 'POST', '/api/v1/orders/ORD-TEST-999/confirm-eaten', new URLSearchParams(), {
+  const confirmRes = await call(store, 'POST', '/api/v1/orders/ORD-TEST-999/confirm-eaten', new URLSearchParams(), {
     dish_id: 'DISH-101',
     dish_name: 'Phở Bò Tái Nạm'
   });
   assert.equal(confirmRes.status, 200);
 
   // Next call should be a fresh query (not from_cache)
-  const resAfter = await handleApiRequest(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
+  const resAfter = await call(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
   assert.equal(resAfter.data.from_cache, undefined);
 });
 
@@ -97,11 +97,11 @@ test('QUEUE-01: PushQueueService enqueues and enforces <= 2 notifications/day SL
 
 test('SYS-01: System monitoring endpoints return cache and queue metrics', async () => {
   const store = createInitialStore();
-  const cacheRes = await handleApiRequest(store, 'GET', '/api/v1/system/cache', new URLSearchParams());
+  const cacheRes = await call(store, 'GET', '/api/v1/system/cache', new URLSearchParams());
   assert.equal(cacheRes.status, 200);
   assert.equal(typeof cacheRes.data.hit_rate_pct, 'number');
 
-  const qRes = await handleApiRequest(store, 'GET', '/api/v1/notifications/queue-status', new URLSearchParams());
+  const qRes = await call(store, 'GET', '/api/v1/notifications/queue-status', new URLSearchParams());
   assert.equal(qRes.status, 200);
   assert.equal(typeof qRes.data.pending_jobs, 'number');
 });
