@@ -40,8 +40,13 @@ const bundled = shellHtml
   .replace('<!--/*__SCREENS_JS_PLACEHOLDER__*/-->', scriptsBlock);
 
 const outIndex = path.join(__dirname, 'index.html');
-const outArtifact = '/Users/longx/.gemini/antigravity/brain/176623c3-3f6e-4106-880e-97fb8bc20f0a/taste_of_vietnam_ui_studio.html';
-
 fs.writeFileSync(outIndex, bundled, 'utf8');
-fs.writeFileSync(outArtifact, bundled, 'utf8');
-console.log(`✔ Bundled 99-Screen UI/UX Studio (${(bundled.length / 1024 / 1024).toFixed(2)} MB) to index.html and artifact.`);
+console.log(`✔ Bundled 99-Screen UI/UX Studio (${(bundled.length / 1024 / 1024).toFixed(2)} MB) to ${path.relative(process.cwd(), outIndex) || outIndex}.`);
+
+// Optional extra copy (e.g. a local preview folder): UI_BUILD_ARTIFACT=/path/to/file.html npm run build:ui
+const outArtifact = process.env.UI_BUILD_ARTIFACT;
+if (outArtifact) {
+  fs.mkdirSync(path.dirname(outArtifact), { recursive: true });
+  fs.writeFileSync(outArtifact, bundled, 'utf8');
+  console.log(`✔ Also wrote ${outArtifact}`);
+}

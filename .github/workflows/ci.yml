@@ -48,6 +48,11 @@ jobs:
             });
           });"
 
+      - name: Build UI bundle and check it is committed in sync
+        run: |
+          npm run build:ui
+          git diff --exit-code --stat ui-design/index.html || (echo "❌ ui-design/index.html is out of date: run 'npm run build:ui' and commit it" && exit 1)
+
       - name: Check Web UI Studio 99-Screen Bundle Size
         run: |
           BUNDLE_SIZE=$(du -sk ui-design/index.html | cut -f1)
