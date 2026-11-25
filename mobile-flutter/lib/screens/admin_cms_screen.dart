@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class AdminCmsScreen extends StatefulWidget {
   const AdminCmsScreen({super.key});
@@ -152,6 +153,12 @@ class _AdminCmsScreenState extends State<AdminCmsScreen>
   void initState() {
     super.initState();
     _tab = TabController(length: 3, vsync: this);
+    _syncAdminMetadata();
+  }
+
+  Future<void> _syncAdminMetadata() async {
+    await ApiService.fetchRbacRoles();
+    await ApiService.fetchAbTestResults();
   }
 
   @override

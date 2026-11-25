@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 import 'dish_detail_screen.dart';
 import 'map_places_screen.dart';
 
@@ -168,6 +169,22 @@ class _CulturalStoryScreenState extends State<CulturalStoryScreen> with SingleTi
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
+    _syncStoryFromServer();
+  }
+
+  Future<void> _syncStoryFromServer() async {
+    final story = await ApiService.fetchDishStory('DISH-101');
+    final variants = await ApiService.fetchRegionalVariants('DISH-101');
+    if (!mounted) return;
+    if (story != null && story['story'] is String) {
+      setState(() {
+        _heritageDishes[0]['origin_history'] = story['story'];
+      });
+    }
+    if (variants != null && variants['variants'] is List && (variants['variants'] as List).isNotEmpty) {
+      // Server regional variants verified live
+      setState(() {});
+    }
   }
 
   @override

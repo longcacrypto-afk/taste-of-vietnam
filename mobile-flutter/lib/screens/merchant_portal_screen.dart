@@ -30,6 +30,12 @@ class _MerchantPortalScreenState extends State<MerchantPortalScreen>
   void initState() {
     super.initState();
     _tab = TabController(length: 3, vsync: this);
+    _syncMerchantExtras();
+  }
+
+  Future<void> _syncMerchantExtras() async {
+    await ApiService.fetchDailySpecial();
+    await ApiService.fetchFraudLogs();
   }
 
   @override

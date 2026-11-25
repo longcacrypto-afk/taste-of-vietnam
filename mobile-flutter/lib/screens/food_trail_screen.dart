@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 import 'map_places_screen.dart';
 
 class FoodTrailScreen extends StatefulWidget {
@@ -215,6 +216,11 @@ class _FoodTrailScreenState extends State<FoodTrailScreen> with SingleTickerProv
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+    _syncTrailsFromServer();
+  }
+
+  Future<void> _syncTrailsFromServer() async {
+    await ApiService.fetchFoodTrails();
   }
 
   @override
@@ -233,6 +239,10 @@ class _FoodTrailScreenState extends State<FoodTrailScreen> with SingleTickerProv
       _curStops[index]['stamped'] = true;
       _curStops[index]['stamp_time'] = 'Vừa đóng dấu';
     });
+    ApiService.stampFoodPassport(
+      (_curTrail['id'] as String?) ?? 'TRAIL-HN',
+      'STOP-${index + 1}',
+    );
 
     final bool allDone = _stampedCount == _curStops.length;
 
