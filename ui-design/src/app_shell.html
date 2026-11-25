@@ -87,7 +87,7 @@
       background: #FFFFFF !important;
     }
     body.pwa-mobile-mode > header,
-    body.pwa-mobile-mode #main-live,
+    body.pwa-mobile-mode #main-liveapp,
     body.pwa-mobile-mode #main-chatgpt,
     body.pwa-mobile-mode #main-screens aside,
     body.pwa-mobile-mode #main-screens section > .genui-card:first-child,
@@ -1682,23 +1682,7 @@ export async function load${activeScr.id.replace('-','')}() {
         updateCanvasModeButtons('single');
       }
       renderSidebar();
-      // Auto-enable clean 1-screen Mobile App Mode on /app or mobile viewport (unless ?studio=1)
-    (function initPwaMobileMode() {
-      const params = new URLSearchParams(window.location.search);
-      const isAppRoute = window.location.pathname === '/app' || params.get('mode') === 'app';
-      const isMobileScreen = window.innerWidth <= 768 && params.get('studio') !== '1';
-      if (isAppRoute || isMobileScreen) {
-        document.body.classList.add('pwa-mobile-mode');
-        window.appState.canvasMode = 'single';
-        if (!window.appState.activeScreenId) window.appState.activeScreenId = 'M3-S01';
-        const live = document.getElementById('main-live');
-        const screens = document.getElementById('main-screens');
-        if (live) live.classList.add('hidden');
-        if (screens) screens.classList.remove('hidden');
-      }
-    })();
-
-    renderStage();
+      renderStage();
     }
 
     function stepScreen(delta) {
@@ -1725,23 +1709,7 @@ export async function load${activeScr.id.replace('-','')}() {
     function setCanvasMode(mode) {
       window.appState.canvasMode = mode;
       updateCanvasModeButtons(mode);
-      // Auto-enable clean 1-screen Mobile App Mode on /app or mobile viewport (unless ?studio=1)
-    (function initPwaMobileMode() {
-      const params = new URLSearchParams(window.location.search);
-      const isAppRoute = window.location.pathname === '/app' || params.get('mode') === 'app';
-      const isMobileScreen = window.innerWidth <= 768 && params.get('studio') !== '1';
-      if (isAppRoute || isMobileScreen) {
-        document.body.classList.add('pwa-mobile-mode');
-        window.appState.canvasMode = 'single';
-        if (!window.appState.activeScreenId) window.appState.activeScreenId = 'M3-S01';
-        const live = document.getElementById('main-live');
-        const screens = document.getElementById('main-screens');
-        if (live) live.classList.add('hidden');
-        if (screens) screens.classList.remove('hidden');
-      }
-    })();
-
-    renderStage();
+      renderStage();
     }
 
     function setMainView(v) {
@@ -3223,44 +3191,12 @@ export async function load${activeScr.id.replace('-','')}() {
 
     function changeServings(delta) {
       window.appState.servings = Math.max(1, Math.min(12, (window.appState.servings || 2) + delta));
-      // Auto-enable clean 1-screen Mobile App Mode on /app or mobile viewport (unless ?studio=1)
-    (function initPwaMobileMode() {
-      const params = new URLSearchParams(window.location.search);
-      const isAppRoute = window.location.pathname === '/app' || params.get('mode') === 'app';
-      const isMobileScreen = window.innerWidth <= 768 && params.get('studio') !== '1';
-      if (isAppRoute || isMobileScreen) {
-        document.body.classList.add('pwa-mobile-mode');
-        window.appState.canvasMode = 'single';
-        if (!window.appState.activeScreenId) window.appState.activeScreenId = 'M3-S01';
-        const live = document.getElementById('main-live');
-        const screens = document.getElementById('main-screens');
-        if (live) live.classList.add('hidden');
-        if (screens) screens.classList.remove('hidden');
-      }
-    })();
-
-    renderStage();
+      renderStage();
     }
 
     function setM3State(st) {
       window.appState.m3State = st;
-      // Auto-enable clean 1-screen Mobile App Mode on /app or mobile viewport (unless ?studio=1)
-    (function initPwaMobileMode() {
-      const params = new URLSearchParams(window.location.search);
-      const isAppRoute = window.location.pathname === '/app' || params.get('mode') === 'app';
-      const isMobileScreen = window.innerWidth <= 768 && params.get('studio') !== '1';
-      if (isAppRoute || isMobileScreen) {
-        document.body.classList.add('pwa-mobile-mode');
-        window.appState.canvasMode = 'single';
-        if (!window.appState.activeScreenId) window.appState.activeScreenId = 'M3-S01';
-        const live = document.getElementById('main-live');
-        const screens = document.getElementById('main-screens');
-        if (live) live.classList.add('hidden');
-        if (screens) screens.classList.remove('hidden');
-      }
-    })();
-
-    renderStage();
+      renderStage();
     }
 
     function spinM3Wheel() {
@@ -4394,7 +4330,6 @@ export async function load${activeScr.id.replace('-','')}() {
     // Boot
     document.getElementById('total-screen-counter').textContent = `${ORDERED_IDS.length}/${ORDERED_IDS.length}`;
     renderSidebar();
-    // Auto-enable clean 1-screen Mobile App Mode on /app or mobile viewport (unless ?studio=1)
     (function initPwaMobileMode() {
       const params = new URLSearchParams(window.location.search);
       const isAppRoute = window.location.pathname === '/app' || params.get('mode') === 'app';
@@ -4402,8 +4337,8 @@ export async function load${activeScr.id.replace('-','')}() {
       if (isAppRoute || isMobileScreen) {
         document.body.classList.add('pwa-mobile-mode');
         window.appState.canvasMode = 'single';
-        if (!window.appState.activeScreenId) window.appState.activeScreenId = 'M3-S01';
-        const live = document.getElementById('main-live');
+        window.appState.activeScreenId = window.appState.activeScreenId || 'M3-S01';
+        const live = document.getElementById('main-liveapp');
         const screens = document.getElementById('main-screens');
         if (live) live.classList.add('hidden');
         if (screens) screens.classList.remove('hidden');
