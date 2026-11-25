@@ -178,3 +178,36 @@ test('M1 PostgreSQL: export has >200 own history rows, reports/orders/recipes; d
   assert.notEqual(again.data.user.id, id);
   assert.equal((await repo.listHistory(again.data.user.id)).length, 0);
 });
+
+test('M1 PostgreSQL: M9 audit anonymization hook receives deletion transaction and rolls back together', { skip }, async t => {
+  google(t);
+  const a = await login('audit-delete');
+  const id = a.data.user.id;
+  await repo.addAudit({ actor: 'owner@example.com', actor_id: id, role: 'user', action: 'TEST_ACTOR', target: id, ip: '127.0.0.1' });
+  let calls = 0;
+  repo.anonymizeAuditActor = async (uid, c) => {
+    calls++;
+    assert.equal(uid, id);
+    assert.ok(c && typeof c.query === 'function', 'must use deletion transaction');
+    await c.query("UPDATE rbac_audit_logs SET actor_id=NULL,actor_email='deleted-user' WHERE actor_id=$1", [uid]);
+  };
+  await db.query(`CREATE FUNCTION reject_audit_delete() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN IF OLD.google_sub='audit-delete' THEN RAISE EXCEPTION 'forced delete rollback'; END IF; RETURN OLD; END $$;
+    CREATE TRIGGER fail_audit_delete BEFORE DELETE ON users FOR EACH ROW EXECUTE FUNCTION reject_audit_delete();`);
+  try {
+    await assert.rejects(api('DELETE', '/me', {}, headers(a)), /forced delete rollback/);
+    assert.ok(await repo.getUser(id));
+    const [audit] = await rows("SELECT actor_id,actor_email FROM rbac_audit_logs WHERE action='TEST_ACTOR'");
+    assert.equal(audit.actor_id, id);
+    assert.equal(audit.actor_email, 'owner@example.com');
+    await db.query('DROP TRIGGER fail_audit_delete ON users; DROP FUNCTION reject_audit_delete();');
+    await api('DELETE', '/me', {}, headers(a));
+    const [anonymized] = await rows("SELECT actor_id,actor_email FROM rbac_audit_logs WHERE action='TEST_ACTOR'");
+    assert.equal(anonymized.actor_id, null);
+    assert.equal(anonymized.actor_email, 'deleted-user');
+    assert.equal(calls, 2);
+  } finally {
+    delete repo.anonymizeAuditActor;
+    await db.query('DROP TRIGGER IF EXISTS fail_audit_delete ON users; DROP FUNCTION IF EXISTS reject_audit_delete();');
+  }
+});

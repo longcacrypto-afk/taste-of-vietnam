@@ -301,7 +301,8 @@ export class PostgresRepository {
       await c.query('DELETE FROM community_recipes WHERE author_id = $1', [id]);
       await c.query('UPDATE ad_clicks SET user_id = NULL WHERE user_id = $1', [id]);
       await c.query('UPDATE ad_campaigns SET created_by = NULL WHERE created_by = $1', [id]);
-      await c.query("UPDATE rbac_audit_logs SET actor_id = NULL, actor_email = 'deleted-account' WHERE actor_id = $1", [id]);
+      if (typeof this.anonymizeAuditActor === 'function') await this.anonymizeAuditActor(id, c);
+      else await c.query("UPDATE rbac_audit_logs SET actor_id = NULL, actor_email = 'deleted-user' WHERE actor_id = $1", [id]);
       await c.query('DELETE FROM users WHERE id = $1', [id]);
       return true;
     });

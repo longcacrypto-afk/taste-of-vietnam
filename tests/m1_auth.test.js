@@ -207,3 +207,52 @@ test('M1 export has all own >50 histories, no shared analytics; deletion scopes 
   assert.notEqual(again.data.user.id, a.data.user.id);
   assert.equal((await repo.listHistory(again.data.user.id)).length, 0);
 });
+
+test('M1 Google key rotation is refreshed with a bounded fetch rate; parallel verifications share a request', async t => {
+  process.env.GOOGLE_CLIENT_ID = CLIENT_ID;
+  resetGoogleKeyCache();
+  t.after(() => { delete process.env.GOOGLE_CLIENT_ID; resetGoogleKeyCache(); });
+  let now = Date.now();
+  t.mock.method(Date, 'now', () => now);
+  let keys = [jwk]; let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return new Response(JSON.stringify({ keys }), { headers: { 'cache-control': 'max-age=3600' } });
+  });
+  await Promise.all([1,2,3].map(() => verifyGoogleIdToken(googleToken())));
+  assert.equal(calls, 1);
+  now += 31000;
+  keys = [{ ...jwk, kid: 'rotated-key' }];
+  await verifyGoogleIdToken(googleToken({}, { kid: 'rotated-key' }));
+  assert.equal(calls, 2);
+  for (let i=0;i<3;i++) await assert.rejects(verifyGoogleIdToken(googleToken({}, { kid: 'random-key' })), e => e.status === 401);
+  assert.equal(calls, 2);
+});
+
+test('M1 malformed JWKS and provider outage back off for 30 seconds rather than fetch per request', async t => {
+  setup(t);
+  t.mock.restoreAll();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => { calls++; return new Response(JSON.stringify({ keys: [null] })); });
+  for (let i=0;i<3;i++) await assert.rejects(verifyGoogleIdToken(googleToken()), e => e.status === 503);
+  assert.equal(calls, 1);
+});
+
+test('M1 login invalidates both guest/account suggestion caches and delegates verified bootstrap to M9', async t => {
+  setup(t);
+  const { suggestionCache } = await import('../src/services/cacheService.js');
+  const store = createInitialStore();
+  const repo = getRepository(store);
+  const g = await api(store, 'POST', '/auth/guest');
+  const a = await api(store, 'POST', '/auth/google', { id_token: googleToken() });
+  suggestionCache.set(`sugg:${g.data.guest_id}:today`, ['stale']);
+  suggestionCache.set(`sugg:${a.data.user.id}:today`, ['stale']);
+  let bootstraps = 0;
+  repo.bootstrapSuperAdmin = async id => { bootstraps++; assert.equal(id, a.data.user.id); };
+  await api(store, 'POST', '/auth/google', { id_token: googleToken() }, bearer(g));
+  assert.equal(bootstraps, 1);
+  assert.equal(suggestionCache.get(`sugg:${g.data.guest_id}:today`), null);
+  assert.equal(suggestionCache.get(`sugg:${a.data.user.id}:today`), null);
+  await api(store, 'POST', '/auth/google', { id_token: googleToken({ email_verified: false }) });
+  assert.equal(bootstraps, 1, 'unverified email never bootstraps');
+});

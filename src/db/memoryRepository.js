@@ -97,7 +97,8 @@ export class MemoryRepository {
     for (const r of this.store.userReports || []) if (r.user_id === id) r.user_id = null;
     for (const o of Object.values(this.store.paymentOrders || {})) if (o.created_by === id) o.created_by = null;
     for (const r of this.store.campaigns || []) if (r.created_by === id) r.created_by = null;
-    for (const r of this.store.auditLogs || []) if (r.actor_id === id) { r.actor_id = null; r.actor = 'deleted-account'; }
+    if (typeof this.anonymizeAuditActor === 'function') await this.anonymizeAuditActor(id);
+    else for (const r of this.store.auditLogs || []) if (r.actor_id === id) { r.actor_id = null; r.actor = 'deleted-user'; }
     delete this.store.users[id];
     return true;
   }

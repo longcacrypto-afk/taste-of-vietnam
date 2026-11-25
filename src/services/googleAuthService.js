@@ -1,32 +1,36 @@
 import crypto from 'node:crypto';
 import { defaultProfile } from './profileService.js';
 import { signToken } from './authService.js';
+import { suggestionCache } from './cacheService.js';
 
 const JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 const TTL = 7 * 24 * 3600;
 let cache = null;
 let pending = null;
 let lastFetch = 0;
+let retryAfter = 0;
 export function googleConfig() {
   const id = process.env.GOOGLE_CLIENT_ID?.trim();
   return { enabled: Boolean(id), client_id: id || null };
 }
-export function resetGoogleKeyCache() { cache = null; pending = null; lastFetch = 0; }
+export function resetGoogleKeyCache() { cache = null; pending = null; lastFetch = 0; retryAfter = 0; }
 const invalid = () => Object.assign(new Error('Google ID token không hợp lệ hoặc đã hết hạn'), { status: 401 });
 const unavailable = () => Object.assign(new Error('Chưa thể xác minh Google, vui lòng thử lại'), { status: 503 });
 async function getKeys(force = false) {
   if (cache && cache.until > Date.now() && (!force || Date.now() - lastFetch < 30000)) return cache.keys;
+  if (Date.now() < retryAfter) throw unavailable();
   if (!pending) pending = (async () => {
     try {
       lastFetch = Date.now();
       const res = await fetch(JWKS_URL, { signal: AbortSignal.timeout(5000), redirect: 'error' });
       if (!res.ok) throw unavailable();
       const data = await res.json();
-      if (!Array.isArray(data.keys) || !data.keys.length || data.keys.length > 20) throw unavailable();
+      if (!data || !Array.isArray(data.keys) || !data.keys.length || data.keys.length > 20
+          || data.keys.some(k => !k || typeof k !== 'object')) throw unavailable();
       const maxAge = Number(/max-age=(\d+)/i.exec(res.headers.get('cache-control') || '')?.[1] || 300);
       cache = { keys: data.keys, until: Date.now() + Math.min(maxAge, 3600) * 1000 };
       return data.keys;
-    } catch { throw unavailable(); }
+    } catch { retryAfter = Date.now() + 30000; throw unavailable(); }
     finally { pending = null; }
   })();
   return pending;
@@ -54,8 +58,9 @@ export async function verifyGoogleIdToken(token, clientId = googleConfig().clien
   let valid = false;
   try { valid = crypto.verify('RSA-SHA256', Buffer.from(`${parts[0]}.${parts[1]}`), crypto.createPublicKey({ key: jwk, format: 'jwk' }), Buffer.from(parts[2], 'base64url')); } catch { throw invalid(); }
   if (!valid) throw invalid();
-  return { sub: p.sub, email: p.email_verified === true && typeof p.email === 'string' && p.email.length <= 254 ? p.email.trim().toLowerCase() : null,
-    identity_verified: p.email_verified === true && typeof p.email === 'string' && p.email.length <= 254 };
+  const verifiedEmail = p.email_verified === true && typeof p.email === 'string'
+    && p.email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email.trim());
+  return { sub: p.sub, email: verifiedEmail ? p.email.trim().toLowerCase() : null, identity_verified: verifiedEmail };
 }
 export async function googleLogin(repo, token, guestUser = null) {
   if (!googleConfig().enabled) return { status: 503, data: { error: 'Đăng nhập Google chưa được cấu hình (GOOGLE_CLIENT_ID)' } };
@@ -67,6 +72,8 @@ export async function googleLogin(repo, token, guestUser = null) {
       id, role: 'user', phone: null, guest: false, created_at: new Date().toISOString(), profile: defaultProfile(id),
       savedCollections: [{ id: 'col-1', name: 'Món yêu thích', dish_ids: [] }]
     });
+    suggestionCache.invalidateUser(user.id);
+    if (guestUser?.guest) suggestionCache.invalidateUser(guestUser.id);
     // M9 owns the one-time bootstrap policy; never infer privileges here.
     if (user.identity_verified && typeof repo.bootstrapSuperAdmin === 'function') {
       await repo.bootstrapSuperAdmin(user.id);

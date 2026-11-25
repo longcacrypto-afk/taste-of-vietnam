@@ -7,7 +7,7 @@ export function defaultProfile(id, name = 'Bạn mới', phone = null) {
 }
 const enums = {
   regions: ['bac', 'trung', 'nam'],
-  hard_allergies: ['shrimp', 'peanut', 'shrimp_paste', 'dairy', 'egg', 'gluten', 'fish', 'soy', 'sesame', 'tree_nut', 'shellfish'],
+  hard_allergies: ['shrimp', 'peanut', 'shrimp_paste', 'dairy', 'egg', 'gluten', 'fish', 'soy', 'shellfish'],
   diet_mode: ['balanced', 'vegetarian', 'vegan', 'low_carb', 'eat_clean']
 };
 const ranges = { spice_level: [0, 3], budget_min: [0, 1000000000], budget_max: [0, 1000000000], lat: [-90, 90], lng: [-180, 180], radius_m: [100, 100000] };
