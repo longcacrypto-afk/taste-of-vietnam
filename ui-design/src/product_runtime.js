@@ -253,7 +253,7 @@
       // Keep the repo's two photo cards + horizontal sponsored card intact.
       const items = d.items || [];
       if (!items.length) return stateHtml(id, "empty");
-      const cards = $$(".group", root);
+      const cards = $$(".grid-cols-2 > .group", root);
       cards.forEach((node, i) => {
         const a = items[i];
         if (!a) {
@@ -265,7 +265,7 @@
           click(n, `P2.dish('${J(a.dish_id)}')`),
         );
         const heart = $("span.absolute", node);
-        if (heart) click(heart, `P2.save('${J(a.dish_id)}')`);
+        if (heart) click(heart, `event.stopPropagation();P2.save('${J(a.dish_id)}')`);
       });
       const third = $('[onclick*="M4-S03"]', root);
       if (third) {
@@ -381,14 +381,14 @@
         if (step) {
           const a = (d.steps || [])[0];
           if (a) {
-            text($(".font-extrabold", step), a.title);
+            text($(".flex-1 .font-extrabold", step), a.title);
             text($("p", step), a.text);
             img($("img", step), d.img_key);
           } else step.innerHTML = "<p>Chưa có cách nấu cho món này.</p>";
         }
         $$("button", root).forEach((b) => {
           if (
-            b.innerHTML.includes("bookmark") ||
+            (b.getAttribute("onclick") || "").includes("M2-S08") || b.innerHTML.includes("bookmark") ||
             b.querySelector("svg")?.outerHTML.includes("M19 21l-7")
           )
             click(b, `P2.save('${J(d.id)}')`);
@@ -906,8 +906,8 @@
             "Thông tin " + (i + 1),
         );
     });
-    $$("[onclick]:not(button):not(a):not(input)", root).forEach((el) => {
-      if (el.closest("svg") || el.querySelector("button,a,input")) return;
+    $$("[onclick]:not(button):not(a):not(input)", root).reverse().forEach((el) => {
+      if (el.closest("svg") || el.querySelector("button,a,input,[onclick]")) return;
       const b = document.createElement("button");
       for (const a of el.attributes) b.setAttribute(a.name, a.value);
       b.type = "button";

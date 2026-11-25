@@ -5977,12 +5977,26 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     async function refreshLiveSuggestions() {
       const grid = document.getElementById('live-suggestions-grid');
       if (!grid) return;
+      // These persistent inputs are present before the first live load.
+      [['live-semantic-input', 'Tìm món ăn theo nhu cầu', 'semantic-search'],
+       ['live-chat-input', 'Tin nhắn cho Măm', 'chat-message']].forEach(([id, label, name]) => {
+        const input = document.getElementById(id);
+        if (input) { input.setAttribute('aria-label', label); input.name = name; }
+      });
+      grid.setAttribute('aria-live', 'polite');
+      grid.setAttribute('aria-busy', 'true');
       grid.innerHTML = '<div class="col-span-3 text-center py-12 text-xs text-[var(--text-muted)]">⏳ Đang phân tích thời tiết và tính toán gợi ý AI...</div>';
 
       try {
         const res = await fetch('/api/v1/suggestions/today');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (data && data.items) {
+        if (!data || !Array.isArray(data.items)) throw new Error('Invalid suggestions');
+        if (data.items.length === 0) {
+          grid.innerHTML = '<div role="status" class="col-span-3 text-center py-8 text-xs text-[var(--text-muted)]">Chưa có món phù hợp với hồ sơ của bạn. <button type="button" onclick="refreshLiveSuggestions()" class="underline font-bold">Thử lại</button></div>';
+          return;
+        }
+        if (data.items) {
           if (data.weather && data.weather.label) {
             const wBadge = document.getElementById('live-weather-badge');
             if (wBadge) wBadge.textContent = data.weather.label;
@@ -5998,26 +6012,26 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                       ${escHtml(isSponsored ? '★ Tài trợ quán gần' : '🌿 Gợi ý hôm nay')}
                     </span>
                     <div class="flex items-center gap-2">
-                      <span class="text-xs font-extrabold text-[#FBBF24]">${escHtml((item.price_vnd || 45000).toLocaleString('vi-VN'))}đ</span>
-                      <button onclick="likeDish('${escJs(item.dish_id)}', '${escJs(item.name)}')" class="text-white/60 hover:text-red-400 text-xs transition" title="Lưu vào món yêu thích">❤️</button>
-                      <button onclick="skipDish('${escJs(item.dish_id)}', '${escJs(item.name)}')" class="text-white/40 hover:text-white text-xs transition" title="Đổi gợi ý món khác">✕</button>
+                      <span class="text-xs font-extrabold text-[#B45309]">${escHtml((item.price_vnd ?? item.estimated_price_vnd ?? '—').toLocaleString('vi-VN'))}đ</span>
+                      <button onclick="likeDish('${escJs(item.dish_id)}', '${escJs(item.name)}')" aria-label="Lưu món yêu thích" class="text-[var(--text-muted)] hover:text-red-700 text-xs transition" title="Lưu vào món yêu thích">❤️</button>
+                      <button onclick="skipDish('${escJs(item.dish_id)}', '${escJs(item.name)}')" aria-label="Đổi gợi ý món" class="text-[var(--text-muted)] hover:text-[var(--text-main)] text-xs transition" title="Đổi gợi ý món khác">✕</button>
                     </div>
                   </div>
                   <h3 class="font-black text-base mt-2">${escHtml(item.name)}</h3>
                   <p class="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">${escHtml(item.description || item.reason)}</p>
                   
                   <div class="flex items-center gap-2 mt-3 text-[11px] text-[var(--text-muted)]">
-                    <span>🔥 ${escHtml(item.calories || 450)} kcal</span>
+                    <span>🔥 ${escHtml(item.calories ?? '—')} kcal</span>
                     <span>•</span>
-                    <span>⏱️ ${escHtml(item.prep_minutes || 25)} phút</span>
+                    <span>⏱️ ${escHtml(item.prep_minutes ?? '—')} phút</span>
                     <span>•</span>
-                    <span>⭐ ${escHtml(place.rating || 4.8)} (${escHtml(place.distance_m || 350)}m)</span>
+                    <span>⭐ ${escHtml(place.rating ?? '—')} (${escHtml(place.distance_m ?? place.distance_meters ?? '—')}m)</span>
                   </div>
                 </div>
 
                 <div class="pt-3 border-t border-[var(--border-subtle)] space-y-2">
                   <div class="text-[11px] font-semibold text-[var(--text-main)] flex items-center gap-1.5">
-                    <span>📍</span> ${escHtml(place.place_name || 'Quán Ngon Gần Bạn')}
+                    <span>📍</span> ${escHtml(place.place_name || place.name || 'Chưa có thông tin quán')}
                   </div>
                   <div class="flex items-center gap-1.5">
                     <a href="${safeUrl(place.links?.grabfood || '#')}" target="_blank" class="flex-1 py-2 text-center rounded-xl bg-[#00B14F] text-white font-extrabold text-[11px] hover:opacity-90">
@@ -6032,7 +6046,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                     <button onclick="openLiveRecipe('${escJs(item.dish_id)}')" class="px-2.5 py-2 rounded-xl bg-[#FBBF24] text-[#0F172A] text-[11px] font-extrabold hover:brightness-105" title="Xem công thức & scale khẩu phần">
                       Công Thức
                     </button>
-                    <button onclick="shareItem('${escJs(item.name)}', 'Hôm nay ăn gì gợi ý: ${escJs(item.name)} (${escJs((item.price_vnd || 45000).toLocaleString('vi-VN'))}đ) - ${escJs(place.place_name || '')}')" class="px-2 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-bold" title="Chia sẻ món">
+                    <button onclick="shareItem('${escJs(item.name)}', 'Hôm nay ăn gì gợi ý: ${escJs(item.name)} (${escJs((item.price_vnd ?? item.estimated_price_vnd ?? '—').toLocaleString('vi-VN'))}đ) - ${escJs(place.place_name || '')}')" class="px-2 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-bold" title="Chia sẻ món">
                       📤
                     </button>
                   </div>
@@ -6042,7 +6056,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           }).join('');
         }
       } catch (err) {
-        grid.innerHTML = '<div class="col-span-3 text-center py-8 text-xs text-red-500">Không thể kết nối API. Vui lòng thử lại.</div>';
+        grid.innerHTML = '<div role="alert" class="col-span-full text-center py-8 text-xs text-red-700">Không tải được gợi ý. Kiểm tra kết nối rồi thử lại. <button type="button" onclick="refreshLiveSuggestions()" class="underline font-bold">Thử lại</button></div>';
+      } finally {
+        grid.setAttribute('aria-busy', 'false');
       }
     }
 
@@ -6053,6 +6069,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dish_id: dishId, action: 'eaten' })
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         showFloatingToast('Đã Ghi Nhận Món Ăn!', `Món "${dishName}" đã được đưa vào chu kỳ cooldown 3 ngày không lặp lại.`, '🍲');
         refreshLiveSuggestions();
       } catch (e) {
@@ -6062,7 +6079,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
 
     async function likeDish(dishId, dishName) {
       try {
-        await Promise.all([
+        const results = await Promise.all([
           fetch('/api/v1/suggestions/feedback', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -6074,6 +6091,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             body: JSON.stringify({ dish_id: dishId })
           })
         ]);
+        if (results.some(res => !res.ok)) throw new Error('Could not save favorite');
         showFloatingToast('Đã Lưu Món Yêu Thích!', `Món "${dishName}" đã được thêm vào bộ sưu tập của bạn.`, '❤️');
       } catch (e) {
         showFloatingToast('Lỗi Kết Nối', 'Không thể lưu món.', '⚠️');
@@ -6082,11 +6100,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
 
     async function skipDish(dishId, dishName) {
       try {
-        await fetch('/api/v1/suggestions/feedback', {
+        const res = await fetch('/api/v1/suggestions/feedback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dish_id: dishId, action: 'skipped', skip_reason: 'not_in_the_mood' })
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         showFloatingToast('Đã Đổi Gợi Ý!', `AI Chef Măm đang tìm món khác phù hợp hơn thay cho "${dishName}".`, '🔄');
         refreshLiveSuggestions();
       } catch (e) {
@@ -6104,6 +6123,10 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
 
     async function executeLiveSemanticSearch() {
       const input = document.getElementById('live-semantic-input');
+      if (input) {
+        input.setAttribute('aria-label', 'Tìm món ăn theo nhu cầu');
+        input.name = 'semantic-search';
+      }
       const q = (input ? input.value : '').trim();
       if (!q) {
         refreshLiveSuggestions();
@@ -6112,29 +6135,33 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       setLiveAppTab('today');
       const grid = document.getElementById('live-suggestions-grid');
       if (!grid) return;
+      grid.setAttribute('aria-live', 'polite');
+      grid.setAttribute('aria-busy', 'true');
       grid.innerHTML = `<div class="col-span-3 text-center py-10 text-xs text-[var(--text-muted)]">🧠 Đang tìm kiếm ngữ nghĩa theo: "${escHtml(q)}"...</div>`;
 
       try {
         const res = await fetch(`/api/v1/dishes/semantic-search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (data && data.results && data.results.length > 0) {
+        if (!data || !Array.isArray(data.results)) throw new Error('Invalid search results');
+        if (data.results.length > 0) {
           grid.innerHTML = data.results.map(item => `
             <div class="genui-card p-5 space-y-4 border-2 border-[#FBBF24]/50 hover:border-[#FBBF24] transition flex flex-col justify-between">
               <div>
                 <div class="flex items-center justify-between">
                   <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FBBF24] text-[#0F172A]">
-                    ${escHtml(item.similarity_pct || 85)}% Phù hợp
+                    ${escHtml(item.similarity_pct ?? '—')}% Phù hợp
                   </span>
-                  <span class="text-xs font-bold text-[#FBBF24]">${escHtml((item.ref_price || item.estimated_price_vnd || 45000).toLocaleString('vi-VN'))}đ</span>
+                  <span class="text-xs font-bold text-[#B45309]">${escHtml((item.ref_price ?? item.estimated_price_vnd ?? '—').toLocaleString('vi-VN'))}đ</span>
                 </div>
                 <h3 class="font-black text-base mt-2">${escHtml(item.name)}</h3>
                 <p class="text-xs text-[var(--text-muted)] mt-1">${escHtml((item.match_reasons || []).join(' · '))}</p>
                 <div class="flex items-center gap-2 mt-3 text-[11px] text-[var(--text-muted)]">
-                  <span>🔥 ${escHtml(item.calories || 450)} kcal</span>
+                  <span>🔥 ${escHtml(item.calories ?? '—')} kcal</span>
                   <span>•</span>
-                  <span>⏱️ ${escHtml(item.prep_minutes || 25)} phút</span>
+                  <span>⏱️ ${escHtml(item.prep_minutes ?? '—')} phút</span>
                   <span>•</span>
-                  <span>🌿 An toàn dị ứng 100%</span>
+                  <span>🌿 Đã lọc dị ứng</span>
                 </div>
               </div>
               <div class="pt-3 border-t border-[var(--border-subtle)] flex gap-2">
@@ -6151,18 +6178,27 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           grid.innerHTML = '<div class="col-span-3 text-center py-8 text-xs text-[var(--text-muted)]">Không tìm thấy món phù hợp với tiêu chí tìm kiếm.</div>';
         }
       } catch (err) {
-        grid.innerHTML = '<div class="col-span-3 text-center py-8 text-xs text-red-500">Lỗi khi tìm kiếm ngữ nghĩa.</div>';
+        grid.innerHTML = '<div role="alert" class="col-span-full text-center py-8 text-xs text-red-700">Không tìm kiếm được món ăn. Vui lòng thử lại. <button type="button" onclick="executeLiveSemanticSearch()" class="underline font-bold">Thử lại</button></div>';
+      } finally {
+        grid.setAttribute('aria-busy', 'false');
       }
     }
 
     async function sendLiveChatMessage() {
       const inp = document.getElementById('live-chat-input');
       const text = (inp ? inp.value : '').trim();
-      if (!text) return;
-      inp.value = '';
+      if (inp) {
+        inp.setAttribute('aria-label', 'Tin nhắn cho Măm');
+        inp.name = 'chat-message';
+      }
+      if (!text || inp.disabled) return;
 
       const container = document.getElementById('live-chat-messages');
       if (!container) return;
+      inp.value = '';
+      inp.disabled = true;
+      container.setAttribute('aria-live', 'polite');
+      container.setAttribute('aria-busy', 'true');
 
       // Append user bubble
       container.innerHTML += `
@@ -6192,11 +6228,13 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: text })
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        if (!data || !(data.assistant_message || data.reply || data.text)) throw new Error('Empty chat response');
         const loadEl = document.getElementById(loadId);
         if (loadEl) loadEl.remove();
 
-        const answer = data.assistant_message || data.reply || data.text || 'Dạ Măm đã ghi nhận yêu cầu của anh!';
+        const answer = data.assistant_message || data.reply || data.text;
         if (!data.matched_dishes && Array.isArray(data.options)) data.matched_dishes = data.options.map(o => ({ name: o.dish_name, price_vnd: o.estimated_group_cost_vnd }));
         container.innerHTML += `
           <div class="flex items-start gap-3">
@@ -6205,8 +6243,8 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
               <p class="whitespace-pre-line">${escHtml(answer)}</p>
               ${data.matched_dishes && data.matched_dishes.length > 0 ? `
                 <div class="pt-2 border-t border-[var(--border-subtle)] space-y-1">
-                  <div class="font-bold text-[11px] text-[#FBBF24]">Món gợi ý phù hợp:</div>
-                  ${data.matched_dishes.map(d => `<div class="p-2 rounded-xl bg-[var(--bg-elevated)] flex justify-between items-center font-semibold"><span>🍲 ${escHtml(d.name)}</span><span class="text-[10px] text-[var(--text-muted)]">${escHtml((d.price_vnd || 45000).toLocaleString('vi-VN'))}đ</span></div>`).join('')}
+                  <div class="font-bold text-[11px] text-[#B45309]">Món gợi ý phù hợp:</div>
+                  ${data.matched_dishes.map(d => `<div class="p-2 rounded-xl bg-[var(--bg-elevated)] flex justify-between items-center font-semibold"><span>🍲 ${escHtml(d.name)}</span><span class="text-[10px] text-[var(--text-muted)]">${escHtml((d.price_vnd ?? '—').toLocaleString('vi-VN'))}đ</span></div>`).join('')}
                 </div>
               ` : ''}
             </div>
@@ -6216,6 +6254,13 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       } catch (err) {
         const loadEl = document.getElementById(loadId);
         if (loadEl) loadEl.remove();
+        inp.value = text;
+        container.innerHTML += '<div role="alert" class="text-xs text-red-700 p-3">Không gửi được tin nhắn. Nội dung đã được giữ trong ô nhập. <button type="button" onclick="sendLiveChatMessage()" class="underline font-bold">Thử lại</button></div>';
+        container.scrollTop = container.scrollHeight;
+      } finally {
+        inp.disabled = false;
+        container.setAttribute('aria-busy', 'false');
+        if (document.getElementById('live-chat-input') === inp) inp.focus();
       }
     }
 
@@ -6692,15 +6737,25 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     async function loadLivePlaces() {
       const grid = document.getElementById('live-places-grid');
       if (!grid) return;
+      grid.setAttribute('aria-live', 'polite');
+      grid.setAttribute('aria-busy', 'true');
+      grid.dataset.loaded = 'false';
+      rawLivePlaces = [];
       grid.innerHTML = '<div class="col-span-2 text-center py-10 text-xs text-[var(--text-muted)]">Đang tải danh sách quán bán kính 3km từ PostGIS...</div>';
 
       try {
         const res = await fetch('/api/v1/places');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        rawLivePlaces = data.places || data.items || [];
+        const places = data?.places ?? data?.items;
+        if (!Array.isArray(places)) throw new Error('Invalid places');
+        rawLivePlaces = places;
+        grid.dataset.loaded = 'true';
         renderLivePlacesGrid();
       } catch (err) {
-        grid.innerHTML = '<div class="col-span-2 text-center py-8 text-xs text-red-500">Lỗi kết nối quán.</div>';
+        grid.innerHTML = '<div role="alert" class="col-span-full text-center py-8 text-xs text-red-700">Không tải được danh sách quán. <button type="button" onclick="loadLivePlaces()" class="underline font-bold">Thử lại</button></div>';
+      } finally {
+        grid.setAttribute('aria-busy', 'false');
       }
     }
 
@@ -6719,7 +6774,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
 
     function renderLivePlacesGrid() {
       const grid = document.getElementById('live-places-grid');
-      if (!grid) return;
+      if (!grid || grid.dataset.loaded !== 'true') return;
 
       let filtered = [...rawLivePlaces];
       if (currentPlaceFilter === 'ac') {
@@ -6751,12 +6806,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                   </div>
                   <div class="text-[11px] text-[var(--text-muted)]">${escHtml(p.address)}</div>
                   <div class="text-[10px] text-[#22C55E] font-bold">
-                    Cách bạn ${escHtml(p.distance_meters || 500)}m · ⭐ ${escHtml(p.rating || 4.8)} (${escHtml(p.review_count || 120)} đánh giá)
+                    Cách bạn ${escHtml(p.distance_m ?? p.distance_meters ?? '—')}m · ⭐ ${escHtml(p.rating ?? '—')} (${escHtml(p.review_count ?? '—')} đánh giá)
                   </div>
                   <div class="flex flex-wrap items-center gap-1 text-[10px] text-[var(--text-muted)] pt-0.5">
                     ${p.has_ac ? '<span class="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">❄️ Máy lạnh</span>' : ''}
-                    ${p.has_kids_seat ? '<span class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">👶 Ghế trẻ em</span>' : ''}
-                    <span class="px-1.5 py-0.5 rounded bg-white/5">Mở cửa: ${escHtml(p.open_hour || 6)}:00 – ${escHtml(p.close_hour || 21)}:30</span>
+                    ${p.has_kids_seat ? '<span class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-800">👶 Ghế trẻ em</span>' : ''}
+                    <span class="px-1.5 py-0.5 rounded bg-white/5">Mở cửa: ${escHtml(p.open_hour ?? '—')}:00 – ${escHtml(p.close_hour ?? '—')}:30</span>
                   </div>
                 </div>
               </div>
@@ -6774,7 +6829,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                 🗺️ Chỉ đường
               </a>
               ${p.phone ? `
-                <a href="${safeUrl(phoneLink)}" class="px-2.5 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-bold text-center hover:border-[#22C55E]" title="Gọi: ${escHtml(p.phone)}">
+                <a href="${safeUrl(phoneLink)}" class="px-2.5 py-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-bold text-center hover:border-[#22C55E]" aria-label="Gọi ${escHtml(p.name)}" title="Gọi: ${escHtml(p.phone)}">
                   📞
                 </a>
               ` : ''}
@@ -6783,7 +6838,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         `;
         }).join('');
       } else {
-        grid.innerHTML = '<div class="col-span-2 text-center py-10 text-xs text-[var(--text-muted)]">Không tìm thấy quán phù hợp với bộ lọc đã chọn.</div>';
+        grid.innerHTML = '<div class="col-span-2 text-center py-10 text-xs text-[var(--text-muted)]">Không tìm thấy quán phù hợp với bộ lọc đã chọn. <button type="button" onclick="loadLivePlaces()" class="underline font-bold">Tải lại</button></div>';
       }
     }
 
@@ -7181,17 +7236,26 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     async function loadLiveExplore() {
       const grid = document.getElementById('live-explore-grid');
       if (!grid) return;
+      grid.setAttribute('aria-live', 'polite');
+      grid.setAttribute('aria-busy', 'true');
       grid.innerHTML = '<div class="col-span-3 text-center py-10 text-xs text-[var(--text-muted)]">⏳ Đang tải thư viện món ăn...</div>';
 
-      const q = document.getElementById('live-explore-search')?.value || '';
+      const input = document.getElementById('live-explore-search');
+      if (input) {
+        input.setAttribute('aria-label', 'Tìm trong thư viện món ăn');
+        input.name = 'explore-search';
+      }
+      const q = input?.value.trim() || '';
       let url = `/api/v1/dishes?safe_only=false`;
       if (q) url += `&q=${encodeURIComponent(q)}`;
       if (currentExploreRegion) url += `&region=${encodeURIComponent(currentExploreRegion)}`;
 
       try {
         const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (data && data.items) {
+        if (!data || !Array.isArray(data.items)) throw new Error('Invalid dish library');
+        if (data.items) {
           if (data.items.length === 0) {
             grid.innerHTML = '<div class="col-span-3 text-center py-10 text-xs text-[var(--text-muted)]">Không tìm thấy món ăn phù hợp. Thử tìm từ khóa khác nhé!</div>';
             return;
@@ -7203,16 +7267,16 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                   <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-[#FBBF24]/20 text-[#B45309]">
                     ${escHtml(dish.region === 'bac' ? 'Miền Bắc' : dish.region === 'trung' ? 'Miền Trung' : dish.region === 'nam' ? 'Miền Nam' : 'Toàn Quốc')}
                   </span>
-                  <span class="text-xs font-extrabold text-[#FBBF24]">${escHtml((dish.ref_price || 45000).toLocaleString('vi-VN'))}đ</span>
+                  <span class="text-xs font-extrabold text-[#B45309]">${escHtml((dish.ref_price ?? '—').toLocaleString('vi-VN'))}đ</span>
                 </div>
                 <h3 class="font-black text-sm mt-2 text-[var(--text-main)]">${escHtml(dish.name)}</h3>
                 <p class="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2 leading-relaxed">${escHtml(dish.description || '')}</p>
                 <div class="flex items-center gap-2 mt-2.5 text-[10px] text-[var(--text-muted)]">
-                  <span>🔥 ${escHtml(dish.calories || 400)} kcal</span>
+                  <span>🔥 ${escHtml(dish.calories ?? '—')} kcal</span>
                   <span>•</span>
-                  <span>⏱️ ${escHtml(dish.prep_minutes || 25)}p</span>
+                  <span>⏱️ ${escHtml(dish.prep_minutes ?? '—')}p</span>
                   <span>•</span>
-                  <span>${escHtml(dish.difficulty || 'Dễ nấu')}</span>
+                  <span>${escHtml(dish.difficulty || 'Chưa rõ độ khó')}</span>
                 </div>
               </div>
 
@@ -7231,7 +7295,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           `).join('');
         }
       } catch (err) {
-        grid.innerHTML = '<div class="col-span-3 text-center py-6 text-xs text-red-500">Lỗi tải dữ liệu món.</div>';
+        grid.innerHTML = '<div role="alert" class="col-span-full text-center py-8 text-xs text-red-700">Không tải được thư viện món ăn. <button type="button" onclick="loadLiveExplore()" class="underline font-bold">Thử lại</button></div>';
+      } finally {
+        grid.setAttribute('aria-busy', 'false');
       }
     }
 
@@ -7250,12 +7316,24 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     async function loadLiveRecipe(dishId = currentRecipeDishId, servings = currentRecipeServings) {
       const card = document.getElementById('live-recipe-card');
       if (!card) return;
+      card.setAttribute('aria-live', 'polite');
+      card.setAttribute('aria-busy', 'true');
       card.innerHTML = '<div class="text-center py-10 text-xs text-[var(--text-muted)]">⏳ Đang tải công thức và tính toán khẩu phần...</div>';
 
+      if (!dishId) {
+        card.innerHTML = '<div role="status" class="text-center py-10 text-xs text-[var(--text-muted)]">Chọn một món trong Khám Phá để xem công thức. <button type="button" onclick="setLiveAppTab(\'explore\')" class="underline font-bold">Khám Phá</button></div>';
+        card.setAttribute('aria-busy', 'false');
+        return;
+      }
+      currentRecipeDishId = dishId;
+      currentRecipeServings = Math.max(1, Math.min(12, Number(servings) || 2));
+      servings = currentRecipeServings;
       try {
-        const res = await fetch(`/api/v1/dishes/${dishId}?servings=${servings}`);
+        const res = await fetch(`/api/v1/dishes/${encodeURIComponent(dishId)}?servings=${servings}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const dish = await res.json();
-        if (dish && dish.id) {
+        if (!dish || !dish.id) throw new Error('Invalid recipe');
+        if (dish.id) {
           card.innerHTML = `
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
               <div>
@@ -7271,9 +7349,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
               <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center gap-3 shrink-0">
                 <span class="text-xs font-bold text-[var(--text-muted)]">Khẩu phần:</span>
                 <div class="flex items-center gap-2">
-                  <button onclick="changeRecipeServings(-1)" class="w-8 h-8 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] font-black text-sm hover:border-[#FBBF24]">-</button>
-                  <span class="font-mono font-black text-base text-[#FBBF24] min-w-[2ch] text-center">${escHtml(dish.servings || servings)}</span>
-                  <button onclick="changeRecipeServings(1)" class="w-8 h-8 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] font-black text-sm hover:border-[#FBBF24]">+</button>
+                  <button aria-label="Giảm khẩu phần" onclick="changeRecipeServings(-1)" class="w-8 h-8 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] font-black text-sm hover:border-[#FBBF24]">-</button>
+                  <span class="font-mono font-black text-base text-[#B45309] min-w-[2ch] text-center">${escHtml(dish.servings || servings)}</span>
+                  <button aria-label="Tăng khẩu phần" onclick="changeRecipeServings(1)" class="w-8 h-8 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] font-black text-sm hover:border-[#FBBF24]">+</button>
                 </div>
                 <span class="text-[11px] text-[var(--text-muted)]">người ăn</span>
               </div>
@@ -7283,33 +7361,34 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
                 <div class="text-[10px] text-[var(--text-muted)]">Tổng Năng Lượng</div>
-                <div class="text-base font-black text-[#FBBF24] mt-0.5">${escHtml(dish.scaled_calories_total || dish.calories)} kcal</div>
+                <div class="text-base font-black text-[#B45309] mt-0.5">${escHtml(dish.scaled_calories_total ?? dish.calories ?? '—')} kcal</div>
               </div>
               <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
                 <div class="text-[10px] text-[var(--text-muted)]">Carbs (Tinh bột)</div>
-                <div class="text-base font-black text-[#60A5FA] mt-0.5">${escHtml(dish.macros?.carbs || 50)}g</div>
+                <div class="text-base font-black text-[#60A5FA] mt-0.5">${escHtml(dish.macros?.carbs ?? '—')}g</div>
               </div>
               <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
                 <div class="text-[10px] text-[var(--text-muted)]">Protein (Chất đạm)</div>
-                <div class="text-base font-black text-[#4ADE80] mt-0.5">${escHtml(dish.macros?.protein || 30)}g</div>
+                <div class="text-base font-black text-[#4ADE80] mt-0.5">${escHtml(dish.macros?.protein ?? '—')}g</div>
               </div>
               <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
                 <div class="text-[10px] text-[var(--text-muted)]">Fat (Chất béo)</div>
-                <div class="text-base font-black text-[#F87171] mt-0.5">${escHtml(dish.macros?.fat || 15)}g</div>
+                <div class="text-base font-black text-[#F87171] mt-0.5">${escHtml(dish.macros?.fat ?? '—')}g</div>
               </div>
             </div>
 
             <!-- Scaled Ingredients Grid -->
             <div class="space-y-3">
               <div class="flex items-center justify-between">
-                <h3 class="text-sm font-black text-[#FBBF24]">🛒 Nguyên Liệu Định Lượng (${escHtml(dish.servings || servings)} Người Ăn):</h3>
-                <span class="text-[11px] text-[#22C55E] font-bold">Ước tính chợ: ~${escHtml((dish.scaled_market_cost_vnd || 50000).toLocaleString('vi-VN'))}đ</span>
+                <h3 class="text-sm font-black text-[#B45309]">🛒 Nguyên Liệu Định Lượng (${escHtml(dish.servings || servings)} Người Ăn):</h3>
+                <span class="text-[11px] text-[#22C55E] font-bold">Ước tính chợ: ~${escHtml((dish.scaled_market_cost_vnd ?? '—').toLocaleString('vi-VN'))}đ</span>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                ${!(dish.ingredients || []).length ? '<p class="text-[var(--text-muted)]">Chưa có thông tin nguyên liệu.</p>' : ''}
                 ${(dish.ingredients || []).map(ing => `
                   <div class="p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
                     <span class="font-bold">${escHtml(ing.name)}</span>
-                    <span class="font-mono font-black text-[#FBBF24]">${escHtml(ing.amount)} ${escHtml(ing.unit)}</span>
+                    <span class="font-mono font-black text-[#B45309]">${escHtml(ing.amount)} ${escHtml(ing.unit)}</span>
                   </div>
                 `).join('')}
               </div>
@@ -7319,6 +7398,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             <div class="space-y-3">
               <h3 class="text-sm font-black text-[#22C55E]">👨‍🍳 Các Bước Nấu Ăn Từng Bước (M2-S06):</h3>
               <div class="space-y-2.5 text-xs">
+                ${!(dish.recipe_steps || dish.steps || []).length ? '<p class="text-[var(--text-muted)]">Chưa có các bước nấu cho món này.</p>' : ''}
                 ${(dish.recipe_steps || dish.steps || []).map((step, idx) => `
                   <div class="p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-start gap-3">
                     <span class="w-6 h-6 rounded-full bg-[#FBBF24] text-[#0F172A] font-black text-xs flex items-center justify-center shrink-0 mt-0.5">${escHtml(step.step || idx+1)}</span>
@@ -7346,7 +7426,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           `;
         }
       } catch (err) {
-        card.innerHTML = '<div class="text-center py-6 text-xs text-red-500">Lỗi tải công thức.</div>';
+        card.innerHTML = '<div role="alert" class="col-span-full text-center py-8 text-xs text-red-700">Không tải được công thức. Chọn món trong Khám Phá hoặc thử lại. <button type="button" onclick="loadLiveRecipe()" class="underline font-bold">Thử lại</button></div>';
+      } finally {
+        card.setAttribute('aria-busy', 'false');
       }
     }
 
@@ -7357,6 +7439,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dish_id: dishId })
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         alert('⭐ Đã lưu món vào Bộ sưu tập yêu thích của bạn!');
       } catch (e) {
@@ -7415,35 +7498,40 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     async function loadLiveAdmin() {
       const c = document.getElementById('live-admin-content');
       if (!c) return;
+      c.setAttribute('aria-live', 'polite');
+      c.setAttribute('aria-busy', 'true');
       c.innerHTML = '<div class="text-center py-12 text-xs text-[var(--text-muted)]">⏳ Đang tải dữ liệu tổng quan Admin CMS &amp; Hàng đợi kiểm duyệt...</div>';
 
       try {
         const res = await fetch('/api/v1/admin/dashboard');
         if (res.status === 401 || res.status === 403) return window.TOV_AUTH.renderLoginRequired(c, res.status, loadLiveAdmin);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (!data) return;
+        if (!data || !Array.isArray(data.ocr_queue) || !Array.isArray(data.user_reports) || !Array.isArray(data.campaigns)) throw new Error('Invalid dashboard');
 
+        const pendingOcrQueue = data.ocr_queue.filter(q => q.status === 'pending_review');
+        const pausedPlaceCount = new Set(data.user_reports.filter(r => r.status === 'auto_paused').map(r => r.place_id)).size;
         c.innerHTML = `
           <!-- KPI Stats -->
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div class="genui-card p-4 rounded-2xl border border-[var(--border-subtle)] space-y-1">
               <span class="text-[10px] font-bold text-[var(--text-muted)] uppercase">Tổng Món Thư Viện (M2)</span>
-              <div class="text-2xl font-black text-[#FBBF24]">${escHtml(data.total_dishes || 12)} món</div>
+              <div class="text-2xl font-black text-[#B45309]">${escHtml(data.total_dishes ?? '—')} món</div>
               <div class="text-[10px] text-[#22C55E]">Chuẩn vị 3 miền</div>
             </div>
             <div class="genui-card p-4 rounded-2xl border border-[var(--border-subtle)] space-y-1">
               <span class="text-[10px] font-bold text-[var(--text-muted)] uppercase">Quán Ăn Xác Thực (M4)</span>
-              <div class="text-2xl font-black text-white">${escHtml(data.total_verified_places || 8)} quán</div>
+              <div class="text-2xl font-black text-[var(--text-main)]">${escHtml(data.total_verified_places ?? '—')} quán</div>
               <div class="text-[10px] text-[var(--text-muted)]">Bán kính Biên Hòa 3km</div>
             </div>
             <div class="genui-card p-4 rounded-2xl border border-[var(--border-subtle)] space-y-1">
               <span class="text-[10px] font-bold text-[var(--text-muted)] uppercase">Duyệt AI OCR Chờ (M6)</span>
-              <div class="text-2xl font-black text-[#EF4444]">${escHtml((data.ocr_queue || []).length)} mục</div>
-              <div class="text-[10px] text-yellow-500">Độ tin cậy 92-94%</div>
+              <div class="text-2xl font-black text-[#EF4444]">${escHtml((pendingOcrQueue || []).length)} mục</div>
+              <div class="text-[10px] text-amber-800">Hàng đợi cần kiểm duyệt</div>
             </div>
             <div class="genui-card p-4 rounded-2xl border border-[var(--border-subtle)] space-y-1">
               <span class="text-[10px] font-bold text-[var(--text-muted)] uppercase">Quán Tạm Dừng Tự Động</span>
-              <div class="text-2xl font-black text-[#F59E0B]">${escHtml((data.user_reports || []).length)} quán</div>
+              <div class="text-2xl font-black text-[#F59E0B]">${escHtml(pausedPlaceCount)} quán</div>
               <div class="text-[10px] text-[#22C55E]">Bảo vệ người dùng</div>
             </div>
           </div>
@@ -7461,18 +7549,19 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             </div>
 
             <div class="space-y-3">
-              ${(data.ocr_queue || []).map(q => `
+              ${!pendingOcrQueue.length ? '<p role="status" class="text-xs text-[var(--text-muted)]">Không có mục OCR chờ duyệt.</p>' : ''}
+              ${(pendingOcrQueue || []).map(q => `
                 <div id="ocr-card-${escHtml(q.id)}" class="p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
                   <div class="space-y-1">
                     <div class="font-extrabold text-xs flex items-center gap-2">
-                      <span class="text-[#FBBF24] font-black">${escHtml(q.place_name)}</span>
+                      <span class="text-[#B45309] font-black">${escHtml(q.place_name)}</span>
                       <span class="px-2 py-0.2 rounded-full text-[9px] bg-white/10 font-mono">Độ tin cậy: ${escHtml((q.confidence * 100).toFixed(0))}%</span>
                     </div>
                     <div class="text-xs">
-                      Chữ OCR trích xuất: <span class="font-mono text-[#FEF3C7] bg-[#18181B] px-1.5 py-0.5 rounded">"${escHtml(q.raw_text)}"</span> ➔ Giá: <span class="text-[#22C55E] font-bold">${escHtml(q.extracted_price.toLocaleString('vi-VN'))}đ</span>
+                      Chữ OCR trích xuất: <span class="font-mono text-[#FEF3C7] bg-[#18181B] px-1.5 py-0.5 rounded">"${escHtml(q.raw_text)}"</span> ➔ Giá: <span class="text-[#22C55E] font-bold">${escHtml((q.extracted_price ?? '—').toLocaleString('vi-VN'))}đ</span>
                     </div>
                     <div class="text-[11px] text-[var(--text-muted)]">
-                      🎯 Gợi ý ghép vào món M2: <strong class="text-white">${escHtml(q.matched_dish_name)}</strong> (${escHtml(q.matched_dish_id)})
+                      🎯 Gợi ý ghép vào món M2: <strong class="text-[var(--text-main)]">${escHtml(q.matched_dish_name)}</strong> (${escHtml(q.matched_dish_id)})
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
@@ -7501,15 +7590,16 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             </div>
 
             <div class="space-y-3">
+              ${!data.user_reports.length ? '<p role="status" class="text-xs text-[var(--text-muted)]">Không có báo cáo cần xử lý.</p>' : ''}
               ${(data.user_reports || []).map(r => `
                 <div id="report-card-${escHtml(r.place_id)}" class="p-3.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <div class="font-bold text-xs text-white">${escHtml(r.place_name)} (${escHtml(r.place_id)})</div>
-                    <div class="text-[11px] text-[var(--text-muted)] mt-0.5">Lý do: <span class="text-yellow-400 font-medium">${escHtml(r.reason)}</span> (${escHtml(r.report_count)} phản ánh)</div>
+                    <div class="font-bold text-xs text-[var(--text-main)]">${escHtml(r.place_name)} (${escHtml(r.place_id)})</div>
+                    <div class="text-[11px] text-[var(--text-muted)] mt-0.5">Lý do: <span class="text-amber-800 font-medium">${escHtml(r.reason)}</span> (${escHtml(r.report_count)} phản ánh)</div>
                     <div class="text-[10px] text-[var(--text-muted)] mt-0.5">Thời gian ghi nhận: ${escHtml(new Date(r.created_at).toLocaleTimeString('vi-VN'))}</div>
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-[#EF4444] text-white">Auto-Paused</span>
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-[#EF4444] text-white">${escHtml(r.status === 'auto_paused' ? 'Auto-Paused' : 'Chờ kiểm tra')}</span>
                     <button onclick="unpausePlace('${escJs(r.place_id)}', '${escJs(r.place_name)}')" class="px-3 py-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[11px] font-bold hover:border-[#FBBF24]">
                       Mở lại quán
                     </button>
@@ -7528,7 +7618,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                 </h3>
                 <p class="text-[11px] text-[var(--text-muted)]">Nghiêm ngặt kiểm soát tỷ lệ Sponsored ≤ 1/3, chống gian lận click (Anti-Fraud Click Guard 60s)</p>
               </div>
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#22C55E]/20 text-[#15803D]">${escHtml((data.campaigns || []).length)} Đang chạy</span>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#22C55E]/20 text-[#15803D]">${escHtml(data.campaigns.filter(c => c.status === 'active').length)} Đang chạy</span>
             </div>
 
             <div class="overflow-x-auto">
@@ -7544,14 +7634,15 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-[var(--border-subtle)]">
+                  ${!data.campaigns.length ? '<tr><td colspan="6" class="py-3 text-[var(--text-muted)]">Chưa có chiến dịch.</td></tr>' : ''}
                   ${(data.campaigns || []).map(c => `
                     <tr>
-                      <td class="py-2.5 font-bold text-white">${escHtml(c.title)} <span class="text-[10px] text-[var(--text-muted)]">(${escHtml(c.id)})</span></td>
-                      <td class="py-2.5 font-semibold text-[#FBBF24]">${escHtml((c.budget_monthly_vnd || 0).toLocaleString('vi-VN'))}đ</td>
-                      <td class="py-2.5">${escHtml((c.impressions || 0).toLocaleString('vi-VN'))}</td>
-                      <td class="py-2.5">${escHtml(c.clicks || 0)} (${escHtml(((c.clicks / (c.impressions || 1)) * 100).toFixed(1))}%)</td>
-                      <td class="py-2.5 text-[#22C55E] font-bold">${escHtml(c.conversions || 0)} đơn</td>
-                      <td class="py-2.5 font-mono font-bold text-[#FBBF24]">${escHtml(c.roas)}x</td>
+                      <td class="py-2.5 font-bold text-[var(--text-main)]">${escHtml(c.title)} <span class="text-[10px] text-[var(--text-muted)]">(${escHtml(c.id)})</span></td>
+                      <td class="py-2.5 font-semibold text-[#B45309]">${escHtml((c.budget_monthly_vnd ?? '—').toLocaleString('vi-VN'))}đ</td>
+                      <td class="py-2.5">${escHtml((c.impressions ?? '—').toLocaleString('vi-VN'))}</td>
+                      <td class="py-2.5">${escHtml(c.clicks ?? '—')} (${escHtml((c.impressions > 0 && c.clicks != null ? ((c.clicks / c.impressions) * 100).toFixed(1) : '—'))}%)</td>
+                      <td class="py-2.5 text-[#22C55E] font-bold">${escHtml(c.conversions ?? '—')} đơn</td>
+                      <td class="py-2.5 font-mono font-bold text-[#B45309]">${escHtml(c.roas ?? '—')}x</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -7560,7 +7651,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           </div>
         `;
       } catch (err) {
-        c.innerHTML = '<div class="text-center py-10 text-xs text-red-500">Lỗi kết nối Cổng Quản Trị CMS.</div>';
+        c.innerHTML = '<div role="alert" class="col-span-full text-center py-8 text-xs text-red-700">Không tải được Cổng Quản Trị CMS. <button type="button" onclick="loadLiveAdmin()" class="underline font-bold">Thử lại</button></div>';
+      } finally {
+        c.setAttribute('aria-busy', 'false');
       }
     }
 
@@ -7578,6 +7671,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ocr_id: ocrId, decision: action, reason: reason })
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const resData = await res.json();
         const card = document.getElementById(`ocr-card-${ocrId}`);
         if (card) {
@@ -7607,6 +7701,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     async function unpausePlace(placeId, placeName) {
       try {
         const res = await fetch(`/api/v1/admin/places/${placeId}/unpause`, { method: 'POST' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const resData = await res.json();
         const card = document.getElementById(`report-card-${placeId}`);
         if (card) {
@@ -7738,19 +7833,24 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     async function loadLiveProfile() {
       const c = document.getElementById('live-profile-content');
       if (!c) return;
+      c.setAttribute('aria-live', 'polite');
+      c.setAttribute('aria-busy', 'true');
       c.innerHTML = '<div class="text-center py-12 text-xs text-[var(--text-muted)]">⏳ Đang tải hồ sơ vị giác và thiết lập riêng tư...</div>';
 
+      liveUserProfile = null;
       try {
         const res = await fetch('/api/v1/me/profile');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const profile = await res.json();
+        if (!profile || typeof profile !== 'object' || Array.isArray(profile) || !Object.keys(profile).length || profile.error) throw new Error('Invalid profile');
         liveUserProfile = profile;
 
         const currentSpice = profile.spice_level ?? 1;
         const currentDiet = profile.diet_mode || 'balanced';
         const currentAllergies = profile.hard_allergies || [];
         const currentRegions = profile.regions || ['bac', 'nam', 'trung'];
-        const budgetMin = profile.budget_min || 30000;
-        const budgetMax = profile.budget_max || 65000;
+        const budgetMin = profile.budget_min ?? 30000;
+        const budgetMax = profile.budget_max ?? 65000;
 
         c.innerHTML = `
           <!-- Section 1: Taste Preferences & Diets -->
@@ -7767,7 +7867,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
 
             <!-- Regions -->
             <div class="space-y-2">
-              <label class="text-xs font-bold text-white block">1. Vùng miền ẩm thực ưa thích:</label>
+              <label class="text-xs font-bold text-[var(--text-main)] block">1. Vùng miền ẩm thực ưa thích:</label>
               <div class="flex flex-wrap gap-2.5">
                 ${[
                   { id: 'bac', label: '🍜 Vị Bắc (Thanh tao, thảo mộc nhẹ nhàng)' },
@@ -7775,7 +7875,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                   { id: 'nam', label: '🥥 Vị Nam (Ngọt béo cốt dừa, rau phong phú)' }
                 ].map(r => `
                   <label class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] cursor-pointer hover:border-[#FBBF24] transition text-xs font-semibold">
-                    <input type="checkbox" id="reg-${escHtml(r.id)}" ${escHtml(currentRegions.includes(r.id) ? 'checked' : '')} class="accent-[#FBBF24]" />
+                    <input type="checkbox" name="regions" value="${escHtml(r.id)}" id="reg-${escHtml(r.id)}" ${escHtml(currentRegions.includes(r.id) ? 'checked' : '')} class="accent-[#FBBF24]" />
                     <span>${escHtml(r.label)}</span>
                   </label>
                 `).join('')}
@@ -7784,7 +7884,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
 
             <!-- Spice Level -->
             <div class="space-y-2">
-              <label class="text-xs font-bold text-white block">2. Khả năng ăn cay:</label>
+              <label class="text-xs font-bold text-[var(--text-main)] block">2. Khả năng ăn cay:</label>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 ${[
                   { lvl: 0, label: '0. Không cay', icon: '🟢' },
@@ -7792,7 +7892,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                   { lvl: 2, label: '2. Cay vừa (Chuẩn vị Huế)', icon: '🟠' },
                   { lvl: 3, label: '3. Rất cay (Ớt hiểm)', icon: '🌶️🌶️' }
                 ].map(s => `
-                  <button type="button" onclick="selectSpiceLevel(${s.lvl})" id="spice-btn-${escHtml(s.lvl)}" class="p-3 rounded-2xl text-left border ${escHtml(currentSpice === s.lvl ? 'bg-[#FBBF24]/20 border-[#FBBF24] text-[#FBBF24] font-extrabold' : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold')} transition text-xs">
+                  <button type="button" onclick="selectSpiceLevel(${s.lvl})" aria-pressed="${currentSpice === s.lvl}" id="spice-btn-${escHtml(s.lvl)}" class="p-3 rounded-2xl text-left border ${escHtml(currentSpice === s.lvl ? 'bg-[#FBBF24]/20 border-[#FBBF24] text-[#B45309] font-extrabold' : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold')} transition text-xs">
                     <div>${escHtml(s.icon)} ${escHtml(s.label)}</div>
                   </button>
                 `).join('')}
@@ -7803,7 +7903,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             <!-- Hard Allergy Filter -->
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <label class="text-xs font-bold text-white block">3. Bộ lọc cứng dị ứng (Hard Allergy Filter — Chặn 100%):</label>
+                <label class="text-xs font-bold text-[var(--text-main)] block">3. Bộ lọc cứng dị ứng (Hard Allergy Filter — Chặn 100%):</label>
                 <span class="text-[10px] text-red-400 font-bold">Tuyệt đối không đề xuất món có dị ứng</span>
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
@@ -7816,7 +7916,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                   { id: 'gluten', label: 'Gluten, Bột mì', icon: '🌾' }
                 ].map(a => `
                   <label class="flex items-center gap-2 p-3 rounded-2xl bg-[var(--bg-elevated)] border ${escHtml(currentAllergies.includes(a.id) ? 'border-red-500/80 bg-red-500/10' : 'border-[var(--border-subtle)]')} cursor-pointer hover:border-red-400 transition font-semibold">
-                    <input type="checkbox" id="allergy-${escHtml(a.id)}" ${escHtml(currentAllergies.includes(a.id) ? 'checked' : '')} class="accent-red-500" />
+                    <input type="checkbox" name="hard_allergies" value="${escHtml(a.id)}" id="allergy-${escHtml(a.id)}" ${escHtml(currentAllergies.includes(a.id) ? 'checked' : '')} class="accent-red-500" />
                     <span>${escHtml(a.icon)} ${escHtml(a.label)}</span>
                   </label>
                 `).join('')}
@@ -7825,7 +7925,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
 
             <!-- Diet Mode -->
             <div class="space-y-2">
-              <label class="text-xs font-bold text-white block">4. Chế độ ăn uống đặc biệt:</label>
+              <label class="text-xs font-bold text-[var(--text-main)] block">4. Chế độ ăn uống đặc biệt:</label>
               <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-xs">
                 ${[
                   { id: 'balanced', label: 'Cân bằng', icon: '🍲' },
@@ -7834,7 +7934,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                   { id: 'low_carb', label: 'Low Carb/Keto', icon: '🥩' },
                   { id: 'eat_clean', label: 'Eat Clean', icon: '🥑' }
                 ].map(d => `
-                  <button type="button" onclick="selectDietMode('${escJs(d.id)}')" id="diet-btn-${escHtml(d.id)}" class="p-3 rounded-2xl text-center border ${escHtml(currentDiet === d.id ? 'bg-[#22C55E]/20 border-[#22C55E] text-[#22C55E] font-extrabold' : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold')} transition">
+                  <button type="button" onclick="selectDietMode('${escJs(d.id)}')" aria-pressed="${currentDiet === d.id}" id="diet-btn-${escHtml(d.id)}" class="p-3 rounded-2xl text-center border ${escHtml(currentDiet === d.id ? 'bg-[#22C55E]/20 border-[#22C55E] text-[#22C55E] font-extrabold' : 'bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold')} transition">
                     <div class="text-base">${escHtml(d.icon)}</div>
                     <div class="mt-1">${escHtml(d.label)}</div>
                   </button>
@@ -7845,11 +7945,11 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
 
             <!-- Budget Range -->
             <div class="space-y-2">
-              <label class="text-xs font-bold text-white block">5. Khoảng ngân sách một bữa (VND):</label>
+              <label class="text-xs font-bold text-[var(--text-main)] block">5. Khoảng ngân sách một bữa (VND):</label>
               <div class="flex items-center gap-3">
-                <input type="number" id="input-budget-min" value="${escHtml(budgetMin)}" step="5000" class="w-1/2 p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-white focus:border-[#FBBF24] outline-none" />
+                <input type="number" id="input-budget-min" name="budget_min" aria-label="Ngân sách tối thiểu (đồng)" min="0" value="${escHtml(budgetMin)}" step="5000" class="w-1/2 p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)] focus:border-[#FBBF24] outline-none" />
                 <span class="text-xs text-[var(--text-muted)]">đến</span>
-                <input type="number" id="input-budget-max" value="${escHtml(budgetMax)}" step="5000" class="w-1/2 p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-white focus:border-[#FBBF24] outline-none" />
+                <input type="number" id="input-budget-max" name="budget_max" aria-label="Ngân sách tối đa (đồng)" min="0" value="${escHtml(budgetMax)}" step="5000" class="w-1/2 p-3 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)] focus:border-[#FBBF24] outline-none" />
               </div>
             </div>
 
@@ -7865,7 +7965,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           <div class="genui-card p-6 rounded-3xl space-y-4 border border-[var(--border-subtle)] bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-elevated)]">
             <div class="flex items-center justify-between">
               <div>
-                <h3 class="font-black text-sm flex items-center gap-2 text-white">
+                <h3 class="font-black text-sm flex items-center gap-2 text-[var(--text-main)]">
                   <span>🛡️</span> Tuân Thủ Nghị Định 13/2023/NĐ-CP (PDPD) Về Dữ Liệu Cá Nhân
                 </h3>
                 <p class="text-[11px] text-[var(--text-muted)]">Quyền của chủ thể dữ liệu: Tải về toàn bộ hồ sơ hoặc xóa vĩnh viễn không lưu trữ bản sao</p>
@@ -7874,7 +7974,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             </div>
 
             <div class="p-4 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs space-y-2 text-[var(--text-muted)]">
-              <div class="flex items-center gap-2 text-white font-semibold">
+              <div class="flex items-center gap-2 text-[var(--text-main)] font-semibold">
                 <span>🔒</span> Cam kết bảo mật:
               </div>
               <p>Mọi thông tin dị ứng, vị trí định vị GPS và lịch sử ăn uống của bạn được bảo mật tuyệt đối, không chia sẻ cho bên thứ ba vì mục đích tiếp thị trái phép.</p>
@@ -7891,7 +7991,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           </div>
         `;
       } catch (err) {
-        c.innerHTML = '<div class="text-center py-10 text-xs text-red-500">Lỗi kết nối tải hồ sơ vị giác.</div>';
+        c.innerHTML = '<div role="alert" class="col-span-full text-center py-8 text-xs text-red-700">Không tải được hồ sơ vị giác. <button type="button" onclick="loadLiveProfile()" class="underline font-bold">Thử lại</button></div>';
+      } finally {
+        c.setAttribute('aria-busy', 'false');
       }
     }
 
@@ -7901,8 +8003,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       for (let i = 0; i <= 3; i++) {
         const btn = document.getElementById(`spice-btn-${i}`);
         if (btn) {
+          btn.setAttribute('aria-pressed', String(i === lvl));
           if (i === lvl) {
-            btn.className = 'p-3 rounded-2xl text-left border bg-[#FBBF24]/20 border-[#FBBF24] text-[#FBBF24] font-extrabold transition text-xs';
+            btn.className = 'p-3 rounded-2xl text-left border bg-[#FBBF24]/20 border-[#FBBF24] text-[#B45309] font-extrabold transition text-xs';
           } else {
             btn.className = 'p-3 rounded-2xl text-left border bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-muted)] font-semibold transition text-xs';
           }
@@ -7917,6 +8020,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       modes.forEach(m => {
         const btn = document.getElementById(`diet-btn-${m}`);
         if (btn) {
+          btn.setAttribute('aria-pressed', String(m === mode));
           if (m === mode) {
             btn.className = 'p-3 rounded-2xl text-center border bg-[#22C55E]/20 border-[#22C55E] text-[#22C55E] font-extrabold transition';
           } else {
@@ -7932,7 +8036,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       if (document.getElementById('reg-trung')?.checked) regions.push('trung');
       if (document.getElementById('reg-nam')?.checked) regions.push('nam');
 
-      const spice_level = Number(document.getElementById('input-spice-level')?.value || 1);
+      const spice_level = Number(document.getElementById('input-spice-level')?.value ?? 1);
       const diet_mode = document.getElementById('input-diet-mode')?.value || 'balanced';
 
       const hard_allergies = [];
@@ -7940,15 +8044,21 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         if (document.getElementById(`allergy-${a}`)?.checked) hard_allergies.push(a);
       });
 
-      const budget_min = Number(document.getElementById('input-budget-min')?.value || 30000);
-      const budget_max = Number(document.getElementById('input-budget-max')?.value || 65000);
+      const budget_min = Number(document.getElementById('input-budget-min')?.value ?? 30000);
+      const budget_max = Number(document.getElementById('input-budget-max')?.value ?? 65000);
 
+      if (!regions.length || !Number.isFinite(budget_min) || !Number.isFinite(budget_max) || budget_min < 0 || budget_max < budget_min) {
+        showFloatingToast('Kiểm Tra Hồ Sơ', 'Chọn ít nhất một vùng miền và ngân sách hợp lệ (tối đa không nhỏ hơn tối thiểu).', '⚠️');
+        return;
+      }
       try {
         const res = await fetch('/api/v1/me/profile', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ regions, spice_level, diet_mode, hard_allergies, budget_min, budget_max })
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        liveUserProfile = await res.json();
         showFloatingToast('Hồ Sơ Vị Giác Đã Cập Nhật', 'AI Chef Măm đã làm mới bộ lọc và sẽ đề xuất món chuẩn vị của bạn!', '✅');
         refreshLiveSuggestions();
       } catch (e) {
@@ -7974,6 +8084,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       }
       try {
         const res = await fetch('/api/v1/me', { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         showFloatingToast('Đã Xóa Toàn Bộ Dữ Liệu', data.pdpd_compliance || 'Đã xóa tài khoản vĩnh viễn theo PDPD.', '🗑️');
         setTimeout(() => location.reload(), 2000);
@@ -8866,7 +8977,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       // Keep the repo's two photo cards + horizontal sponsored card intact.
       const items = d.items || [];
       if (!items.length) return stateHtml(id, "empty");
-      const cards = $$(".group", root);
+      const cards = $$(".grid-cols-2 > .group", root);
       cards.forEach((node, i) => {
         const a = items[i];
         if (!a) {
@@ -8878,7 +8989,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           click(n, `P2.dish('${J(a.dish_id)}')`),
         );
         const heart = $("span.absolute", node);
-        if (heart) click(heart, `P2.save('${J(a.dish_id)}')`);
+        if (heart) click(heart, `event.stopPropagation();P2.save('${J(a.dish_id)}')`);
       });
       const third = $('[onclick*="M4-S03"]', root);
       if (third) {
@@ -8994,14 +9105,14 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         if (step) {
           const a = (d.steps || [])[0];
           if (a) {
-            text($(".font-extrabold", step), a.title);
+            text($(".flex-1 .font-extrabold", step), a.title);
             text($("p", step), a.text);
             img($("img", step), d.img_key);
           } else step.innerHTML = "<p>Chưa có cách nấu cho món này.</p>";
         }
         $$("button", root).forEach((b) => {
           if (
-            b.innerHTML.includes("bookmark") ||
+            (b.getAttribute("onclick") || "").includes("M2-S08") || b.innerHTML.includes("bookmark") ||
             b.querySelector("svg")?.outerHTML.includes("M19 21l-7")
           )
             click(b, `P2.save('${J(d.id)}')`);
@@ -9519,8 +9630,8 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             "Thông tin " + (i + 1),
         );
     });
-    $$("[onclick]:not(button):not(a):not(input)", root).forEach((el) => {
-      if (el.closest("svg") || el.querySelector("button,a,input")) return;
+    $$("[onclick]:not(button):not(a):not(input)", root).reverse().forEach((el) => {
+      if (el.closest("svg") || el.querySelector("button,a,input,[onclick]")) return;
       const b = document.createElement("button");
       for (const a of el.attributes) b.setAttribute(a.name, a.value);
       b.type = "button";
