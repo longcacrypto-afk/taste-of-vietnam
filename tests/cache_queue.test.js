@@ -51,7 +51,10 @@ test('CACHE-03: Order confirmation (M5 loopback) invalidates suggestion cache', 
   await call(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
 
   // Confirm eaten order -> triggers invalidation
-  const confirmRes = await call(store, 'POST', '/api/v1/orders/ORD-TEST-999/confirm-eaten', new URLSearchParams(), {
+  const redirect = await call(store, 'POST', '/api/v1/orders/redirect', new URLSearchParams(), {
+    place_id: 'PLACE-401', dish_id: 'DISH-101'
+  });
+  const confirmRes = await call(store, 'POST', `/api/v1/orders/${redirect.data.id}/confirm-eaten`, new URLSearchParams(), {
     dish_id: 'DISH-101',
     dish_name: 'Phở Bò Tái Nạm'
   });

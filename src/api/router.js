@@ -1,16 +1,16 @@
 import { googleConfig, googleLogin } from '../services/googleAuthService.js';
 import { validateProfilePatch } from '../services/profileService.js';
-// =============================================================================
-// REST API GATEWAY ROUTER (/api/v1/*) — HÔM NAY ĂN GÌ · TASTE OF VIETNAM
+// ======================================================================// REST API GATEWAY ROUTER (/api/v1/*) — HÔM NAY ĂN GÌ · TASTE OF VIETNAM
 // Core launch modules (M1–M5, M7 campaigns/payments, M9 admin, M20 recipes)
 // read and write through the repository (src/db/repository.js): PostgreSQL in
 // production, the in-memory store in tests/dev. Frozen modules live in
 // ./frozenRoutes.js.
-// =============================================================================
-
+// ======================================================================
 import { handleAdminRoute } from './adminRoutes.js';
 import { reportInput } from '../services/reportPolicy.js';
 import { PolicyError } from '../services/adminPolicy.js';
+import { randomUUID } from 'node:crypto';
+import { buildRedirect, redirectAction } from '../services/redirectService.js';
 import { matchesVietnameseQuery } from '../services/textUtils.js';
 import { getTodaySuggestions, isDishSafeForUser } from '../services/recommender.js';
 import { runAiFoodChat } from '../services/intentParser.js';
@@ -115,9 +115,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // The caller's taste profile; anonymous reads use the shared default profile.
   const profile = authUser ? authUser.profile : store.userProfile;
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M1: ACCOUNT, AUTH, ONBOARDING & TASTE PROFILE (M1-S01 .. M1-S10)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/auth/google/config' && method === 'GET') return { status: 200, data: googleConfig() };
   if (pathname === '/api/v1/auth/google' && method === 'POST') return googleLogin(repo, body.id_token, authUser);
 
@@ -186,9 +186,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     } };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M2: VIETNAMESE DISH LIBRARY & DYNAMIC RECIPE SCALER (M2-S01 .. M2-S08)
-  // ===========================================================================
+  // ====================================================================
   const dishResponse = await handleDishRoutes({
     repo, method, pathname, searchParams, body, userId, profile, cleanText,
     openPlaces: id => openPlacesForDish(repo, id, profile, profile.radius_m),
@@ -235,9 +235,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M3: AI RECOMMENDATION ENGINE, SPIN & AI FOOD CHAT (M3-S01 .. M3-S07)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/suggestions/today' && method === 'GET') {
     bump(store, 'suggestion_shown');
     const view = await buildView(repo, store, authUser);
@@ -312,9 +312,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M4: PLACES, POSTGIS 3KM SEARCH & CROWDSOURCED REPORTS (M4-S01 .. M4-S06)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/places' && method === 'GET') {
     const items = await repo.findPlacesNear({
       lat: profile.lat,
@@ -337,75 +337,59 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 200, data: publicReport };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M5: EXTERNAL ORDER DEEP-LINK & LOOPBACK CONFIRMATION (M5-S01 .. M5-S05)
-  // ===========================================================================
+  // ====================================================================
+  if (pathname === '/api/v1/orders/redirects' && method === 'GET') {
+    if (!authUser) return UNAUTHORIZED;
+    return { status: 200, data: { items: await repo.listOrderRedirects(userId) } };
+  }
   if (pathname === '/api/v1/orders/redirect' && method === 'POST') {
-    const place = (await repo.getPlace(body.place_id)) || (await repo.listPlaces())[0];
-    const dish = (await repo.getDish(body.dish_id)) || (await repo.listDishes())[0];
-    if (!place || !dish) return { status: 404, data: { error: 'Place or dish not found' } };
-    const partner = /^[a-z_]{2,20}$/.test(body.partner || '') ? body.partner : 'grabfood';
-    const utm = 'utm_source=hom_nay_an_gi&utm_medium=app_mvp';
-    const baseLink = (place.links && place.links[partner]) || `https://maps.google.com/?q=${place.lat},${place.lng}`;
+    const partner = body.partner === undefined ? 'grabfood' : body.partner;
+    // Validate the partner before looking up data; never fall back to a different action.
+    const known = buildRedirect({}, partner);
+    if (known.status === 400) return { status: 400, data: { error: known.error } };
+    if (typeof body.place_id !== 'string' || (body.dish_id !== undefined && typeof body.dish_id !== 'string'))
+      return { status: 404, data: { error: 'Place or dish not found' } };
+    const place = await repo.getPlace(body.place_id);
+    const dish = body.dish_id === undefined ? null : await repo.getDish(body.dish_id);
+    if (!place || (body.dish_id !== undefined && !dish))
+      return { status: 404, data: { error: 'Place or dish not found' } };
+    if (partner !== 'maps' && partner !== 'phone' && !dish)
+      return { status: 400, data: { error: 'Dish required for ordering' } };
+    if (!place.is_verified || place.is_paused || place.is_open_override === false ||
+        (place.status && !['active', 'verified'].includes(place.status)))
+      return { status: 409, data: { error: 'Place unavailable' } };
+    if (dish && !(place.menu || []).some(m => m.dish_id === dish.id && m.available === true))
+      return { status: 409, data: { error: 'Dish unavailable at this place' } };
+    const links = buildRedirect(place, partner);
+    if (links.error) return { status: links.status, data: { error: links.error } };
+    const now = new Date().toISOString();
     const record = await repo.createOrderRedirect({
-      id: `redir-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      user_id: userId,
-      place_id: place.id,
-      place_name: place.name,
-      dish_id: dish.id,
-      dish_name: dish.name,
-      partner,
-      target_deeplink: `${baseLink}${baseLink.includes('?') ? '&' : '?'}${utm}`,
-      fallback_web_url: baseLink,
-      loopback_confirmed_eaten: false,
-      created_at: new Date().toISOString()
+      id: `redir-${randomUUID()}`, user_id: userId,
+      place_id: place.id, place_name: place.name,
+      dish_id: dish?.id || null, dish_name: dish?.name || null,
+      partner, ...links, action_type: redirectAction(partner),
+      clicked_at: now, confirmed_at: null,
+      loopback_confirmed_eaten: false, created_at: now
     });
-    bump(store, partner === 'maps' ? 'direction_click' : partner === 'phone' ? 'call_click' : 'order_click');
     return { status: 200, data: record };
   }
 
   const confirmOrderMatch = pathname.match(/^\/api\/v1\/orders\/([^/]+)\/confirm-eaten$/);
   if (confirmOrderMatch && method === 'POST') {
     if (!authUser) return UNAUTHORIZED;
-    const existing = await repo.getOrderRedirect(confirmOrderMatch[1]);
-    if (existing && existing.user_id && existing.user_id !== userId) {
-      return { status: 404, data: { error: 'Order not found' } };
-    }
-    let ord;
-    if (existing) {
-      ord = await repo.confirmOrderEaten(existing.id);
-    } else {
-      // No redirect on record (e.g. ate there without ordering through the app): log the dish named in the body
-      const dish = (await repo.getDish(body.dish_id || 'DISH-101')) || (await repo.listDishes())[0];
-      const place = (await repo.getPlace(body.place_id || 'PLACE-401')) || (await repo.listPlaces())[0];
-      if (!dish) return { status: 404, data: { error: 'Dish not found' } };
-      ord = {
-        id: confirmOrderMatch[1],
-        dish_id: dish.id,
-        dish_name: dish.name,
-        place_id: place ? place.id : null,
-        place_name: place ? place.name : null,
-        loopback_confirmed_eaten: true
-      };
-    }
-    const dish = await repo.getDish(ord.dish_id);
-    await repo.addHistory(userId, {
-      id: `hist-loopback-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      dish_id: ord.dish_id,
-      dish_name: ord.dish_name,
-      place_id: ord.place_id,
-      place_name: ord.place_name,
-      price_vnd: dish ? dish.ref_price : null,
-      action: 'eaten',
-      created_at: new Date().toISOString()
-    });
+    const result = await repo.confirmOrderEaten(confirmOrderMatch[1], userId);
+    if (!result) return { status: 404, data: { error: 'Order not found' } };
+    if (result.no_dish) return { status: 409, data: { error: 'No dish to confirm; use meal feedback' } };
     suggestionCache.invalidateUser(profile.id || 'default');
-    return { status: 200, data: { confirmed: true, order: ord, cooldown_days_applied: 3 } };
+    return { status: 200, data: { confirmed: true, order: result.order,
+      already_confirmed: result.already_confirmed, confirmation_source: 'self_report', cooldown_days_applied: 3 } };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M7: SPONSORED LISTINGS, ANTI-FRAUD GUARD & VIETQR (M7-S01 .. M7-S08)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/ads/campaigns' && method === 'GET') {
     return {
       status: 200,
@@ -535,9 +519,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 404, data: { error: 'Order not found', order_id: orderId } };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M8: SMART CONTEXTUAL MEAL REMINDERS (M8-S01 .. M8-S04)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/notifications' && method === 'GET') {
     return {
       status: 200,
@@ -573,9 +557,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M20: CREATOR KITCHEN & COMMUNITY RECIPES (tipping, likes)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/community/recipes' && method === 'GET') {
     let recipes = await repo.listRecipes();
     if (searchParams.get('tag') === 'zero_waste') recipes = recipes.filter(r => r.zero_waste_tag);
@@ -669,9 +653,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 200, data: updated };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // FROZEN MODULES (M6, M10–M19) & SYSTEM ROUTES
-  // ===========================================================================
+  // ====================================================================
   const frozen = await handleFrozenRoute(await buildView(repo, store, authUser), method, pathname, searchParams, body);
   if (frozen) return frozen;
 
