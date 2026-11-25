@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="vi" class="dark">
+<html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Hôm nay ăn gì · Taste of Vietnam</title>
   <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#18181B" />
+  <meta name="theme-color" content="#FBBF24" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Ăn Gì?" />
-  <link rel="apple-touch-icon" href="/assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="/assets/mascot_mam.jpg" />
   <script src="/assets/tailwindcss.min.js"></script>
   <script>
     if (!window.tailwind) {
@@ -26,103 +26,123 @@
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body {
       margin: 0; padding: 0; height: 100%; width: 100%;
-      background: #18181B; color: #F4F4F5;
+      background: #F4F6F9; color: #0F172A;
       font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
       overflow: hidden;
     }
     .app-shell {
       display: flex; flex-direction: column;
       height: 100dvh; width: 100%; max-width: 480px;
-      margin: 0 auto; background: #18181B;
+      margin: 0 auto; background: #FFFFFF;
       padding-top: env(safe-area-inset-top);
+      box-shadow: 0 20px 50px rgba(15,23,42,0.12);
     }
     .app-header {
       flex-shrink: 0; padding: 12px 16px 10px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+      border-bottom: 1px solid #F1F5F9;
       display: flex; align-items: center; justify-content: space-between;
-      background: rgba(24,24,27,0.95); backdrop-filter: blur(12px);
+      background: #FFFFFF;
     }
     .app-main {
       flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-      padding: 14px 16px 24px;
+      padding: 14px 16px 24px; background: #F8FAFC;
     }
     .app-nav {
       flex-shrink: 0; display: grid; grid-template-columns: repeat(5, 1fr);
-      align-items: center; background: #111114;
-      border-top: 1px solid rgba(255,255,255,0.1);
+      align-items: center; background: #FFFFFF;
+      border-top: 1px solid #E2E8F0;
       padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     }
     .nav-btn {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 2px; font-size: 10px; font-weight: 600; color: #71717A;
+      gap: 2px; font-size: 10px; font-weight: 600; color: #64748B;
       background: none; border: none; padding: 4px 0; cursor: pointer;
     }
-    .nav-btn.active { color: #FBBF24; font-weight: 800; }
+    .nav-btn.active { color: #F59E0B; font-weight: 800; }
     .fab-btn {
       width: 48px; height: 48px; border-radius: 9999px;
       background: linear-gradient(135deg, #FBBF24, #F59E0B);
-      color: #18181B; font-size: 20px; font-weight: 900;
+      color: #0F172A; font-size: 22px; font-weight: 900;
       display: flex; align-items: center; justify-content: center;
-      margin: -14px auto 0; border: 3px solid #18181B;
-      box-shadow: 0 6px 20px rgba(251,191,36,0.35); cursor: pointer;
+      margin: -18px auto 0; border: 3px solid #FFFFFF;
+      box-shadow: 0 8px 20px rgba(245,158,11,0.35); cursor: pointer;
     }
-    .card {
-      background: #27272A; border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px; padding: 14px;
+    .lux-card {
+      background: #FFFFFF; border: 1px solid #E2E8F0;
+      border-radius: 20px; overflow: hidden;
+      box-shadow: 0 6px 20px -6px rgba(15,23,42,0.06);
     }
   </style>
 </head>
 <body>
   <div class="app-shell">
-    <!-- Top Header -->
+    <!-- Top Header matching Benchmark Screen 1 -->
     <header class="app-header">
-      <div>
-        <div class="text-sm font-extrabold text-amber-400 tracking-tight">🍜 Hôm nay ăn gì?</div>
-        <div id="weather-bar" class="text-[11px] text-zinc-400">Đang tải thời tiết & khẩu vị...</div>
+      <div class="flex items-center gap-2.5">
+        <img src="/assets/mascot_mam.jpg" alt="Măm" class="w-9 h-9 rounded-full object-cover border-2 border-[#FBBF24]" />
+        <div>
+          <div class="text-sm font-black text-[#0F172A] leading-tight">Hôm nay ăn gì?</div>
+          <div id="weather-bar" class="text-[11px] font-semibold text-[#64748B]">Đang đồng bộ thời tiết...</div>
+        </div>
       </div>
-      <div class="flex items-center gap-2">
-        <button onclick="openSpinModal()" class="px-2.5 py-1.5 rounded-xl bg-amber-400/15 text-amber-300 text-xs font-bold border border-amber-400/30">🎲 Quay món</button>
+      <div class="flex items-center gap-1.5">
+        <button onclick="openSpinModal()" class="px-3 py-1.5 rounded-full bg-[#FEF3C7] text-[#B45309] text-xs font-extrabold border border-[#FDE68A]">
+          🎲 Quay món
+        </button>
       </div>
     </header>
 
     <!-- Single Active Screen Content -->
     <main id="app-main" class="app-main"></main>
 
-    <!-- Fixed 5-Tab Bottom Navigation -->
+    <!-- Fixed 5-Tab Bottom Bar matching Benchmark -->
     <nav class="app-nav">
       <button class="nav-btn active" data-tab="today" onclick="switchTab('today')">
-        <span class="text-lg">🏠</span><span>Hôm nay</span>
+        <span class="text-lg">🏠</span><span>Home</span>
       </button>
       <button class="nav-btn" data-tab="explore" onclick="switchTab('explore')">
-        <span class="text-lg">🧭</span><span>Khám phá</span>
+        <span class="text-lg">🧭</span><span>Explore</span>
       </button>
       <button class="nav-btn" data-tab="chat" onclick="switchTab('chat')">
-        <div class="fab-btn">🤖</div>
-        <span class="mt-0.5 text-amber-400 font-bold">Măm AI</span>
+        <div class="fab-btn">+</div>
+        <span class="mt-0.5 text-[#F59E0B] font-extrabold">Măm AI</span>
       </button>
       <button class="nav-btn" data-tab="places" onclick="switchTab('places')">
         <span class="text-lg">📍</span><span>Quán 3km</span>
       </button>
       <button class="nav-btn" data-tab="more" onclick="switchTab('more')">
-        <span class="text-lg">👤</span><span>Cá nhân</span>
+        <span class="text-lg">👤</span><span>Profile</span>
       </button>
     </nav>
   </div>
 
-  <!-- Clean Single Modal Overlay -->
-  <div id="modal-overlay" class="hidden fixed inset-0 z-50 bg-black/75 flex items-end sm:items-center justify-center p-0 sm:p-4">
-    <div id="modal-box" class="w-full max-w-[480px] max-h-[85dvh] overflow-y-auto bg-zinc-900 border-t sm:border border-zinc-700 rounded-t-3xl sm:rounded-3xl p-5"></div>
+  <!-- Clean Single Modal Sheet -->
+  <div id="modal-overlay" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div id="modal-box" class="w-full max-w-[480px] max-h-[88dvh] overflow-y-auto bg-white text-[#0F172A] rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl"></div>
   </div>
 
   <script>
     const API = '/api/v1';
     let currentTab = 'today';
-    let subView = null; // e.g., 'meal_plan', 'fridge', 'recipes'
-    let chatMessages = [
-      { isUser: false, text: 'Chào anh! 👋 Mình là Măm AI. Hôm nay anh muốn ăn gì, mấy người, ngân sách bao nhiêu?' }
-    ];
     let familySize = 4;
     let mealsPerDay = 3;
+    let selectedRegion = '';
+    let chatMessages = [
+      { isUser: false, text: 'Xin chào anh! 👋 Mình là Măm — trợ lý ẩm thực AI. Anh muốn ăn món gì, mấy người, ngân sách bao nhiêu?' }
+    ];
+
+    const DISH_PHOTOS = {
+      'DISH-101': '/assets/hero_pho.jpg',
+      'DISH-102': '/assets/dish_banhmi.jpg',
+      'DISH-103': '/assets/hero_pho.jpg',
+      'DISH-104': '/assets/dish_banhmi.jpg',
+      'DISH-105': '/assets/place_restaurant.jpg',
+      'DISH-106': '/assets/dish_banhmi.jpg'
+    };
+
+    function dishImg(id) {
+      return DISH_PHOTOS[id] || '/assets/hero_pho.jpg';
+    }
 
     async function apiGet(path) {
       const r = await fetch(API + path);
@@ -130,17 +150,13 @@
     }
     async function apiPost(path, body = {}) {
       const r = await fetch(API + path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
       return r.json();
     }
     async function apiPut(path, body = {}) {
       const r = await fetch(API + path, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
       return r.json();
     }
@@ -155,7 +171,7 @@
 
     function showToast(msg) {
       const el = document.createElement('div');
-      el.className = 'fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-amber-400 text-zinc-950 font-bold text-xs px-4 py-2 rounded-full shadow-lg';
+      el.className = 'fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-[#18181B] text-[#FBBF24] font-bold text-xs px-4 py-2.5 rounded-full shadow-xl border border-[#FBBF24]/40';
       el.textContent = msg;
       document.body.appendChild(el);
       setTimeout(() => el.remove(), 2200);
@@ -164,7 +180,6 @@
     function closeModal() {
       document.getElementById('modal-overlay').classList.add('hidden');
     }
-
     function openModal(html) {
       document.getElementById('modal-box').innerHTML = html;
       document.getElementById('modal-overlay').classList.remove('hidden');
@@ -172,16 +187,13 @@
 
     function switchTab(tab) {
       currentTab = tab;
-      subView = null;
-      document.querySelectorAll('.nav-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.tab === tab);
-      });
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
       renderCurrentTab();
     }
 
     async function renderCurrentTab() {
       const main = document.getElementById('app-main');
-      main.innerHTML = '<div class="text-center py-12 text-zinc-400 text-xs">Đang tải dữ liệu...</div>';
+      main.innerHTML = '<div class="text-center py-12 text-[#64748B] text-xs font-semibold">⏳ Đang tải dữ liệu thực tế...</div>';
       if (currentTab === 'today') await renderToday(main);
       else if (currentTab === 'explore') await renderExplore(main);
       else if (currentTab === 'chat') renderChat(main);
@@ -189,38 +201,43 @@
       else if (currentTab === 'more') await renderMore(main);
     }
 
-    // ─── TAB 1: TODAY ────────────────────────────────────────────────────────
+    // ─── TAB 1: HOME (M3-S01 AI CHEF BENCHMARK) ──────────────────────────────
     async function renderToday(main) {
       const data = await apiGet('/suggestions/today');
-      const weather = data.weather?.label || '🌧️ 26°C · Trời dịu mát';
-      document.getElementById('weather-bar').textContent = weather;
+      document.getElementById('weather-bar').textContent = data.weather?.label || '🌧️ 26°C · Trời dịu mát';
       const items = data.items || [];
       main.innerHTML = `
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <h2 class="text-base font-extrabold">✨ 3 Gợi Ý AI Hôm Nay</h2>
-            <button onclick="renderCurrentTab()" class="text-xs text-amber-400 font-bold">↻ Làm mới</button>
+        <div class="space-y-4">
+          <!-- Mascot Măm Hero Card -->
+          <div class="bg-[#18181B] text-white rounded-3xl p-4 flex items-center gap-3 shadow-lg">
+            <img src="/assets/mascot_mam.jpg" class="w-12 h-12 rounded-2xl object-cover border border-[#FBBF24]" />
+            <div class="flex-1">
+              <div class="text-xs font-extrabold text-[#FBBF24]">✨ Trợ lý Măm AI gợi ý hôm nay</div>
+              <div class="text-[11px] text-zinc-300 mt-0.5">Đã lọc cứng dị ứng 100% & không lặp món trong 3 ngày</div>
+            </div>
+            <button onclick="renderCurrentTab()" class="px-2.5 py-1.5 rounded-xl bg-white/10 text-xs font-bold">↻</button>
           </div>
+
           ${items.map(it => `
-            <div class="card space-y-2.5">
-              <div class="flex items-start justify-between gap-2">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-extrabold text-white">${it.dish_name}</span>
-                    ${it.is_sponsored ? '<span class="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold">Tài trợ</span>' : ''}
-                  </div>
-                  <p class="text-xs text-zinc-400 mt-1">${it.reason || 'Hợp khẩu vị & thời tiết hôm nay'}</p>
+            <div class="lux-card">
+              <div class="relative h-36 w-full bg-zinc-200">
+                <img src="${dishImg(it.dish_id)}" class="w-full h-full object-cover" />
+                <div class="absolute top-2.5 left-2.5 flex gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-white/95 text-[#0F172A] text-[10px] font-extrabold shadow-sm">🔥 ${it.calories || 480} kcal</span>
+                  ${it.is_sponsored ? '<span class="px-2.5 py-1 rounded-full bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold shadow-sm">Tài trợ</span>' : ''}
                 </div>
-                <span class="text-xs font-extrabold text-amber-400 shrink-0">${fmtVnd(it.ref_price)}</span>
+                <span class="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-full bg-[#18181B]/90 text-[#FBBF24] text-xs font-black">${fmtVnd(it.ref_price)}</span>
               </div>
-              <div class="flex items-center gap-2 text-[11px] text-zinc-400">
-                <span>🔥 ${it.calories || 480} kcal</span>
-                <span>•</span>
-                <span>📍 ${it.nearest_place?.name || 'Quán gần bạn'}</span>
-              </div>
-              <div class="grid grid-cols-2 gap-2 pt-1">
-                <button onclick="openDishModal('${it.dish_id}')" class="py-2 rounded-xl bg-zinc-800 text-white text-xs font-bold border border-zinc-700">📖 Công thức</button>
-                <button onclick="markEaten('${it.dish_id}', '${it.dish_name.replace(/'/g, '')}')" class="py-2 rounded-xl bg-amber-400 text-zinc-950 text-xs font-extrabold">✅ Đã ăn (Cooldown)</button>
+              <div class="p-3.5 space-y-2.5">
+                <div>
+                  <h3 class="text-sm font-black text-[#0F172A]">${it.dish_name}</h3>
+                  <p class="text-xs text-[#64748B] mt-0.5">${it.reason || 'Phù hợp khẩu vị & thời tiết hôm nay'}</p>
+                  <div class="text-[11px] text-[#15803D] font-bold mt-1">📍 ${it.nearest_place?.name || 'Quán gần bạn'}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                  <button onclick="openDishModal('${it.dish_id}')" class="py-2.5 rounded-xl bg-[#F8FAFC] text-[#0F172A] text-xs font-extrabold border border-[#E2E8F0]">📖 Công thức</button>
+                  <button onclick="markEaten('${it.dish_id}', '${it.dish_name.replace(/'/g, '')}')" class="py-2.5 rounded-xl bg-[#FBBF24] text-[#0F172A] text-xs font-black shadow-sm">✅ Đã ăn</button>
+                </div>
               </div>
             </div>
           `).join('')}
@@ -230,7 +247,7 @@
 
     async function markEaten(dishId, name) {
       await apiPost('/suggestions/feedback', { dish_id: dishId, action: 'eaten' });
-      showToast(`Đã ghi nhận "${name}" · Cooldown 3 ngày`);
+      showToast(`Đã ăn "${name}" · Cooldown 3 ngày`);
       renderCurrentTab();
     }
 
@@ -238,14 +255,15 @@
       const res = await apiGet('/suggestions/spin');
       const d = res.picked_dish || {};
       openModal(`
-        <div class="space-y-4 text-center">
-          <div class="text-4xl">🎲</div>
-          <h3 class="text-lg font-extrabold text-amber-400">${d.name || 'Phở Bò Hà Nội'}</h3>
-          <p class="text-xs text-zinc-400">${d.description || 'Món ngon an toàn 100% theo bộ lọc dị ứng của anh'}</p>
-          <div class="text-sm font-bold text-emerald-400">${fmtVnd(d.ref_price)} · 🔥 ${d.calories || 450} kcal</div>
+        <div class="space-y-3 text-center">
+          <img src="${dishImg(d.id)}" class="w-full h-36 object-cover rounded-2xl" />
+          <div class="text-xs font-extrabold text-[#F59E0B]">🎲 KẾT QUẢ QUAY NGẪU NHIÊN</div>
+          <h3 class="text-lg font-black text-[#0F172A]">${d.name || 'Phở Bò Hà Nội'}</h3>
+          <p class="text-xs text-[#64748B]">${d.description || ''}</p>
+          <div class="text-sm font-extrabold text-[#15803D]">${fmtVnd(d.ref_price)} · 🔥 ${d.calories || 450} kcal</div>
           <div class="grid grid-cols-2 gap-2 pt-2">
-            <button onclick="openSpinModal()" class="py-2.5 rounded-xl bg-zinc-800 text-white text-xs font-bold">🔄 Quay lại</button>
-            <button onclick="closeModal()" class="py-2.5 rounded-xl bg-amber-400 text-zinc-950 text-xs font-extrabold">Chọn món này</button>
+            <button onclick="openSpinModal()" class="py-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-xs font-bold">🔄 Quay lại</button>
+            <button onclick="closeModal(); openDishModal('${d.id || 'DISH-101'}')" class="py-2.5 rounded-xl bg-[#FBBF24] text-[#0F172A] text-xs font-black">Xem chi tiết</button>
           </div>
         </div>
       `);
@@ -256,83 +274,109 @@
       openModal(`
         <div class="space-y-3">
           <div class="flex items-center justify-between">
-            <h3 class="text-base font-extrabold text-amber-400">${d.name}</h3>
-            <button onclick="closeModal()" class="text-zinc-400 text-lg">✕</button>
+            <h3 class="text-base font-black text-[#0F172A]">${d.name}</h3>
+            <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-[#F1F5F9] font-bold">✕</button>
           </div>
-          <p class="text-xs text-zinc-300">${d.description || ''}</p>
-          <div class="flex items-center justify-between bg-zinc-800 rounded-xl p-3">
-            <span class="text-xs font-bold">Khẩu phần: ${servings} người</span>
+          <img src="${dishImg(d.id)}" class="w-full h-36 object-cover rounded-2xl" />
+          <p class="text-xs text-[#64748B]">${d.description || ''}</p>
+          <div class="flex items-center justify-between bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl p-3">
+            <span class="text-xs font-extrabold text-[#B45309]">⚖️ Khẩu phần: ${servings} người</span>
             <div class="flex gap-2">
-              <button onclick="openDishModal('${dishId}', ${Math.max(1, servings - 1)})" class="w-7 h-7 rounded-lg bg-zinc-700 font-bold">-</button>
-              <button onclick="openDishModal('${dishId}', ${Math.min(10, servings + 1)})" class="w-7 h-7 rounded-lg bg-amber-400 text-black font-bold">+</button>
+              <button onclick="openDishModal('${dishId}', ${Math.max(1, servings - 1)})" class="w-7 h-7 rounded-lg bg-white border border-[#E2E8F0] font-black">-</button>
+              <button onclick="openDishModal('${dishId}', ${Math.min(10, servings + 1)})" class="w-7 h-7 rounded-lg bg-[#FBBF24] text-[#0F172A] font-black">+</button>
             </div>
           </div>
-          <div class="text-xs font-bold text-zinc-400">Nguyên liệu (${d.scaled_calories_total || d.calories} kcal):</div>
+          <div class="text-xs font-extrabold text-[#0F172A]">Nguyên liệu (${d.scaled_calories_total || d.calories} kcal):</div>
           <div class="space-y-1.5">
             ${(d.scaled_ingredients || []).map(i => `
-              <div class="flex justify-between text-xs bg-zinc-800/70 px-3 py-2 rounded-lg">
-                <span>${i.name}</span><span class="text-amber-300 font-bold">${i.scaled_amount} ${i.unit}</span>
+              <div class="flex justify-between text-xs bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-2 rounded-xl">
+                <span class="font-semibold">${i.name}</span><span class="text-[#D97706] font-extrabold">${i.scaled_amount} ${i.unit}</span>
               </div>
             `).join('')}
           </div>
+          <button onclick="saveToFav('${d.id}')" class="w-full py-2.5 rounded-xl bg-[#18181B] text-[#FBBF24] text-xs font-extrabold">🔖 Lưu vào Bộ sưu tập</button>
         </div>
       `);
     }
 
-    // ─── TAB 2: EXPLORE (SEARCH + MEAL PLAN 3 MEALS + FRIDGE) ────────────────
+    async function saveToFav(dishId) {
+      await apiPost('/me/collections', { dish_id: dishId });
+      showToast('Đã lưu vào Bộ sưu tập');
+    }
+
+    // ─── TAB 2: EXPLORE (M2 + M11 + M18) ──────────────────────────────────────
     async function renderExplore(main, query = '') {
-      const res = await apiGet(`/dishes?q=${encodeURIComponent(query)}`);
+      const res = await apiGet(`/dishes?q=${encodeURIComponent(query)}&region=${encodeURIComponent(selectedRegion)}`);
       const items = res.items || [];
       main.innerHTML = `
         <div class="space-y-3">
           <div class="flex gap-2">
             <input id="dish-search" value="${query}" placeholder="Tìm món (VD: bun bo, com tam)..."
               onkeydown="if(event.key==='Enter') renderExplore(document.getElementById('app-main'), this.value)"
-              class="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400" />
+              class="flex-1 bg-white border border-[#E2E8F0] rounded-2xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-[#FBBF24]" />
             <button onclick="renderExplore(document.getElementById('app-main'), document.getElementById('dish-search').value)"
-              class="px-3 py-2 rounded-xl bg-amber-400 text-zinc-950 text-xs font-extrabold">Tìm</button>
+              class="px-4 py-2.5 rounded-2xl bg-[#FBBF24] text-[#0F172A] text-xs font-black">Tìm</button>
+          </div>
+          <div class="flex gap-1.5 overflow-x-auto pb-1">
+            ${['', 'Miền Bắc', 'Miền Trung', 'Miền Nam'].map(r => `
+              <button onclick="selectedRegion='${r}'; renderExplore(document.getElementById('app-main'), document.getElementById('dish-search')?.value||'')"
+                class="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border ${selectedRegion===r ? 'bg-[#18181B] text-[#FBBF24] border-[#18181B]' : 'bg-white text-[#64748B] border-[#E2E8F0]'}">
+                ${r || 'Tất cả 3 miền'}
+              </button>
+            `).join('')}
           </div>
           <div class="grid grid-cols-2 gap-2">
-            <button onclick="switchSubView('meal_plan')" class="py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-xs font-bold text-amber-300">📅 Thực đơn 7 ngày (3 bữa)</button>
-            <button onclick="switchSubView('fridge')" class="py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-xs font-bold text-emerald-400">🧊 Tủ lạnh AI (M18)</button>
+            <button onclick="switchSubView('meal_plan')" class="p-3 rounded-2xl bg-[#FFFBEB] border border-[#FDE68A] text-left">
+              <div class="text-base">📅</div>
+              <div class="text-xs font-extrabold text-[#92400E]">Thực đơn 7 ngày</div>
+              <div class="text-[10px] text-[#B45309]">3 bữa/ngày · Gia đình</div>
+            </button>
+            <button onclick="switchSubView('fridge')" class="p-3 rounded-2xl bg-[#F0FDF4] border border-[#BBF7D0] text-left">
+              <div class="text-base">🧊</div>
+              <div class="text-xs font-extrabold text-[#166534]">Tủ lạnh AI (M18)</div>
+              <div class="text-[10px] text-[#15803D]">Thêm/sửa/xóa thực phẩm</div>
+            </button>
           </div>
-          <div class="text-xs font-bold text-zinc-400">Thư viện món Việt (${items.length} món an toàn):</div>
+          <div class="text-xs font-extrabold text-[#64748B]">Thư viện món ăn (${items.length} món an toàn):</div>
           ${items.map(d => `
-            <div onclick="openDishModal('${d.id}')" class="card flex items-center justify-between cursor-pointer">
-              <div>
-                <div class="text-sm font-bold">${d.name}</div>
-                <div class="text-[11px] text-zinc-400">${d.region} · 🔥 ${d.calories} kcal</div>
+            <div onclick="openDishModal('${d.id}')" class="lux-card p-3 flex items-center gap-3 cursor-pointer">
+              <img src="${dishImg(d.id)}" class="w-16 h-16 rounded-xl object-cover shrink-0" />
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-extrabold text-[#0F172A] truncate">${d.name}</div>
+                <div class="text-[11px] text-[#64748B]">${d.region} · 🔥 ${d.calories} kcal</div>
+                <div class="text-xs font-black text-[#D97706] mt-0.5">${fmtVnd(d.ref_price)}</div>
               </div>
-              <span class="text-xs font-extrabold text-amber-400">${fmtVnd(d.ref_price)}</span>
+              <span class="text-[#94A3B8] text-sm">›</span>
             </div>
           `).join('')}
         </div>
       `;
     }
 
-    // ─── TAB 3: MĂM AI CHAT ──────────────────────────────────────────────────
+    // ─── TAB 3: MĂM AI CHEF (M3-S04) ─────────────────────────────────────────
     function renderChat(main) {
       main.innerHTML = `
         <div class="flex flex-col h-full justify-between gap-3">
-          <div id="chat-log" class="flex-1 overflow-y-auto space-y-2.5">
+          <div id="chat-log" class="flex-1 overflow-y-auto space-y-3">
             ${chatMessages.map(m => `
-              <div class="flex ${m.isUser ? 'justify-end' : 'justify-start'}">
-                <div class="max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${m.isUser ? 'bg-amber-400 text-zinc-950 font-bold' : 'bg-zinc-800 text-zinc-100 border border-zinc-700'}">
+              <div class="flex items-end gap-2 ${m.isUser ? 'justify-end' : 'justify-start'}">
+                ${!m.isUser ? '<img src="/assets/avatar_mam_ai.jpg" class="w-7 h-7 rounded-full object-cover shrink-0" />' : ''}
+                <div class="max-w-[82%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed shadow-sm ${m.isUser ? 'bg-[#18181B] text-[#FBBF24] font-bold' : 'bg-white text-[#0F172A] border border-[#E2E8F0]'}">
                   ${m.text}
                 </div>
               </div>
             `).join('')}
           </div>
-          <div class="space-y-2 shrink-0">
+          <div class="space-y-2 shrink-0 pt-1">
             <div class="flex gap-1.5 overflow-x-auto pb-1">
-              <button onclick="sendChat('Tối nay 4 người, 300k, có trẻ nhỏ')" class="shrink-0 px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-[11px]">👨‍👩‍👧‍👦 4 người 300k</button>
-              <button onclick="sendChat('Trời mưa ăn gì ấm bụng?')" class="shrink-0 px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-[11px]">🌧️ Trời mưa</button>
-              <button onclick="sendChat('Món chay thanh đạm')" class="shrink-0 px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-[11px]">🥗 Món chay</button>
+              <button onclick="sendChat('Tối nay 4 người, 300k, có trẻ nhỏ')" class="shrink-0 px-3 py-1.5 rounded-full bg-white border border-[#E2E8F0] text-[11px] font-bold">👨‍👩‍👧‍👦 4 người 300k</button>
+              <button onclick="sendChat('Trời mưa ăn gì ấm bụng?')" class="shrink-0 px-3 py-1.5 rounded-full bg-white border border-[#E2E8F0] text-[11px] font-bold">🌧️ Trời mưa</button>
+              <button onclick="sendChat('Món chay thanh đạm')" class="shrink-0 px-3 py-1.5 rounded-full bg-white border border-[#E2E8F0] text-[11px] font-bold">🥗 Món chay</button>
             </div>
             <div class="flex gap-2">
-              <input id="chat-input" placeholder="Hỏi Măm AI..." onkeydown="if(event.key==='Enter') sendChat()"
-                class="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400" />
-              <button onclick="sendChat()" class="px-4 py-2.5 rounded-xl bg-amber-400 text-zinc-950 text-xs font-extrabold">Gửi</button>
+              <input id="chat-input" placeholder="Nhắn cho Măm AI..." onkeydown="if(event.key==='Enter') sendChat()"
+                class="flex-1 bg-white border border-[#E2E8F0] rounded-2xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-[#FBBF24]" />
+              <button onclick="sendChat()" class="px-4 py-2.5 rounded-2xl bg-[#FBBF24] text-[#0F172A] text-xs font-black">Gửi</button>
             </div>
           </div>
         </div>
@@ -346,7 +390,7 @@
       chatMessages.push({ isUser: true, text: q });
       renderChat(document.getElementById('app-main'));
       const res = await apiPost('/chat', { query: q });
-      const opts = (res.options || []).map(o => `• ${o.dish_name} (${fmtVnd(o.est_total_vnd || o.ref_price)})`).join('<br/>');
+      const opts = (res.options || []).map(o => `• <b>${o.dish_name}</b> (${fmtVnd(o.est_total_vnd || o.ref_price)})`).join('<br/>');
       chatMessages.push({
         isUser: false,
         text: `${res.reply || 'Măm gợi ý cho anh:'}${opts ? '<br/><br/>' + opts : ''}`
@@ -354,26 +398,33 @@
       renderChat(document.getElementById('app-main'));
     }
 
-    // ─── TAB 4: PLACES 3KM ───────────────────────────────────────────────────
+    // ─── TAB 4: PLACES 3KM (M4 + M5 + M13) ────────────────────────────────────
     async function renderPlaces(main) {
       const res = await apiGet('/places');
       const places = res.items || res.places || [];
       main.innerHTML = `
         <div class="space-y-3">
-          <h2 class="text-base font-extrabold">📍 Quán Đang Mở (Bán kính 3km)</h2>
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-black text-[#0F172A]">📍 Quán Đang Mở (Bán kính 3km)</h2>
+            <span class="px-2.5 py-0.5 rounded-full bg-[#DCFCE7] text-[#15803D] text-[10px] font-extrabold">${places.length} quán</span>
+          </div>
           ${places.map(p => `
-            <div class="card space-y-2">
-              <div class="flex justify-between items-start">
-                <div>
-                  <div class="text-sm font-extrabold">${p.name}</div>
-                  <div class="text-[11px] text-zinc-400">${p.address} · ${(p.distance_m/1000).toFixed(1)} km</div>
+            <div class="lux-card p-3.5 space-y-2.5">
+              <div class="flex gap-3">
+                <img src="/assets/place_restaurant.jpg" class="w-16 h-16 rounded-xl object-cover shrink-0" />
+                <div class="flex-1">
+                  <div class="flex justify-between items-start gap-2">
+                    <div class="text-sm font-black text-[#0F172A]">${p.name}</div>
+                    <span class="px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#15803D] text-[10px] font-bold shrink-0">Đang mở</span>
+                  </div>
+                  <div class="text-[11px] text-[#64748B] mt-0.5">${p.address}</div>
+                  <div class="text-[11px] font-bold text-[#D97706] mt-0.5">📏 ${(p.distance_m/1000).toFixed(1)} km · ⭐ ${p.rating || 4.8}</div>
                 </div>
-                <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">Đang mở</span>
               </div>
-              <div class="grid grid-cols-3 gap-1.5 pt-1">
-                <a href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank" class="text-center py-2 rounded-lg bg-zinc-800 text-[11px] font-bold border border-zinc-700">🗺️ Chỉ đường</a>
-                <button onclick="bookTable('${p.id}', '${p.name.replace(/'/g, '')}')" class="py-2 rounded-lg bg-amber-400 text-zinc-950 text-[11px] font-extrabold">🪑 Đặt bàn</button>
-                <button onclick="reportPlace('${p.id}')" class="py-2 rounded-lg bg-red-500/15 text-red-400 text-[11px] font-bold border border-red-500/30">⚠️ Báo đóng</button>
+              <div class="grid grid-cols-3 gap-1.5">
+                <a href="https://maps.google.com/?q=${p.lat},${p.lng}" target="_blank" class="text-center py-2 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-[11px] font-bold">🗺️ Chỉ đường</a>
+                <button onclick="bookTable('${p.id}', '${p.name.replace(/'/g, '')}')" class="py-2 rounded-xl bg-[#FBBF24] text-[#0F172A] text-[11px] font-black">🪑 Đặt bàn</button>
+                <button onclick="reportPlace('${p.id}')" class="py-2 rounded-xl bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] text-[11px] font-bold">⚠️ Báo đóng</button>
               </div>
             </div>
           `).join('')}
@@ -383,46 +434,66 @@
 
     async function bookTable(placeId, name) {
       const res = await apiPost('/bookings', { place_id: placeId, party_size: familySize, time_slot: '19:00 Hôm nay' });
-      showToast(`Đã đặt bàn ${name} (${res.booking_id})`);
+      showToast(`Đặt bàn ${name} thành công (${res.booking_id})`);
     }
 
     async function reportPlace(placeId) {
       const res = await apiPost(`/places/${placeId}/reports`, { reason: 'Quán đóng cửa' });
-      showToast(`Đã báo cáo (${res.report_count}/3)`);
+      showToast(`Đã gửi báo cáo (${res.report_count}/3)`);
     }
 
-    // ─── TAB 5: CÁ NHÂN & CÁC MODULE MỞ RỘNG ─────────────────────────────────
+    // ─── TAB 5: PROFILE & ECOSYSTEM (M1, M6, M11, M18, M20) ───────────────────
     async function renderMore(main) {
       const prof = await apiGet('/me/profile');
+      const allergies = prof.hard_allergies || [];
       main.innerHTML = `
         <div class="space-y-3">
-          <div class="card space-y-2">
+          <div class="lux-card p-4 space-y-3">
             <div class="flex items-center justify-between">
-              <div>
-                <div class="text-sm font-extrabold">👤 ${prof.name || 'Hồ sơ vị giác'}</div>
-                <div class="text-[11px] text-zinc-400">Dị ứng: ${(prof.hard_allergies || []).join(', ') || 'Không có'} · Cay: ${prof.spice_level ?? 1}/3</div>
+              <div class="flex items-center gap-2.5">
+                <img src="/assets/mascot_la.jpg" class="w-11 h-11 rounded-full object-cover border border-[#22C55E]" />
+                <div>
+                  <div class="text-sm font-black">${prof.name || 'Hồ sơ vị giác'}</div>
+                  <div class="text-[11px] text-[#64748B]">Cay: ${prof.spice_level ?? 1}/3 · Dị ứng: ${allergies.join(', ') || 'Không'}</div>
+                </div>
               </div>
-              <button onclick="exportPdpd()" class="px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-[11px] font-bold text-amber-300">📥 PDPD JSON</button>
+              <button onclick="exportPdpd()" class="px-2.5 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-[11px] font-bold">📥 PDPD</button>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              ${['shrimp', 'peanut', 'dairy', 'gluten'].map(al => {
+                const on = allergies.includes(al);
+                return `<button onclick="toggleAllergy('${al}', ${on})" class="px-2.5 py-1 rounded-full text-[11px] font-bold border ${on ? 'bg-[#FFE4E6] text-[#BE123C] border-[#FECDD3]' : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0]'}">${on ? '🛡️ Chặn ' : '+ '}${al}</button>`;
+              }).join('')}
             </div>
           </div>
-          <div class="text-xs font-bold text-zinc-400">Mở từng màn hình chức năng (gọn 1 màn hình):</div>
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="switchSubView('meal_plan')" class="card text-left space-y-1">
-              <div class="text-xl">📅</div><div class="text-xs font-bold">Thực đơn 7 ngày</div><div class="text-[10px] text-zinc-400">3 bữa/ngày · Gia đình</div>
+
+          <div class="text-xs font-extrabold text-[#64748B]">Tính năng mở rộng (mở từng màn hình riêng):</div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button onclick="switchSubView('meal_plan')" class="lux-card p-3.5 text-left space-y-1">
+              <div class="text-xl">📅</div><div class="text-xs font-black">Thực đơn 7 ngày</div><div class="text-[10px] text-[#64748B]">3 bữa/ngày · Gia đình</div>
             </button>
-            <button onclick="switchSubView('fridge')" class="card text-left space-y-1">
-              <div class="text-xl">🧊</div><div class="text-xs font-bold">Tủ lạnh AI</div><div class="text-[10px] text-zinc-400">Thêm/sửa/xóa nguyên liệu</div>
+            <button onclick="switchSubView('fridge')" class="lux-card p-3.5 text-left space-y-1">
+              <div class="text-xl">🧊</div><div class="text-xs font-black">Tủ lạnh AI</div><div class="text-[10px] text-[#64748B]">Thêm/sửa/xóa thực phẩm</div>
             </button>
-            <button onclick="switchSubView('recipes')" class="card text-left space-y-1">
-              <div class="text-xl">🍳</div><div class="text-xs font-bold">Bếp cộng đồng</div><div class="text-[10px] text-zinc-400">Công thức & Tip VietQR</div>
+            <button onclick="switchSubView('recipes')" class="lux-card p-3.5 text-left space-y-1">
+              <div class="text-xl">🍳</div><div class="text-xs font-black">Bếp cộng đồng</div><div class="text-[10px] text-[#64748B]">Công thức & Tip VietQR</div>
             </button>
-            <button onclick="switchSubView('merchant')" class="card text-left space-y-1">
-              <div class="text-xl">🏪</div><div class="text-xs font-bold">Cổng Quán M6</div><div class="text-[10px] text-zinc-400">Menu & Chiến dịch</div>
+            <button onclick="switchSubView('merchant')" class="lux-card p-3.5 text-left space-y-1">
+              <div class="text-xl">🏪</div><div class="text-xs font-black">Cổng Quán M6</div><div class="text-[10px] text-[#64748B]">Thêm/sửa/xóa món</div>
             </button>
           </div>
-          <a href="/studio?studio=1" class="block text-center py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-xs text-zinc-400 font-semibold">🖥️ Chuyển sang 99-Screen Studio (Desktop)</a>
+          <a href="/studio?studio=1" class="block text-center py-2.5 rounded-2xl bg-white border border-[#E2E8F0] text-xs text-[#64748B] font-bold">🖥️ Mở 99-Screen Studio (Desktop)</a>
         </div>
       `;
+    }
+
+    async function toggleAllergy(al, currentlyOn) {
+      const prof = await apiGet('/me/profile');
+      let list = prof.hard_allergies || [];
+      list = currentlyOn ? list.filter(x => x !== al) : [...list, al];
+      await apiPut('/me/profile', { hard_allergies: list });
+      showToast(currentlyOn ? `Đã bỏ chặn ${al}` : `Đã kích hoạt lọc cứng ${al}`);
+      renderCurrentTab();
     }
 
     async function exportPdpd() {
@@ -430,10 +501,10 @@
       openModal(`
         <div class="space-y-3">
           <div class="flex justify-between items-center">
-            <h3 class="text-sm font-extrabold text-amber-400">📥 Dữ Liệu Cá Nhân (PDPD)</h3>
-            <button onclick="closeModal()" class="text-zinc-400">✕</button>
+            <h3 class="text-sm font-black">📥 Dữ Liệu Cá Nhân (PDPD)</h3>
+            <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-[#F1F5F9] font-bold">✕</button>
           </div>
-          <pre class="text-[10px] bg-black p-3 rounded-xl overflow-x-auto text-emerald-300">${JSON.stringify(data, null, 2)}</pre>
+          <pre class="text-[10px] bg-[#18181B] text-[#4ADE80] p-3 rounded-2xl overflow-x-auto">${JSON.stringify(data, null, 2)}</pre>
         </div>
       `);
     }
@@ -445,24 +516,24 @@
         main.innerHTML = `
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <button onclick="renderCurrentTab()" class="text-xs text-amber-400 font-bold">← Quay lại</button>
-              <span class="text-xs font-extrabold">📅 Thực Đơn 7 Ngày (${familySize} người)</span>
+              <button onclick="renderCurrentTab()" class="text-xs text-[#D97706] font-extrabold">← Quay lại</button>
+              <span class="text-xs font-black">📅 Thực Đơn 7 Ngày (${familySize} người)</span>
             </div>
-            <div class="card flex items-center justify-between">
-              <span class="text-xs font-bold">👨‍👩‍👧‍👦 Số người: ${familySize}</span>
+            <div class="lux-card p-3 flex items-center justify-between">
+              <span class="text-xs font-extrabold">👨‍👩‍👧‍👦 Quy mô: ${familySize} người · 3 bữa/ngày</span>
               <div class="flex gap-2">
-                <button onclick="familySize=Math.max(1,familySize-1);switchSubView('meal_plan')" class="w-7 h-7 rounded-lg bg-zinc-800 font-bold">-</button>
-                <button onclick="familySize=Math.min(10,familySize+1);switchSubView('meal_plan')" class="w-7 h-7 rounded-lg bg-amber-400 text-black font-bold">+</button>
+                <button onclick="familySize=Math.max(1,familySize-1);switchSubView('meal_plan')" class="w-7 h-7 rounded-lg bg-[#F1F5F9] font-black">-</button>
+                <button onclick="familySize=Math.min(10,familySize+1);switchSubView('meal_plan')" class="w-7 h-7 rounded-lg bg-[#FBBF24] text-[#0F172A] font-black">+</button>
               </div>
             </div>
             ${(plan.days || []).map(d => `
-              <div class="card space-y-1.5">
-                <div class="flex justify-between text-xs font-extrabold text-amber-400">
+              <div class="lux-card p-3.5 space-y-1.5">
+                <div class="flex justify-between text-xs font-black text-[#D97706]">
                   <span>${d.day}</span><span>${fmtVnd(d.est_market_cost_vnd)}</span>
                 </div>
-                <div class="text-xs text-zinc-200">☀️ Sáng: <b>${d.meals?.breakfast?.dish_name || d.dish_name}</b></div>
-                <div class="text-xs text-zinc-200">🥢 Trưa: <b>${d.meals?.lunch?.dish_name || d.dish_name}</b></div>
-                <div class="text-xs text-zinc-200">🌙 Tối: <b>${d.meals?.dinner?.dish_name || d.dish_name}</b></div>
+                <div class="text-xs">☀️ Sáng: <b>${d.meals?.breakfast?.dish_name || d.dish_name}</b></div>
+                <div class="text-xs">🥢 Trưa: <b>${d.meals?.lunch?.dish_name || d.dish_name}</b></div>
+                <div class="text-xs">🌙 Tối: <b>${d.meals?.dinner?.dish_name || d.dish_name}</b></div>
               </div>
             `).join('')}
           </div>
@@ -472,16 +543,16 @@
         main.innerHTML = `
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <button onclick="renderCurrentTab()" class="text-xs text-amber-400 font-bold">← Quay lại</button>
-              <button onclick="addFridgeQuick()" class="px-2.5 py-1 rounded-lg bg-amber-400 text-black text-xs font-extrabold">+ Thêm đồ</button>
+              <button onclick="renderCurrentTab()" class="text-xs text-[#D97706] font-extrabold">← Quay lại</button>
+              <button onclick="addFridgeQuick()" class="px-3 py-1.5 rounded-xl bg-[#FBBF24] text-[#0F172A] text-xs font-black">+ Thêm đồ</button>
             </div>
             ${(inv.items || []).map(it => `
-              <div class="card flex items-center justify-between">
+              <div class="lux-card p-3.5 flex items-center justify-between">
                 <div>
-                  <div class="text-sm font-bold">${it.name}</div>
-                  <div class="text-[11px] text-zinc-400">${it.quantity} · Còn ${it.expires_in_days} ngày</div>
+                  <div class="text-sm font-extrabold">${it.name}</div>
+                  <div class="text-[11px] text-[#64748B]">${it.quantity} · Còn ${it.expires_in_days} ngày</div>
                 </div>
-                <button onclick="delFridge('${it.id}')" class="text-red-400 text-xs font-bold">Xóa</button>
+                <button onclick="delFridge('${it.id}')" class="px-2.5 py-1 rounded-lg bg-[#FEF2F2] text-[#DC2626] text-xs font-bold">Xóa</button>
               </div>
             `).join('')}
           </div>
@@ -490,11 +561,12 @@
         const rec = await apiGet('/community/recipes');
         main.innerHTML = `
           <div class="space-y-3">
-            <button onclick="renderCurrentTab()" class="text-xs text-amber-400 font-bold">← Quay lại</button>
+            <button onclick="renderCurrentTab()" class="text-xs text-[#D97706] font-extrabold">← Quay lại</button>
             ${(rec.recipes || []).map(r => `
-              <div class="card space-y-2">
-                <div class="text-sm font-extrabold">${r.title}</div>
-                <div class="text-[11px] text-zinc-400">👨‍🍳 ${r.author} · ⏱️ ${r.prep_time_minutes}p · ❤️ ${r.likes_count}</div>
+              <div class="lux-card p-3.5 space-y-2">
+                <div class="text-sm font-black">${r.title}</div>
+                <div class="text-[11px] text-[#64748B]">👨‍🍳 ${r.author} · ⏱️ ${r.prep_time_minutes}p · ❤️ ${r.likes_count}</div>
+                <button onclick="likeRec('${r.id}')" class="px-3 py-1.5 rounded-xl bg-[#FFFBEB] text-[#B45309] text-xs font-bold border border-[#FDE68A]">❤️ Thả tim</button>
               </div>
             `).join('')}
           </div>
@@ -503,12 +575,17 @@
         const menu = await apiGet('/merchant/menu');
         main.innerHTML = `
           <div class="space-y-3">
-            <button onclick="renderCurrentTab()" class="text-xs text-amber-400 font-bold">← Quay lại</button>
-            <div class="text-sm font-extrabold">🏪 Thực Đơn Quán (M6)</div>
+            <div class="flex items-center justify-between">
+              <button onclick="renderCurrentTab()" class="text-xs text-[#D97706] font-extrabold">← Quay lại</button>
+              <button onclick="addMenuQuick()" class="px-3 py-1.5 rounded-xl bg-[#FBBF24] text-[#0F172A] text-xs font-black">+ Thêm món</button>
+            </div>
             ${(menu.items || []).map(m => `
-              <div class="card flex justify-between items-center">
-                <span class="text-xs font-bold">${m.name}</span>
-                <span class="text-xs text-amber-400 font-extrabold">${fmtVnd(m.price_vnd)}</span>
+              <div class="lux-card p-3.5 flex justify-between items-center">
+                <div>
+                  <div class="text-xs font-black">${m.name}</div>
+                  <div class="text-xs text-[#D97706] font-bold">${fmtVnd(m.price_vnd)}</div>
+                </div>
+                <button onclick="delMenu('${m.id}')" class="px-2.5 py-1 rounded-lg bg-[#FEF2F2] text-[#DC2626] text-xs font-bold">Xóa</button>
               </div>
             `).join('')}
           </div>
@@ -523,11 +600,27 @@
       showToast('Đã thêm vào tủ lạnh');
       switchSubView('fridge');
     }
-
     async function delFridge(id) {
       await apiDelete(`/fridge/inventory/${id}`);
       showToast('Đã xóa nguyên liệu');
       switchSubView('fridge');
+    }
+    async function likeRec(id) {
+      await apiPost(`/community/recipes/${id}/like`, {});
+      showToast('Đã thả tim công thức');
+      switchSubView('recipes');
+    }
+    async function addMenuQuick() {
+      const name = prompt('Tên món ăn mới của quán:');
+      if (!name) return;
+      await apiPost('/merchant/menu', { name, price_vnd: 50000 });
+      showToast('Đã thêm món mới');
+      switchSubView('merchant');
+    }
+    async function delMenu(id) {
+      await apiDelete(`/merchant/menu/${id}`);
+      showToast('Đã xóa món khỏi thực đơn');
+      switchSubView('merchant');
     }
 
     renderCurrentTab();
