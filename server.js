@@ -45,6 +45,7 @@ export function createAppServer() {
         uptime_seconds: Math.floor(process.uptime()),
         modules_loaded: 20,
         postgres_connected: isPostgresConnected(),
+        gemini_active: Boolean(process.env.GEMINI_API_KEY),
         environment: process.env.NODE_ENV || 'development',
         timestamp: new Date().toISOString()
       }, null, 2));
