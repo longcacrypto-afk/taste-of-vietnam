@@ -1322,7 +1322,7 @@
       };
       let guestPromise = null;
       const pathOf = (url) => { try { const u = new URL(url, location.href); return u.origin === location.origin ? u.pathname : null; } catch (_) { return null; } };
-      function save(d) { if (d && d.access_token) { ls.set(KEY, d.access_token); ls.set(ROLE_KEY, d.role || 'guest'); } return d; }
+      function save(d) { if (d && d.access_token) { ls.set(KEY, d.access_token); ls.set(ROLE_KEY, d.role || d.user?.role || 'guest'); } return d; }
       function ensureToken() {
         const t = ls.get(KEY);
         if (t) return Promise.resolve(t);
@@ -1352,13 +1352,13 @@
         }
         return res;
       };
-      async function postJson(url, body) {
-        const r = await nativeFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      async function postJson(url, body, headers = {}) {
+        const r = await nativeFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
         return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
       }
       window.TOV_AUTH = {
         role: () => ls.get(ROLE_KEY) || 'guest',
-        async google(id_token) { const r = await postJson('/api/v1/auth/google', { id_token }); if (r.ok) save(r.data); return r; },
+        async google(id_token) { const guest = (ls.get(ROLE_KEY) || 'guest') === 'guest' ? ls.get(KEY) : null; const r = await postJson('/api/v1/auth/google', { id_token }, guest ? { Authorization: 'Bearer ' + guest } : {}); if (r.ok) save(r.data); return r; },
         requestOtp: (phone) => postJson('/api/v1/auth/otp/request', { phone }),
         async verifyOtp(phone, code) { const r = await postJson('/api/v1/auth/otp/verify', { phone, code }); if (r.ok) save(r.data); return r; },
         logout() { ls.del(KEY); ls.del(ROLE_KEY); },
@@ -10017,7 +10017,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         const script=document.createElement("script");script.src="https://accounts.google.com/gsi/client";script.async=true;
         script.onload=()=>{google.accounts.id.initialize({client_id:state.google.client_id,callback:credential=>action(
           async()=>{const r=await TOV_AUTH.google(credential.credential);if(!r.ok)throw Object.assign(new Error("Đăng nhập chưa thành công"),{status:r.status});return r.data;},
-          (d)=>{state.cache={};if(document.body.classList.contains("pwa-mobile-mode"))goScreen("M1-S03");else setLiveAppTab(d.role==="admin"?"admin":"profile");}
+          (d)=>{state.cache={};if(document.body.classList.contains("pwa-mobile-mode"))goScreen("M1-S03");else setLiveAppTab((d.role||d.user?.role)==="admin"?"admin":"profile");}
         )});state.google.ready=true;$$("[onclick='P2.google()']").forEach(b=>b.disabled=false);};
         script.onerror=()=>status("Chưa tải được đăng nhập Google. Kiểm tra mạng rồi thử lại.");
         document.head.append(script);

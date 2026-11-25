@@ -1292,7 +1292,7 @@
         const script=document.createElement("script");script.src="https://accounts.google.com/gsi/client";script.async=true;
         script.onload=()=>{google.accounts.id.initialize({client_id:state.google.client_id,callback:credential=>action(
           async()=>{const r=await TOV_AUTH.google(credential.credential);if(!r.ok)throw Object.assign(new Error("Đăng nhập chưa thành công"),{status:r.status});return r.data;},
-          (d)=>{state.cache={};if(document.body.classList.contains("pwa-mobile-mode"))goScreen("M1-S03");else setLiveAppTab(d.role==="admin"?"admin":"profile");}
+          (d)=>{state.cache={};if(document.body.classList.contains("pwa-mobile-mode"))goScreen("M1-S03");else setLiveAppTab((d.role||d.user?.role)==="admin"?"admin":"profile");}
         )});state.google.ready=true;$$("[onclick='P2.google()']").forEach(b=>b.disabled=false);};
         script.onerror=()=>status("Chưa tải được đăng nhập Google. Kiểm tra mạng rồi thử lại.");
         document.head.append(script);
