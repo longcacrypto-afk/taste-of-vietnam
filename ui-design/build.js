@@ -38,7 +38,7 @@ const scriptsBlock = jsFiles
 const bundled = shellHtml
   .replace('/*__IMAGES_DATA_PLACEHOLDER__*/ {}', JSON.stringify(imagesMap))
   .replace('<!--/*__SCREENS_JS_PLACEHOLDER__*/-->', scriptsBlock)
-  .replace('<!--/*__PRODUCT_RUNTIME__*/-->', () => `<script>\n${fs.readFileSync(path.join(srcDir, 'product_runtime.js'), 'utf8')}\n</script>`);
+  .replace('<!--/*__PRODUCT_RUNTIME__*/-->', () => `<script>\n${['admin_dish_forms.js', 'admin_place_forms.js', 'admin_forms.js', 'product_runtime.js'].map(f => fs.readFileSync(path.join(srcDir, f), 'utf8')).join('\n')}\n</script>`);
 
 const outIndex = path.join(__dirname, 'index.html');
 fs.writeFileSync(outIndex, bundled, 'utf8');

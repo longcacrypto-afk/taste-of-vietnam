@@ -1340,7 +1340,7 @@
       }
       window.fetch = async function (input, init) {
         const p = pathOf(typeof input === 'string' ? input : (input && input.url) || '');
-        if (!p || !p.startsWith('/api/v1/') || p.startsWith('/api/v1/auth/')) return nativeFetch(input, init);
+        if (!p || !p.startsWith('/api/v1/') || (p.startsWith('/api/v1/auth/') && p !== '/api/v1/auth/me')) return nativeFetch(input, init);
         let token = null;
         try { token = await ensureToken(); } catch (_) {}
         let res = await withAuth(input, init, token);

@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main, integration/release-7, feat/m9-data-entry ]
+    branches: [ main, integration/release-7, feat/m9-data-entry, feat/m9-review-reports ]
 
 jobs:
   # ─── JOB 1: BACKEND QA & END-TO-END TESTS (NODE 20) ─────────────────────────
