@@ -28,6 +28,17 @@
     collections: false, // M2-S08 per-card collection chip "N món"
     // M5-S02: partners the server redirect allowlist accepts (src/services/redirectService.js).
     orderPartners: ["grabfood", "shopeefood"],
+    // <m5-frozen> Owner decision 26/11 "Mở lại, xem được thiết kế": the 54 out-of-scope
+    // screens show their original design as an inert "sắp có" preview. One switch for all
+    // (false = the old "chưa mở" block everywhere) plus one per module:
+    //   "preview" = design view, no API calls; "off" = old block; "live" = reserved for a
+    //   module that has real wiring registered in FROZEN_LIVE (none yet → falls back to preview).
+    frozenPreview: true,
+    frozenModules: {
+      W: "preview", M6: "preview", M7: "preview", M8: "preview", M10: "preview",
+      M11: "preview", M12: "preview", M13: "preview", M14: "preview", M15: "preview",
+      M16: "preview", M17: "preview", M18: "preview", M19: "preview", M20: "preview",
+    },
     ...(window.TOV_FEATURES || {}),
   });
   const SOON = " · sắp có";
@@ -40,6 +51,79 @@
     el.removeAttribute("onclick");
     if (el.tagName === "BUTTON") el.disabled = true;
   }
+  // Frozen modules with real wiring would register here (module → true). None today.
+  const FROZEN_LIVE = {};
+  const moduleOf = (id) => String(id).split("-")[0];
+  function frozenMode(id) {
+    if (/^M[1-59]-/.test(id)) return "core";
+    if (!FEATURES.frozenPreview) return "off";
+    const m = (FEATURES.frozenModules || {})[moduleOf(id)] || "off";
+    return m === "live" && !FROZEN_LIVE[moduleOf(id)] ? "preview" : m;
+  }
+  // API paths owned by frozen modules (payments, orders, merchant, bookings, ...). The
+  // product UI never calls them unless that module is live; previews make no calls at all.
+  const FROZEN_API = [
+    ["/api/v1/merchant/", "M6"], ["/api/v1/ads/payments/", "M7"], ["/api/v1/ads/campaigns", "M7"],
+    ["/api/v1/payments/", "M7"], ["/api/v1/notifications", "M8"], ["/api/v1/me/meal-schedule", "M8"],
+    ["/api/v1/analytics/", "M10"], ["/api/v1/meal-plans", "M11"], ["/api/v1/meal-planner", "M11"],
+    ["/api/v1/groceries", "M11"], ["/api/v1/polls", "M12"], ["/api/v1/reviews/gps", "M12"],
+    ["/api/v1/bookings", "M13"], ["/api/v1/vouchers", "M13"], ["/api/v1/stories", "M14"],
+    ["/api/v1/tourism/", "M15"], ["/api/v1/translate/menu", "M16"], ["/api/v1/enterprise/", "M17"],
+    ["/api/v1/fridge/", "M18"], ["/api/v1/health/", "M19"], ["/api/v1/community/recipes", "M20"],
+  ];
+  function frozenApi(pathname) {
+    const hit = FROZEN_API.find(([p]) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(p + "/")));
+    if (!hit) return null;
+    // Only a module switched to "live" with real wiring registered may reach its API.
+    return frozenMode(hit[1] + "-S01") === "live" ? null : hit[1];
+  }
+  // Preview-only content that could mislead a real user is blanked (see notes).
+  const FROZEN_BLANK = [
+    [/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "email-mau@…"],
+    [/\b0121000889999\b/g, "•••• (mẫu)"],
+  ];
+  const NAV_CALL = /^\s*goScreen\('([A-Za-z0-9-]+)'\)\s*;?\s*$/;
+  const NOTICE = 'P2.frozenNotice()';
+  function frozenInert(html, screens = {}) {
+    // String-level so it runs before the markup reaches the DOM (and in tests).
+    let out = String(html || "").replace(/\s(on[a-z]+)\s*=\s*("([^"]*)"|'([^']*)')/gi, (all, name, _q, dq, sq) => {
+      const v = dq ?? sq ?? "";
+      const nav = v.match(NAV_CALL);
+      if (name.toLowerCase() === "onclick") return nav && screens[nav[1]] ? ` onclick="goScreen('${nav[1]}')"` : ` onclick="${NOTICE}"`;
+      return "";
+    });
+    out = out.replace(/\s(href|action|formaction|src)\s*=\s*("javascript:[^"]*"|'javascript:[^']*')/gi, "")
+      .replace(/\s(href|action|formaction)\s*=\s*("[^"]*"|'[^']*')/gi, "")
+      .replace(/<a\b(?![^>]*\sonclick=)/gi, `<a onclick="${NOTICE}"`)
+      .replace(/<form\b/gi, `<form onsubmit="event.preventDefault();${NOTICE}"`)
+      .replace(/\stype\s*=\s*("submit"|'submit')/gi, ' type="button"')
+      .replace(/<select\b/gi, "<select disabled")
+      .replace(/<textarea\b/gi, "<textarea readonly")
+      .replace(/<input\b([^>]*)>/gi, (all, attrs) => {
+        const t = (attrs.match(/\stype\s*=\s*["']?(\w+)/i) || [])[1]?.toLowerCase() || "text";
+        if (["checkbox", "radio"].includes(t))
+          return `<input${attrs.replace(/\sonclick="[^"]*"/i, "")} onclick="event.preventDefault();${NOTICE}">`;
+        if (["file", "range", "color", "date", "time"].includes(t)) return `<input disabled${attrs}>`;
+        return `<input readonly${attrs}>`;
+      });
+    for (const [re, to] of FROZEN_BLANK) out = out.replace(re, to);
+    return out;
+  }
+  const FROZEN_LABEL = "Bản xem trước thiết kế · sắp có";
+  function frozenBanner(id) {
+    return `<div data-frozen-banner="${H(id)}" role="note" style="position:sticky;top:0;z-index:30" class="m-2 p-2.5 rounded-xl bg-[#FEF3C7] border border-[#F59E0B] text-[#92400E] text-[11px] font-extrabold shadow-sm">👁️ ${FROZEN_LABEL}<span class="block font-medium mt-0.5">Số tiền, tên, tài khoản và số liệu trên màn này là mẫu minh hoạ, không phải dữ liệu thật. Các nút chưa hoạt động.</span></div>`;
+  }
+  function frozenPreviewHtml(id, html, screens) {
+    return `<div data-frozen-preview="${H(id)}" data-module="${H(moduleOf(id))}">${frozenBanner(id)}${frozenInert(html, screens)}</div>`;
+  }
+  // Desktop Live App tabs that belong to frozen modules, and the designs they show.
+  const FROZEN_TABS = {
+    mealplan: ["M11"], poll: ["M12"], merchant: ["M6", "M7"], booking: ["M13"],
+    stories: ["M14", "M15"], translator: ["M16"], insights: ["M17"], analytics: ["M10"],
+    notifications: ["M8"], fridge: ["M18"], health: ["M19"], community: ["M20"],
+  };
+  const tabMode = (tab) => (FROZEN_TABS[tab] || []).some((m) => frozenMode(m + "-S01") === "preview") ? "preview" : "off";
+  // </m5-frozen>
   const REGIONS = ["bac", "trung", "nam"];
   // Segment under the pointer after the original 1560deg wheelSpin (4 turns + 120deg).
   const WHEEL_LAND = 4;
@@ -242,6 +326,14 @@
     );
     if (u.origin !== location.origin || !u.pathname.startsWith("/api/v1/"))
       return request(input, init);
+    // <m5-frozen> Frozen-module APIs (payments, orders, merchant, bookings...) are never
+    // called from the product UI while the module is not live.
+    if (frozenApi(u.pathname)) {
+      const e = new Error("Tính năng này chưa mở trong bản hiện tại.");
+      e.status = 423;
+      e.frozen = true;
+      throw e;
+    }
     const controller = new AbortController(),
       timer = setTimeout(() => controller.abort(), 15000);
     const method = (init.method || "GET").toUpperCase(),
@@ -1168,7 +1260,16 @@
     const reports=d.user_reports||[];
     $$("aside nav button",root).forEach(b=>{
       const code=b.getAttribute("onclick")||"";
-      // Frozen modules (M10, M17) stay out pending the owner's decision; S08/S09 follow permissions.
+      // Frozen modules (M10, M17) open their design preview (m5-frozen); S08/S09 follow permissions.
+      const frozenTarget = (code.match(/goScreen\('((?:M\d+|W)-S\d+)'\)/) || [])[1];
+      if (frozenTarget && frozenMode(frozenTarget) === "preview") {
+        const label=[...$$("span",b)].reverse().find(x=>!x.children.length);
+        // The entry stays as designed; invented counts in its label are dropped here.
+        if(label && !label.textContent.includes(SOON)) label.textContent=label.textContent.replace(/\s*\([^)]*\d[^)]*\)/g,"")+SOON;
+        b.title=FROZEN_LABEL;
+        b.style.opacity="0.75";
+        return;
+      }
       if (!/M9-S0[1234567]/.test(code) &&
           !(/M9-S08/.test(code) && d.actor_role === "super_admin") &&
           !(/M9-S09/.test(code) && AUDIT_ROLES.includes(d.actor_role))) b.remove();
@@ -1323,7 +1424,8 @@
     // Only presented product text is cleaned; Studio templates retain their specs.
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) =>
-        n.parentElement?.closest("script,style,svg")
+        // Frozen previews keep their design text as drawn (they carry the "sắp có" label).
+        n.parentElement?.closest("script,style,svg,[data-frozen-preview]")
           ? NodeFilter.FILTER_REJECT
           : NodeFilter.FILTER_ACCEPT,
     });
@@ -1694,7 +1796,15 @@
         );
     },
   };
-  // Bind only core designs. The frozen modules remain byte-for-byte unchanged.
+  // <m5-frozen> Frozen screens keep their original templates; on product routes they are
+  // shown through an inert preview wrapper (label + no handlers, links or submits).
+  window.P2.frozenNotice = () => status("Tính năng này chưa mở trong bản hiện tại. Màn này là bản xem trước thiết kế.");
+  Object.entries(ALL_SCREENS).forEach(([id, scr]) => {
+    if (/^M[1-59]-/.test(id)) return;
+    const original = scr.render;
+    scr.render = () => (frozenMode(id) === "preview" ? frozenPreviewHtml(id, original(), ALL_SCREENS) : original());
+  });
+  // Bind only core designs. The frozen modules keep their templates (preview above).
   Object.entries(ALL_SCREENS).forEach(([id, scr]) => {
     if (!/^M[1-59]-/.test(id)) return;
     const original = scr.render;
@@ -1707,10 +1817,26 @@
       return mobile(id, original(), entry?.data);
     };
   });
+  function widenPreview(id) {
+    // Same as the M9 admin shell (admin_forms.js): a desktop design is not squeezed
+    // into the 480px phone preview at desktop widths; phones keep the original layout.
+    if (ALL_SCREENS[id]?.platform !== "desktop" || window.innerWidth <= 768) return;
+    const pv = $("#stage-container [data-frozen-preview]"), frame = pv?.closest(".phone-frame");
+    if (frame) frame.style.setProperty("max-width", "100%", "important");
+    const aside = pv && $("aside", pv);
+    if (aside && $("nav", aside)) aside.style.setProperty("display", "flex", "important");
+  }
   goScreen = function (id) {
     if(id==="M1-S02") id="M1-S01";
-    if (!/^M[1-59]-/.test(id))
-      return status("Tính năng này chưa mở trong bản hiện tại.");
+    if (!/^M[1-59]-/.test(id)) {
+      // Design preview of a frozen screen (no data load), or the old block when switched off.
+      if (!ALL_SCREENS[id] || frozenMode(id) === "off")
+        return status("Tính năng này chưa mở trong bản hiện tại.");
+      originalGo(id);
+      polish($("#stage-container"));
+      widenPreview(id);
+      return;
+    }
     originalGo(id);
     if (id === "M1-S08") loadAreas();
     load(id);
@@ -1719,6 +1845,7 @@
   renderStage = function () {
     originalStage();
     polish($("#stage-container"));
+    widenPreview(appState.activeScreenId);
   };
   changeServings = function (delta) {
     appState.servings = Math.max(
@@ -1766,7 +1893,7 @@
   // Keep the original blind-box layout, but do not promise a nonexistent voucher.
   text($("#view-subgame-blindbox > div:first-child > div:last-child"),
     "Chọn 1 trong 3 túi để nhận gợi ý món theo điều kiện bữa ăn đã chọn.");
-  // Remove design-tool and frozen-module entry points, not the original app UI.
+  // Remove design-tool chrome, not the original app UI (frozen tabs: see m5-frozen below).
   document.querySelector("body > header")?.remove();
   $("#main-chatgpt")?.remove();
   $("#main-screens aside")?.remove();
@@ -1782,12 +1909,55 @@
     "admin",
     "profile",
   ];
+  // <m5-frozen> Frozen-module tabs stay (design preview); removed only when switched off.
   $$("[id^=ltab-]").forEach((n) => {
-    if (!allowed.includes(n.id.slice(5))) n.remove();
+    const tab = n.id.slice(5);
+    if (allowed.includes(tab)) return;
+    if (tabMode(tab) === "off") n.remove();
+    else n.title = FROZEN_LABEL;
   });
   $$("[id^=lpanel-]").forEach((n) => {
-    if (!allowed.includes(n.id.slice(7))) n.remove();
+    if (!allowed.includes(n.id.slice(7)) && tabMode(n.id.slice(7)) === "off") n.remove();
   });
+  // Their original loaders and actions call frozen APIs (vouchers, polls, VietQR...):
+  // replaced so nothing is fetched or written; the preview shows the module's designs.
+  const frozenNoop = () => {};
+  ["loadLiveMealPlan", "renderLivePoll", "loadLiveBooking", "loadLiveStories", "loadLiveTranslator",
+   "loadLiveInsights", "loadLiveAnalytics", "loadLiveNotifications", "loadLiveFridge", "loadLiveHealth",
+   "loadLiveCommunity"].forEach((f) => { if (typeof window[f] === "function") window[f] = frozenNoop; });
+  ["voteLivePoll", "openLiveVietQrModal", "confirmLivePayment", "submitLiveBooking", "stampPassport",
+   "scanLiveFridgeItem", "syncLiveWearable", "tipLiveRecipe", "saveLiveNotifications"].forEach((f) => {
+    if (typeof window[f] === "function") window[f] = () => window.P2.frozenNotice();
+  });
+  function previewPanel(tab) {
+    const panel = document.getElementById("lpanel-" + tab);
+    if (!panel || panel.dataset.frozenPreview) return;
+    panel.dataset.frozenPreview = tab;
+    panel.innerHTML = frozenInert(panel.innerHTML, {});
+    // Containers the original loaders filled from the frozen API stay in place, marked.
+    $$("[id^=live-]", panel).forEach((c) => {
+      if (!c.children.length && !c.textContent.trim() && !c.closest(".hidden") && c.tagName === "DIV")
+        c.innerHTML = '<div class="p-4 rounded-2xl border border-dashed border-[var(--border-subtle)] text-center text-xs text-[var(--text-muted)]">Dữ liệu sẽ hiện khi tính năng mở' + SOON + "</div>";
+    });
+    const mods = FROZEN_TABS[tab];
+    const ids = ORDERED_IDS.filter((id) => mods.includes(moduleOf(id)) && frozenMode(id) === "preview");
+    const designs = ids.map((id) => {
+      const scr = ALL_SCREENS[id];
+      const html = scr.platform === "mobile" ? wrapMobileFrame(scr, scr.render(), true) : scr.render();
+      return `<div class="space-y-1 ${scr.platform === "mobile" ? "" : "w-full"}"><div class="text-[10px] font-mono font-bold text-[var(--text-muted)]">${H(id)} · ${H(scr.title)}</div>${frozenInert(html, {})}</div>`;
+    }).join("");
+    panel.insertAdjacentHTML("afterbegin", frozenBanner(tab));
+    panel.insertAdjacentHTML("beforeend", `<div data-frozen-designs="${H(tab)}" class="genui-card p-4 rounded-3xl space-y-3"><div class="text-xs font-extrabold">Thiết kế các màn ${H(mods.join(", "))} · ${FROZEN_LABEL}</div><div class="flex flex-wrap gap-4 justify-center">${designs}</div></div>`);
+    hydrateImages(panel);
+  }
+  if (typeof setLiveAppTab === "function") {
+    const originalTab = setLiveAppTab;
+    setLiveAppTab = function (tab) {
+      if (FROZEN_TABS[tab] && tabMode(tab) === "off") return status("Tính năng này chưa mở trong bản hiện tại.");
+      originalTab(tab);
+      if (FROZEN_TABS[tab]) previewPanel(tab);
+    };
+  }
   $$("[data-ai-badge]").forEach((n) => n.remove());
   const style = document.createElement("style");
   style.textContent = `.product-mode #p2-action-status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;max-width:calc(100vw - 24px);width:420px;box-shadow:0 8px 30px #0003}.product-mode :focus-visible{outline:3px solid #B45309;outline-offset:3px}.product-mode input{min-width:0}.product-mode [onclick]{touch-action:manipulation}.product-mode .phone-frame .flex-1{min-width:0}.product-mode .phone-frame{overflow:hidden}.product-mode #main-liveapp{min-width:0}.product-mode [data-p2-layout]{min-width:0}@media(max-width:768px){.product-mode #stage-container .min-w-\\[1100px\\],.product-mode #stage-container .min-w-\\[1000px\\]{min-width:0!important}.product-mode #stage-container table{display:block;max-width:100%;overflow:auto}.product-mode #stage-container aside nav{display:flex;flex-wrap:wrap;max-height:none}.product-mode #stage-container aside nav button{width:auto}.product-mode #stage-container .min-w-0{max-width:100%}}`;
