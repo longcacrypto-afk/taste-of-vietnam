@@ -30,7 +30,8 @@ function frozenKit(overrides) {
 const ui = loadUi();
 const ALL = Object.assign({}, ui.SCREENS_M1_M2, ui.SCREENS_M3_M4_M5_M8, ui.SCREENS_WEB_M6_M7, ui.SCREENS_M9_M10_EXP);
 const FROZEN = Object.keys(ALL).filter((id) => !/^M[1-59]-/.test(id));
-const CORE = Object.keys(ALL).filter((id) => /^M[1-59]-/.test(id));
+// M9-S07 (ads review of frozen M7) follows the M7 preview; tests/ui-m9-remaining.test.js.
+const CORE = Object.keys(ALL).filter((id) => /^M[1-59]-/.test(id) && id !== 'M9-S07');
 
 test('one switch + one flag per frozen module, all on "preview"; nothing is live', () => {
   const k = frozenKit();
@@ -161,7 +162,7 @@ test('frozen API routes still refuse: anonymous 401, consumer 403 on merchant/pa
 });
 
 test('in-scope screens are untouched: same core binding, admin sidebar keeps frozen entries as previews', () => {
-  assert.match(runtime, /Object\.entries\(ALL_SCREENS\)\.forEach\(\(\[id, scr\]\) => \{\n    if \(!\/\^M\[1-59\]-\/\.test\(id\)\) return;\n    const original = scr\.render;\n    originals\[id\] = original;/);
+  assert.match(runtime, /Object\.entries\(ALL_SCREENS\)\.forEach\(\(\[id, scr\]\) => \{\n    if \(!\/\^M\[1-59\]-\/\.test\(id\) \|\| adsPreview\(id\)\) return;\n    const original = scr\.render;\n    originals\[id\] = original;/);
   const side = between('    $$("aside nav button",root).forEach(b=>{', '      const badge=b.lastElementChild;');
   assert.match(side, /frozenMode\(frozenTarget\) === "preview"/);
   assert.match(side, /\+SOON/);

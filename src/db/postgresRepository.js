@@ -428,6 +428,18 @@ export class PostgresRepository {
     return r ? dishFromRow(r) : null;
   }
 
+  /** M9-S02 "Vector DB": ids of dishes that really have a stored search vector.
+   * dishes.embedding exists only when pgvector was available at migration (001_baseline);
+   * without the column no dish has a vector. Checked first so no failing query can
+   * abort the surrounding admin transaction. */
+  async listEmbeddedDishIds() {
+    const col = await this.q(
+      `SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'dishes' AND column_name = 'embedding'`);
+    if (!col.rowCount) return [];
+    return (await this.q('SELECT id FROM dishes WHERE embedding IS NOT NULL ORDER BY id')).rows.map(r => r.id);
+  }
+
   async createDish(dish) {
     const cols = { id: dish.id, ...dishColumns(dish), sort_order: Date.now() };
     const keys = Object.keys(cols);

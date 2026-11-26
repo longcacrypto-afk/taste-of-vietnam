@@ -9872,11 +9872,17 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   // Frozen modules with real wiring would register here (module → true). None today.
   const FROZEN_LIVE = {};
   const moduleOf = (id) => String(id).split("-")[0];
+  // M9-S07 "Kiểm duyệt Ads M7" reviews campaigns of the frozen M7 module: until
+  // adsModeration is on it is shown exactly like the M7 screens (same flag, inert preview,
+  // no API calls); the sidebar entry stays and opens that preview.
+  const ADS_REVIEW = "M9-S07";
+  const adsPreview = (id) => id === ADS_REVIEW && !FEATURES.adsModeration;
   function frozenMode(id) {
-    if (/^M[1-59]-/.test(id)) return "core";
+    if (/^M[1-59]-/.test(id) && !adsPreview(id)) return "core";
     if (!FEATURES.frozenPreview) return "off";
-    const m = (FEATURES.frozenModules || {})[moduleOf(id)] || "off";
-    return m === "live" && !FROZEN_LIVE[moduleOf(id)] ? "preview" : m;
+    const mod = adsPreview(id) ? "M7" : moduleOf(id);
+    const m = (FEATURES.frozenModules || {})[mod] || "off";
+    return m === "live" && !FROZEN_LIVE[mod] ? "preview" : m;
   }
   // API paths owned by frozen modules (payments, orders, merchant, bookings, ...). The
   // product UI never calls them unless that module is live; previews make no calls at all.
@@ -10585,6 +10591,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     polish($("#stage-container"));
   }
   async function load(id, force = false) {
+    if (frozenMode(id) !== "core") return; // design previews (M9-S07 too) load no data
     const cfg = config(id);
     if (!cfg) return;
     const [key, get] = cfg;
@@ -11524,7 +11531,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       links.forEach(n=>{
         const code=n.getAttribute("onclick")||"";
         if(code.includes("M9-S07")) {
-          if(!FEATURES.adsModeration){text($(".text-\\[10px\\]",n),"Chưa mở (M7 đang đóng băng)");soon(n,"Kiểm duyệt quảng cáo chưa mở.");}
+          if(!FEATURES.adsModeration){
+            text($(".text-\\[10px\\]",n),"Chưa mở (M7 đang đóng băng)");
+            // Opens the design preview (m5-frozen) when M7 previews are on, else stays locked.
+            if(frozenMode("M9-S07")==="preview"){n.title=FROZEN_LABEL;n.style.opacity="0.75";}
+            else soon(n,"Kiểm duyệt quảng cáo chưa mở.");
+          }
         }
         else text($(".text-\\[10px\\]",n),code.includes("M9-S05")?queue.length:reports.length);
       });
@@ -12004,13 +12016,13 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   // shown through an inert preview wrapper (label + no handlers, links or submits).
   window.P2.frozenNotice = () => status("Tính năng này chưa mở trong bản hiện tại. Màn này là bản xem trước thiết kế.");
   Object.entries(ALL_SCREENS).forEach(([id, scr]) => {
-    if (/^M[1-59]-/.test(id)) return;
+    if (/^M[1-59]-/.test(id) && !adsPreview(id)) return;
     const original = scr.render;
     scr.render = () => (frozenMode(id) === "preview" ? frozenPreviewHtml(id, original(), ALL_SCREENS) : original());
   });
   // Bind only core designs. The frozen modules keep their templates (preview above).
   Object.entries(ALL_SCREENS).forEach(([id, scr]) => {
-    if (!/^M[1-59]-/.test(id)) return;
+    if (!/^M[1-59]-/.test(id) || adsPreview(id)) return;
     const original = scr.render;
     originals[id] = original;
     scr.render = () => {
@@ -12032,7 +12044,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   }
   goScreen = function (id) {
     if(id==="M1-S02") id="M1-S01";
-    if (!/^M[1-59]-/.test(id)) {
+    if (frozenMode(id) !== "core") {
       // Design preview of a frozen screen (no data load), or the old block when switched off.
       if (!ALL_SCREENS[id] || frozenMode(id) === "off")
         return status("Tính năng này chưa mở trong bản hiện tại.");
