@@ -45,9 +45,11 @@ async function dispatch(repo,actor,method,path,q,body,store) {
   const content=await handleAdminDataRoute(repo,actor,method,path,q,body);
   if(content) return content;
   if(path==='/api/v1/admin/dashboard') {
-    const [dishes,places,ocr,reports,campaigns]=await Promise.all([
-      repo.listDishes(),repo.listPlaces(),repo.listOcrQueue(),repo.listUserReports(),repo.listCampaigns()]);
-    return ok({catalog:['content_moderator','super_admin'].includes(actor.role)?dishes:[],places:['ops_admin','super_admin'].includes(actor.role)?places:[],total_dishes:dishes.length,total_verified_places:places.filter(p=>p.is_verified).length,
+    const [dishes,places,ocr,reports,campaigns,embedded]=await Promise.all([
+      repo.listDishes(),repo.listPlaces(),repo.listOcrQueue(),repo.listUserReports(),repo.listCampaigns(),repo.listEmbeddedDishIds()]);
+    // M9-S02 "Vector DB" column: has_embedding is read from storage, false until a vector exists.
+    const vectors=new Set(embedded);
+    return ok({catalog:['content_moderator','super_admin'].includes(actor.role)?dishes.map(d=>({...d,has_embedding:vectors.has(d.id)})):[],places:['ops_admin','super_admin'].includes(actor.role)?places:[],total_dishes:dishes.length,total_verified_places:places.filter(p=>p.is_verified).length,
       ocr_queue:ocr,user_reports:reports.map(publicReport),campaigns,events:store.analyticsEvents});
   }
   if(path==='/api/v1/admin/rbac/roles') return ok({roles:ROLES});

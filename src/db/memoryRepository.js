@@ -177,6 +177,9 @@ export class MemoryRepository {
 
   async getDish(id) { return this.store.dishes.find(d => d.id === id) || null; }
 
+  // M9-S02 "Vector DB": the in-memory store keeps no search vectors (none in seed data).
+  async listEmbeddedDishIds() { return []; }
+
   async createDish(dish) {
     dish = { safety_status: 'pending', ...dish };
     this.store.dishes.unshift(dish);
