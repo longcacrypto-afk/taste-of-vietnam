@@ -9941,6 +9941,57 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   };
   const tabMode = (tab) => (FROZEN_TABS[tab] || []).some((m) => frozenMode(m + "-S01") === "preview") ? "preview" : "off";
   // </m5-frozen>
+  // <m6-wording> Owner decision 26/11 "Sửa cho đúng thực tế": copy that claims more than
+  // the code does is reworded (words only, same element/place/style). Allergy copy says
+  // what is filtered and asks the user to confirm with the restaurant.
+  const ALLERGY_VI = {
+    shrimp: "tôm/hải sản", peanut: "đậu phộng", shrimp_paste: "mắm tôm", dairy: "sữa", milk: "sữa",
+    egg: "trứng", gluten: "gluten", fish: "cá", soy: "đậu nành", shellfish: "hải sản có vỏ",
+  };
+  function allergyLine(tags) {
+    // From /suggestions/today applied_allergies (the tags the list was really filtered by).
+    const list = [...new Set((tags || []).map((t) => ALLERGY_VI[t] || t))];
+    return list.length
+      ? "Đã lọc món có " + list.join(", ") + " theo thành phần đã ghi, hãy xác nhận lại với quán"
+      : "Chưa khai báo dị ứng, chưa lọc món nào";
+  }
+  const WORDING = [
+    // M1-S05 (allergy step): the filter removes dishes whose recorded tags match.
+    [/Hard Filter · Chặn tuyệt đối 100%/g, "Hard Filter · Lọc theo thành phần món"],
+    [/Mọi thành phần anh đánh dấu dưới đây sẽ bị chặn cứng 100%, kể cả trong slot Tài trợ\./g,
+      "Món có thành phần anh đánh dấu dưới đây sẽ không được gợi ý, kể cả slot Tài trợ (theo thành phần đã ghi của món). Hãy xác nhận lại với quán khi gọi món."],
+    [/🚫 Dị ứng \(Chặn cứng\)/g, "🚫 Dị ứng (Lọc khỏi gợi ý)"],
+    [/Định dạng JSON chuẩn PDPD/g, "Định dạng JSON"],
+    [/✨ Món ngon ngày mát/g, "✨ Món ngon hôm nay"],
+    [/M3-S03 · Đã lọc 100% dị ứng & Cooldown 3 ngày/g, "M3-S03 · Lọc theo dị ứng đã khai báo & không lặp món 3 ngày"],
+    [/Bộ lọc AI: 0% Dị ứng · 0% Lặp món 3 ngày qua/g, "Đã lọc: dị ứng đã khai báo · món đã ăn 3 ngày qua"],
+    [/M4-S04 · Chuẩn hóa bởi AI OCR/g, "M4-S04 · Theo thực đơn quán đã nhập"],
+    [/M4-S05 · Cập nhật thời gian thực/g, "M4-S05 · Theo thực đơn đã nhập, chưa cập nhật trực tiếp"],
+    [/Grab \/ Shopee \/ Xanh SM/g, "Grab / Shopee"],
+    [/, Kcal và vector 1536-dim cho tìm kiếm tương đồng/g, ", Kcal; vector tìm kiếm tương đồng sắp có"],
+    [/Chuẩn hóa định lượng gram\/ml và thông số Kcal cùng chuyên gia dinh dưỡng/g, "Chuẩn hóa định lượng gram/ml và thông số Kcal"],
+    [/LLM không tự nghĩ ra quán ăn, mọi quán đều được xác minh thực tế/g, "LLM không tự nghĩ ra quán ăn, quán chỉ được xác minh khi có bằng chứng thực tế"],
+    [/^Đạt chuẩn An toàn$/g, "Chưa kiểm duyệt · sắp có"],
+    [/✔ Có nhãn Tài trợ · ✔ Đã khai báo mắm ruốc\/độ cay · ✔ Trần hiển thị ≤ 1\/3 slot/g, "Cần kiểm: nhãn Tài trợ · khai báo mắm ruốc/độ cay · trần hiển thị ≤ 1/3 slot"],
+    // Desktop Live App.
+    [/Đã loại trừ hải sản & đậu phộng/g, "Lọc theo dị ứng đã khai báo"],
+    [/Trợ lý đầu bếp thông minh · Am hiểu 600\+ món ăn Việt Nam/g, "Trợ lý đầu bếp thông minh · Gợi ý từ thư viện món của ứng dụng"],
+    [/Thư viện 600\+ món ăn truyền thống/g, "Thư viện món ăn truyền thống"],
+    [/Quán ngon đang mở cửa trong bán kính 3km/g, "Quán ngon trong bán kính 3km"],
+    [/⭐ [\d.—]+ \([\d—]+ đánh giá\)/g, "Chưa có đánh giá thực tế"],
+    [/⭐ [\d.—]+ \(([\d—]+m)\)/g, "📍 $1"],
+    [/Cổng Quản Trị CMS & Kiểm Duyệt Tự Động/g, "Cổng Quản Trị CMS & Kiểm Duyệt"],
+    [/Quản lý chiến dịch quảng cáo · /g, "Quản lý chiến dịch quảng cáo (sắp có) · "],
+    [/chặn 100% dị ứng & tuân thủ nghiêm ngặt Nghị định/g, "lọc theo dị ứng đã khai báo & quyền dữ liệu theo Nghị định"],
+    [/\(Hard Allergy Filter — Chặn 100%\):/g, "(Hard Allergy Filter):"],
+    [/Tuyệt đối không đề xuất món có dị ứng/g, "Không gợi ý món có thành phần trùng dị ứng đã chọn · hãy xác nhận lại với quán"],
+    [/hoặc xóa vĩnh viễn không lưu trữ bản sao/g, "hoặc xóa vĩnh viễn tài khoản (chứng từ thanh toán được giữ lại nhưng bỏ liên kết)"],
+    [/^100% Compliant$/g, "Tải về & xóa dữ liệu"],
+    [/Tuân Thủ Nghị Định 13\/2023\/NĐ-CP \(PDPD\) Về Dữ Liệu Cá Nhân/g, "Quyền Dữ Liệu Cá Nhân Theo Nghị Định 13/2023/NĐ-CP (PDPD)"],
+    [/được bảo mật tuyệt đối, không chia sẻ/g, "được lưu để gợi ý món và quán, không chia sẻ"],
+  ];
+  const reword = (s) => WORDING.reduce((t, [re, to]) => t.replace(re, to), s);
+  // </m6-wording>
   const REGIONS = ["bac", "trung", "nam"];
   // Segment under the pointer after the original 1560deg wheelSpin (4 turns + 120deg).
   const WHEEL_LAND = 4;
@@ -10078,7 +10129,13 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     }
     $$("#lpanel-today p").forEach((n) => {
       if (!/theo thời tiết/.test(n.textContent)) return;
-      const next = n.textContent.replace(/theo thời tiết [^·]*·/, "theo thời tiết " + (w?.label || "(sắp có)") + " ·");
+      let next = n.textContent.replace(/theo thời tiết [^·]*·/, "theo thời tiết " + (w?.label || "(sắp có)") + " ·");
+      // Second segment: the allergens this list was really filtered by (m6-wording).
+      const applied = appState.liveToday?.applied_allergies;
+      if (Array.isArray(applied)) {
+        const parts = next.split(" · ");
+        if (parts.length >= 3) { parts[1] = allergyLine(applied); next = parts.join(" · "); }
+      }
       if (next !== n.textContent) n.textContent = next;
     });
   }
@@ -10587,7 +10644,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       }
       if (id === "M2-S05") {
         const tip=$(".bg-\\[\\#DCFCE7\\]",root);
-        if(tip){text($(".font-extrabold",tip),d.name);text($("p",tip),d.description||"");}
+        if(tip){text($(".font-extrabold",tip),d.name);text($(".text-\\[\\#334155\\]",tip),d.description||"");}
         text($(".text-2xl", root), d.calories ?? "—");
         const vals = $$(".grid-cols-3 b", root);
         [d.macros?.carbs, d.macros?.protein, d.macros?.fat].forEach((v, i) =>
@@ -10992,7 +11049,8 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         text($("b", n), (m.name || m.dish_id) + " (" + money(m.price) + ")");
         text($(".text-\\[10px\\]", n), low ? "Chỉ còn " + m.remaining_portions + " phần · " + hoursNote(place) : hoursNote(place));
         const pill = $(":scope > span", n);
-        text(pill, low ? "Sắp hết" : m.available ? "● Còn món" : "Tạm hết");
+        // "available" is the menu flag entered by admins, not live stock (m6-wording).
+        text(pill, low ? "Sắp hết" : m.available ? "● Đang bán" : "Tạm hết");
         if (pill) pill.style.whiteSpace = "nowrap";
         if (m.available) {
           n.setAttribute("onclick", `P2.dish('${J(m.dish_id)}','M5-S01')`);
@@ -11258,7 +11316,8 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         .replace(/Verified Merchant/g,"Thông tin quán")
         .replace(/⭐ 4\.8 \(150\)/g, "Chưa có đánh giá thực tế")
         .replace(/Chặn 100% dị ứng/g,"Lọc theo dị ứng đã khai báo");
-      if (next !== n.textContent) n.textContent = next;
+      const fixed = reword(next); // <m6-wording>
+      if (fixed !== n.textContent) n.textContent = fixed;
     }
     $$("img", root).forEach((i) => {
       if (!i.hasAttribute("alt")) i.alt = "Ảnh minh họa";

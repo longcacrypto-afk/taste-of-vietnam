@@ -263,13 +263,15 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     const cached = suggestionCache.get(cacheKey);
     // live_weather: real reading from the provider hook, or null while none is configured.
     const live_weather = await currentWeather({ lat: profile.lat, lng: profile.lng });
+    // applied_allergies: the allergen tags this list was filtered against (the UI names them).
+    const applied_allergies = [...(profile.hard_allergies || [])];
     if (cached) {
-      return { status: 200, data: { ...cached, live_weather, from_cache: true } };
+      return { status: 200, data: { ...cached, live_weather, applied_allergies, from_cache: true } };
     }
     const fresh = getTodaySuggestions(view, opts);
     if (!fresh.context.valid) return { status: 400, data: fresh };
     suggestionCache.set(cacheKey, fresh, 60);
-    return { status: 200, data: { ...fresh, live_weather } };
+    return { status: 200, data: { ...fresh, live_weather, applied_allergies } };
   }
 
   // Three existing decision animations share the same safe pool; never fake loot/vouchers.
