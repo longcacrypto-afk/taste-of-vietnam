@@ -76,7 +76,9 @@ test('M5-S05 copy names the real meal, or says there is none', () => {
 
 test('M5-S05 confirm never posts a guessed meal', () => {
   const confirm = runtime.slice(runtime.indexOf('    confirmMeal() {'), runtime.indexOf('    exportData() {'));
-  assert.match(confirm, /P2\.feedback\("eaten", state\.order\.dish_id, state\.order\.place_id\)/);
+  // Every order, call and route now has a redirect id; confirm goes through confirm-eaten only.
+  assert.match(confirm, /\/confirm-eaten/);
+  assert.doesNotMatch(confirm, /P2\.feedback\(/);
   assert.doesNotMatch(confirm, /else P2\.feedback\("eaten"\);/);
   assert.match(runtime, /else soon\(b, "Chưa có lượt đặt món/);
 });

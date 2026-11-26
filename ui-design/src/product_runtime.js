@@ -29,6 +29,9 @@
     liveMap: true, // M4-S02 / M5-S03: real Leaflet map in the original frame (m7)
     // M5-S02: partners the server redirect allowlist accepts (src/services/redirectService.js).
     orderPartners: ["grabfood", "shopeefood"],
+    // M5-S03 "Apple Maps": the server redirect allowlist builds Google Maps directions only
+    // (partner "maps"); no Apple Maps host is allowed yet, so the button stays "sắp có".
+    appleMaps: false,
     // <m5-frozen> Owner decision 26/11 "Mở lại, xem được thiết kế": the 54 out-of-scope
     // screens show their original design as an inert "sắp có" preview. One switch for all
     // (false = the old "chưa mở" block everywhere) plus one per module:
@@ -653,6 +656,11 @@
       );
     }
   };
+  // The dish the user really picked (card, search, spin); null when none was chosen.
+  // selected() falls back to today's first pick or the first seed dish for browsing lists;
+  // that fallback must never become a recorded meal.
+  const chosenDish = () => state.dish || null;
+  let calling = false;
   function selected() {
     return (
       state.dish || window.appState.liveToday?.items?.[0]?.dish_id || "DISH-101"
@@ -1395,6 +1403,15 @@
   // M5-S05 names only the meal the user really chose (from the redirect record or the
   // catalogue already loaded); with no order it says so instead of showing a sample dish.
   function confirmCopy(order) {
+    // A call or route to a place with no dish chosen: the visit is recorded, but there is
+    // no meal to mark as eaten (the server refuses confirm-eaten without a dish).
+    if (order?.id && !order.dish_id)
+      return {
+        ready: false,
+        heading: "Đã ghi nhận lượt liên hệ quán",
+        title: "Chưa chọn món để xác nhận",
+        text: "Bạn chưa chọn món nào" + (order.place_name ? " ở " + order.place_name : "") + ", nên chưa thể đánh dấu Đã ăn. Hãy chọn món trước khi gọi điện hoặc chỉ đường.",
+      };
     if (!order?.dish_id)
       return {
         ready: false,
@@ -1412,11 +1429,6 @@
     };
   }
   // </m5-confirm>
-  function knownDishName(id) {
-    for (const [k, v] of Object.entries(state.cache))
-      if (/^(dish|why):/.test(k) && v?.data?.id === id && v.data.name) return v.data.name;
-    return (window.appState.liveToday?.items || []).find((a) => a.dish_id === id)?.name || null;
-  }
   function bindPlaces(root, id, items) {
     const place = items.find((p) => p.id === state.place) || items[0];
     if (!place) {
@@ -1598,9 +1610,17 @@
         frame.append(pin);
         frame.dataset.liveMap = JSON.stringify(spec);
       }
-      $$("button", root)
-        .slice(-2)
-        .forEach((b) => click(b, "P2.order('maps')"));
+      // Google Maps and Apple Maps buttons (design order). Apple Maps opens only when the
+      // server allowlist builds an Apple Maps link; until then it stays in place as "sắp có".
+      const [google, apple] = $$("button", root).slice(-2);
+      if (google) click(google, "P2.order('maps')");
+      if (apple) {
+        if (FEATURES.appleMaps) click(apple, "P2.order('apple_maps')");
+        else {
+          text(apple, apple.textContent.trimEnd() + SOON);
+          soon(apple, "Chỉ đường bằng Apple Maps chưa mở. Dùng Google Maps.");
+        }
+      }
     }
     if (id === "M5-S04") {
       text($(".text-sm.font-extrabold", root), place.name);
@@ -2058,7 +2078,8 @@
       const items = state.cache["places:" + selected()]?.data.items || [],
         p = items.find((p) => p.id === state.place) || items[0];
       if (!p) return status("Chưa chọn được quán.");
-      const dishId=selected();
+      // Directions need no dish: send only a dish the user really chose, never the default.
+      const dishId=partner==="maps"||partner==="apple_maps"?chosenDish():selected();
       let tab=window.open("about:blank","_blank");
       if(!tab) return status("Trình duyệt đang chặn mở dịch vụ bên ngoài. Cho phép cửa sổ mới rồi thử lại.");
       tab.opener=null;
@@ -2082,18 +2103,28 @@
     call() {
       const items = state.cache["places:" + selected()]?.data.items || [],
         p = items.find((p) => p.id === state.place) || items[0];
-      if (!/^\+?[\d\s-]+$/.test(p?.phone || ""))
-        return status("Chưa có số điện thoại hợp lệ.");
-      const dishId = selected();
-      state.order = {
-        target_deeplink: "tel:" + p.phone.replace(/\s/g, ""),
-        dish_id: dishId,
-        dish_name: knownDishName(dishId),
-        place_id: p.id,
-        place_name: p.name,
-      };
-      location.href=state.order.target_deeplink;
-      goScreen("M5-S05");
+      if (!p?.phone) return status("Chưa có số điện thoại hợp lệ.");
+      if (calling) return; // one tap, one recorded call (no double row on a double tap)
+      calling = true;
+      // The call is recorded as a redirect (action "call") so M5-S05 can confirm it.
+      // Only a dish the user chose goes with it; none chosen → a place-only call.
+      const dishId = chosenDish();
+      return action(
+        async () => {
+          try {
+            const d = await api("/orders/redirect", "POST", { place_id: p.id, partner: "phone", ...(dishId ? { dish_id: dishId } : {}) });
+            if (!/^tel:\d{8,15}$/.test(d?.target_deeplink || "")) throw new Error("Số điện thoại không hợp lệ");
+            return d;
+          } finally {
+            calling = false;
+          }
+        },
+        (d) => {
+          state.order = d;
+          location.href = d.target_deeplink;
+          goScreen("M5-S05");
+        },
+      );
     },
     confirmMeal() {
       if (state.order?.id)
@@ -2112,9 +2143,6 @@
             goScreen("M3-S07");
           },
         );
-      // After a call there is no redirect id: record the meal and place the user chose.
-      else if (state.order?.dish_id)
-        P2.feedback("eaten", state.order.dish_id, state.order.place_id);
       // Nothing was ordered, called or routed: there is no real meal to confirm.
       else status("Chưa có món để xác nhận. Hãy chọn quán rồi đặt món, gọi điện hoặc chỉ đường trước.");
     },
