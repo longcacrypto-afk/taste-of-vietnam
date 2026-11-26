@@ -1,7 +1,7 @@
 import { publicRepository } from '../services/dataEntry.js';
 import { googleConfig, googleLogin } from '../services/googleAuthService.js';
-import { validateProfilePatch } from '../services/profileService.js';
-import { parsePlaceQuery, placeWithStatus, placeDistance } from '../services/placeQuery.js';
+import { validateProfilePatch, locationChosen } from '../services/profileService.js';
+import { parsePlaceQuery, placeWithStatus, placeDistance, validCoordinates } from '../services/placeQuery.js';
 // =============================================================================
 // REST API GATEWAY ROUTER (/api/v1/*) — HÔM NAY ĂN GÌ · TASTE OF VIETNAM
 // Core launch modules (M1–M5, M7 campaigns/payments, M9 admin, M20 recipes)
@@ -90,7 +90,7 @@ async function openPlacesForDish(repo, dishId, profile, radiusM) {
  * campaigns, the caller's profile and history loaded from the database; everything
  * else falls through to the in-process store.
  */
-async function buildView(repo, store, authUser) {
+async function buildView(repo, store, authUser, extra = {}) {
   const [dishes, places, campaigns, suggestionHistory, savedCollections] = await Promise.all([
     repo.listDishes(),
     repo.listPlaces(),
@@ -105,7 +105,8 @@ async function buildView(repo, store, authUser) {
     suggestionHistory,
     savedCollections,
     userProfile: authUser ? authUser.profile : store.userProfile,
-    currentUser: authUser
+    currentUser: authUser,
+    ...extra
   });
 }
 
@@ -252,7 +253,11 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ====================================================================
   if (pathname === '/api/v1/suggestions/today' && method === 'GET') {
     bump(store, 'suggestion_shown');
-    const view = await buildView(repo, store, authUser);
+    // live_weather: real reading for the user's saved location (null when the provider
+    // has none). It is also the only weather the ranking sees; no seeded weather.
+    // Only for a location the user chose/shared: the default seed point is not "their" weather.
+    const live_weather = locationChosen(profile) ? await currentWeather({ lat: profile.lat, lng: profile.lng }) : null;
+    const view = await buildView(repo, store, authUser, { weather: live_weather });
     const opts = Object.fromEntries(['radius_m', 'mode', 'meal_slot', 'diet_mode', 'budget_min', 'budget_max', 'spice_max'].filter(k => searchParams.has(k)).map(k => [k, searchParams.get(k)]));
     // Hash every gate input, catalogue and history so approval/menu/profile changes
     // cannot replay an old unsafe result. Retain per-user cache invalidation prefix.
@@ -261,8 +266,6 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       view.places.map(p => getPlaceOpenStatus(p, Date.now()))])).digest('hex');
     const cacheKey = `sugg:${profile.id || 'default'}:${version}`;
     const cached = suggestionCache.get(cacheKey);
-    // live_weather: real reading from the provider hook, or null while none is configured.
-    const live_weather = await currentWeather({ lat: profile.lat, lng: profile.lng });
     // applied_allergies: the allergen tags this list was filtered against (the UI names them).
     const applied_allergies = [...(profile.hard_allergies || [])];
     if (cached) {
@@ -276,7 +279,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   // Three existing decision animations share the same safe pool; never fake loot/vouchers.
   if (['/api/v1/suggestions/spin', '/api/v1/suggestions/game', '/api/v1/suggestions/fortune', '/api/v1/suggestions/blind-box'].includes(pathname) && method === 'GET') {
-    const view = await buildView(repo, store, authUser);
+    const weather = locationChosen(profile) ? await currentWeather({ lat: profile.lat, lng: profile.lng }) : null;
+    const view = await buildView(repo, store, authUser, { weather });
     const opts = Object.fromEntries(['radius_m', 'mode', 'meal_slot', 'diet_mode', 'budget_min', 'budget_max', 'spice_max'].filter(k => searchParams.has(k)).map(k => [k, searchParams.get(k)]));
     const result = buildCandidates(view, opts);
     const pick = result.candidates[Math.floor(Math.random() * result.candidates.length)];
@@ -340,7 +344,13 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     const query = parsePlaceQuery(searchParams, profile);
     if (query.error) return { status: 400, data: { error: query.error } };
     const items = await repo.findPlacesNear(query);
-    return { status: 200, data: { total: items.length, items } };
+    // center: the point and radius this search used (the caller's own chosen/GPS position),
+    // so the M4-S02/M5-S03 map can draw "you are here" and the search radius.
+    // null when the search ran from the default seed point (no chosen location, no lat/lng given).
+    const explicit = searchParams.has('lat') || searchParams.has('lng');
+    const center = (explicit || locationChosen(profile)) && validCoordinates(query.lat, query.lng)
+      ? { lat: query.lat, lng: query.lng, radius_m: query.radiusM } : null;
+    return { status: 200, data: { total: items.length, items, center } };
   }
 
   const placeMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)$/);
