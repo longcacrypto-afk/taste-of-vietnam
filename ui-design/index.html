@@ -9174,7 +9174,10 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       }
       return {weekly, overrides};
     }
+    let dirty = false, selectedPlace = "";
+    const requireSaved = () => { if (dirty) throw new Error("Có thay đổi hồ sơ chưa lưu. Hãy lưu trước khi duyệt hoặc thực hiện thao tác khác."); };
     function render(p) {
+      dirty = false;
       const version = p?.cms?.version || 0;
       const url = p ? "/admin/places/" + encodeURIComponent(p.id) : "/admin/places";
       const status = p ? ({pending:"Chờ xác minh", verified:"Đã xác minh", archived:"Đã lưu trữ"}[p.cms?.status] ||
@@ -9201,11 +9204,14 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         note("Lưu thay đổi đưa hồ sơ về chờ xác minh, không tự duyệt hoặc mở lại quán đang tạm dừng.") +
         C.button(p ? "Lưu thay đổi và chờ xác minh" : "Tạo hồ sơ chờ xác minh"));
       const f = body.querySelector("form");
+      f.addEventListener("input", () => {dirty=true;});
+      f.addEventListener("change", () => {dirty=true;});
       f.addEventListener("click", event => {
         const b = event.target.closest("button");
         if (!b || !f.contains(b)) return;
         const a = b.dataset.action;
         if (!a || a === "submit") return;
+        dirty = true;
         if (a === "add-menu") f.querySelector("[data-menu]").insertAdjacentHTML("beforeend", menuHTML());
         else if (a === "remove-menu") b.closest("[data-menu-row]").remove();
         else if (a === "add-interval") b.previousElementSibling.insertAdjacentHTML("beforeend", intervalHTML());
@@ -9246,6 +9252,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       forms[1].addEventListener("submit", event => {
         event.preventDefault();
         C.run(forms[1], async () => {
+          requireSaved();
           const evidence = val(forms[1],"approval_evidence"), reason = val(forms[1],"approval_reason");
           if (!evidence || !reason) throw new Error("Cần bằng chứng và lý do duyệt.");
           if (!p.cms) throw new Error("Hồ sơ cũ cần lưu thông tin, nguồn và giờ trước khi xác minh.");
@@ -9255,6 +9262,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       forms[2].addEventListener("submit", event => {
         event.preventDefault();
         C.run(forms[2], async () => {
+          requireSaved();
           const reason = val(forms[2],"archive_reason");
           if (!reason) throw new Error("Cần lý do lưu trữ hồ sơ.");
           await C.api(url + "/archive", "POST", {version, reason});
@@ -9274,13 +9282,17 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         af.addEventListener("submit", event => {
           event.preventDefault();
           C.run(af, async () => {
+            requireSaved();
             await C.api(url + "/availability", "PATCH", {version, dish_id:val(af,"available_dish"),
               available:checked(af,"available_now"), reason:val(af,"availability_reason")});
           });
         });
       }
     }
-    picker.addEventListener("change", () => render(places.find(p => p.id === picker.value)));
+    picker.addEventListener("change", () => {
+      if (dirty && !window.confirm("Bỏ các thay đổi chưa lưu để chuyển quán?")) {picker.value=selectedPlace;return;}
+      selectedPlace=picker.value;render(places.find(p => p.id === picker.value));
+    });
     render();
     const importer = host.querySelector("[data-import-card]");
     importer.innerHTML = C.card("Nhập quán từ CSV",
@@ -9496,20 +9508,24 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   function reports(root,id,d) {
     if (id !== "M9-S06") return;
     const area = root.lastElementChild.lastElementChild;
+    const placeOptions = [...new Map([...(d.places || []), ...(d.user_reports || []).map(r => ({id:r.place_id,name:r.place_name || r.place_id}))].map(p => [p.id,p.name])).entries()];
     const filters = document.createElement("div");
     filters.innerHTML = C.card("Lọc báo cáo", C.form(
       C.select("status", "Trạng thái", "", [["","Tất cả"],["pending_review","Chờ xử lý"],["auto_paused","Đã tạm ẩn"],["resolved","Đã xử lý"],["rejected","Đã bác bỏ"]]) +
       C.select("reason", "Loại báo cáo", "", [["","Tất cả"],["closed","Đóng cửa"],["wrong_price","Sai giá"],["wrong_location","Sai vị trí"],["wrong_menu","Sai thực đơn"],["other","Khác"]]) +
-      C.field("place_id", "Mã quán (để trống: tất cả)") + C.button("Lọc báo cáo")));
+      C.select("place_id", "Quán", "", [["","Tất cả"], ...placeOptions]) + C.button("Lọc báo cáo")));
     const rows = document.createElement("div"); rows.className = "space-y-3";
-    const draw = items => {
-      rows.replaceChildren();
+    const more = document.createElement("button");
+    more.type="button"; more.className=buttonClass; more.textContent="Tải thêm báo cáo"; more.hidden=true;
+    let currentQuery="", shown=0, total=0;
+    const draw = (items, append = false) => {
+      if (!append) rows.replaceChildren();
       if (!items.length) {rows.textContent = "Không có báo cáo phù hợp."; return;}
       items.forEach(a => {
         const node = document.createElement("div");
         const status = ({pending_review:"Chờ xử lý", auto_paused:"Đã tạm ẩn",resolved:"Đã xử lý",rejected:"Đã bác bỏ"})[a.status] || a.status;
         node.innerHTML = C.card(a.place_name || a.place_id,
-          `<div>${H(status)} · ${H(a.reason)}</div><p>${H(a.evidence || "Chưa có bằng chứng")}</p><p>${H(a.resolution_reason || "")} ${H(a.resolved_at || "")}</p>` +
+          `<div>${H(status)} · ${H(({closed:"Đóng cửa",wrong_price:"Sai giá",wrong_location:"Sai vị trí",wrong_menu:"Sai thực đơn",other:"Khác"})[a.reason] || a.reason)}</div><p>${H(a.evidence || "Chưa có bằng chứng")}</p><p>${H(a.resolution_reason || "")} ${H(a.resolved_at || "")}</p>` +
           (["pending_review","auto_paused"].includes(a.status) ? C.form(
             C.area("reason","Lý do xử lý") + `<div class="flex flex-wrap gap-2">${C.button("Xác nhận đã xử lý")}${C.button("Bác bỏ báo cáo","button")}</div>`) : ""));
         const f = $("form",node);
@@ -9525,7 +9541,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         rows.append(node);
       });
     };
-    area.replaceChildren(filters,rows); draw(d.user_reports || []);
+    area.replaceChildren(filters,rows,more); draw(d.user_reports || []);
     const f = $("form",filters);
     f.addEventListener("submit",e=>{
       e.preventDefault();
@@ -9533,9 +9549,16 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         const query = new URLSearchParams();
         new FormData(f).forEach((v,k)=>{if(v.trim())query.set(k,v.trim());});
         const response = await C.api("/admin/reports?"+query);
+        currentQuery=query.toString(); shown=response.items.length; total=response.total; more.hidden=shown>=total;
         draw(response.items); return `${response.total} báo cáo phù hợp (hiển thị tối đa ${response.limit}).`;
       });
     });
+    more.addEventListener("click",()=>C.run(f,async()=>{
+      const query=new URLSearchParams(currentQuery); query.set("offset",shown);
+      const response=await C.api("/admin/reports?"+query);
+      draw(response.items,true); shown+=response.items.length; total=response.total; more.hidden=shown>=total;
+      return "Đã tải "+shown+" / "+total+" báo cáo.";
+    }));
     if (C.canOps) {
       const paused = (d.places || []).filter(p => p.is_open_override === false);
       if (paused.length) {
@@ -10461,7 +10484,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         const buttons=$$("button",n);
         click(buttons[0],`P2.approvePlace('${J(p.id)}',${p.cms?.version||0})`);
         buttons[0].disabled=!p.cms?.evidence;
-        buttons[1].disabled=true;buttons[1].title="Màn gốc chưa có ô nhập yêu cầu bổ sung.";
+        buttons[1].disabled=true;buttons[1].title="Chưa có API yêu cầu bổ sung; sửa hồ sơ và ghi lý do tại biểu mẫu bên dưới.";
       });
     }
     if(id==="M9-S05") {

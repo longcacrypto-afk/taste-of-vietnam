@@ -122,20 +122,24 @@
   function reports(root,id,d) {
     if (id !== "M9-S06") return;
     const area = root.lastElementChild.lastElementChild;
+    const placeOptions = [...new Map([...(d.places || []), ...(d.user_reports || []).map(r => ({id:r.place_id,name:r.place_name || r.place_id}))].map(p => [p.id,p.name])).entries()];
     const filters = document.createElement("div");
     filters.innerHTML = C.card("Lọc báo cáo", C.form(
       C.select("status", "Trạng thái", "", [["","Tất cả"],["pending_review","Chờ xử lý"],["auto_paused","Đã tạm ẩn"],["resolved","Đã xử lý"],["rejected","Đã bác bỏ"]]) +
       C.select("reason", "Loại báo cáo", "", [["","Tất cả"],["closed","Đóng cửa"],["wrong_price","Sai giá"],["wrong_location","Sai vị trí"],["wrong_menu","Sai thực đơn"],["other","Khác"]]) +
-      C.field("place_id", "Mã quán (để trống: tất cả)") + C.button("Lọc báo cáo")));
+      C.select("place_id", "Quán", "", [["","Tất cả"], ...placeOptions]) + C.button("Lọc báo cáo")));
     const rows = document.createElement("div"); rows.className = "space-y-3";
-    const draw = items => {
-      rows.replaceChildren();
+    const more = document.createElement("button");
+    more.type="button"; more.className=buttonClass; more.textContent="Tải thêm báo cáo"; more.hidden=true;
+    let currentQuery="", shown=0, total=0;
+    const draw = (items, append = false) => {
+      if (!append) rows.replaceChildren();
       if (!items.length) {rows.textContent = "Không có báo cáo phù hợp."; return;}
       items.forEach(a => {
         const node = document.createElement("div");
         const status = ({pending_review:"Chờ xử lý", auto_paused:"Đã tạm ẩn",resolved:"Đã xử lý",rejected:"Đã bác bỏ"})[a.status] || a.status;
         node.innerHTML = C.card(a.place_name || a.place_id,
-          `<div>${H(status)} · ${H(a.reason)}</div><p>${H(a.evidence || "Chưa có bằng chứng")}</p><p>${H(a.resolution_reason || "")} ${H(a.resolved_at || "")}</p>` +
+          `<div>${H(status)} · ${H(({closed:"Đóng cửa",wrong_price:"Sai giá",wrong_location:"Sai vị trí",wrong_menu:"Sai thực đơn",other:"Khác"})[a.reason] || a.reason)}</div><p>${H(a.evidence || "Chưa có bằng chứng")}</p><p>${H(a.resolution_reason || "")} ${H(a.resolved_at || "")}</p>` +
           (["pending_review","auto_paused"].includes(a.status) ? C.form(
             C.area("reason","Lý do xử lý") + `<div class="flex flex-wrap gap-2">${C.button("Xác nhận đã xử lý")}${C.button("Bác bỏ báo cáo","button")}</div>`) : ""));
         const f = $("form",node);
@@ -151,7 +155,7 @@
         rows.append(node);
       });
     };
-    area.replaceChildren(filters,rows); draw(d.user_reports || []);
+    area.replaceChildren(filters,rows,more); draw(d.user_reports || []);
     const f = $("form",filters);
     f.addEventListener("submit",e=>{
       e.preventDefault();
@@ -159,9 +163,16 @@
         const query = new URLSearchParams();
         new FormData(f).forEach((v,k)=>{if(v.trim())query.set(k,v.trim());});
         const response = await C.api("/admin/reports?"+query);
+        currentQuery=query.toString(); shown=response.items.length; total=response.total; more.hidden=shown>=total;
         draw(response.items); return `${response.total} báo cáo phù hợp (hiển thị tối đa ${response.limit}).`;
       });
     });
+    more.addEventListener("click",()=>C.run(f,async()=>{
+      const query=new URLSearchParams(currentQuery); query.set("offset",shown);
+      const response=await C.api("/admin/reports?"+query);
+      draw(response.items,true); shown+=response.items.length; total=response.total; more.hidden=shown>=total;
+      return "Đã tải "+shown+" / "+total+" báo cáo.";
+    }));
     if (C.canOps) {
       const paused = (d.places || []).filter(p => p.is_open_override === false);
       if (paused.length) {

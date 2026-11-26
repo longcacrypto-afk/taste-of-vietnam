@@ -842,7 +842,7 @@
         const buttons=$$("button",n);
         click(buttons[0],`P2.approvePlace('${J(p.id)}',${p.cms?.version||0})`);
         buttons[0].disabled=!p.cms?.evidence;
-        buttons[1].disabled=true;buttons[1].title="Màn gốc chưa có ô nhập yêu cầu bổ sung.";
+        buttons[1].disabled=true;buttons[1].title="Chưa có API yêu cầu bổ sung; sửa hồ sơ và ghi lý do tại biểu mẫu bên dưới.";
       });
     }
     if(id==="M9-S05") {

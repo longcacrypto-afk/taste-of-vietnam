@@ -67,7 +67,10 @@
       }
       return {weekly, overrides};
     }
+    let dirty = false, selectedPlace = "";
+    const requireSaved = () => { if (dirty) throw new Error("Có thay đổi hồ sơ chưa lưu. Hãy lưu trước khi duyệt hoặc thực hiện thao tác khác."); };
     function render(p) {
+      dirty = false;
       const version = p?.cms?.version || 0;
       const url = p ? "/admin/places/" + encodeURIComponent(p.id) : "/admin/places";
       const status = p ? ({pending:"Chờ xác minh", verified:"Đã xác minh", archived:"Đã lưu trữ"}[p.cms?.status] ||
@@ -94,11 +97,14 @@
         note("Lưu thay đổi đưa hồ sơ về chờ xác minh, không tự duyệt hoặc mở lại quán đang tạm dừng.") +
         C.button(p ? "Lưu thay đổi và chờ xác minh" : "Tạo hồ sơ chờ xác minh"));
       const f = body.querySelector("form");
+      f.addEventListener("input", () => {dirty=true;});
+      f.addEventListener("change", () => {dirty=true;});
       f.addEventListener("click", event => {
         const b = event.target.closest("button");
         if (!b || !f.contains(b)) return;
         const a = b.dataset.action;
         if (!a || a === "submit") return;
+        dirty = true;
         if (a === "add-menu") f.querySelector("[data-menu]").insertAdjacentHTML("beforeend", menuHTML());
         else if (a === "remove-menu") b.closest("[data-menu-row]").remove();
         else if (a === "add-interval") b.previousElementSibling.insertAdjacentHTML("beforeend", intervalHTML());
@@ -139,6 +145,7 @@
       forms[1].addEventListener("submit", event => {
         event.preventDefault();
         C.run(forms[1], async () => {
+          requireSaved();
           const evidence = val(forms[1],"approval_evidence"), reason = val(forms[1],"approval_reason");
           if (!evidence || !reason) throw new Error("Cần bằng chứng và lý do duyệt.");
           if (!p.cms) throw new Error("Hồ sơ cũ cần lưu thông tin, nguồn và giờ trước khi xác minh.");
@@ -148,6 +155,7 @@
       forms[2].addEventListener("submit", event => {
         event.preventDefault();
         C.run(forms[2], async () => {
+          requireSaved();
           const reason = val(forms[2],"archive_reason");
           if (!reason) throw new Error("Cần lý do lưu trữ hồ sơ.");
           await C.api(url + "/archive", "POST", {version, reason});
@@ -167,13 +175,17 @@
         af.addEventListener("submit", event => {
           event.preventDefault();
           C.run(af, async () => {
+            requireSaved();
             await C.api(url + "/availability", "PATCH", {version, dish_id:val(af,"available_dish"),
               available:checked(af,"available_now"), reason:val(af,"availability_reason")});
           });
         });
       }
     }
-    picker.addEventListener("change", () => render(places.find(p => p.id === picker.value)));
+    picker.addEventListener("change", () => {
+      if (dirty && !window.confirm("Bỏ các thay đổi chưa lưu để chuyển quán?")) {picker.value=selectedPlace;return;}
+      selectedPlace=picker.value;render(places.find(p => p.id === picker.value));
+    });
     render();
     const importer = host.querySelector("[data-import-card]");
     importer.innerHTML = C.card("Nhập quán từ CSV",
