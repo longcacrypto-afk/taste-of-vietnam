@@ -276,6 +276,42 @@
     };
   }
   // </core-static-controls>
+  // <unsave-and-timers> M2-S08: un-save removes the dish from every own collection that
+  // holds it, through the documented DELETE /me/collections/:id/dishes/:dishId (docs/M2_API.md).
+  function savedRemovals(collections, dishId) {
+    return (collections || [])
+      .filter((c) => (c.dish_ids || []).includes(dishId))
+      .map((c) => "/me/collections/" + encodeURIComponent(c.id) + "/dishes/" + encodeURIComponent(dishId));
+  }
+  // M2-S07: one client-side countdown per cooking step, from that step's own duration_min.
+  // No positive duration in the data → no timer (never a made-up time).
+  function stepTimer(min) {
+    const m = Number(min);
+    if (min === null || min === "" || !Number.isFinite(m) || m <= 0) return null;
+    const ms = Math.round(m * 60000);
+    return { total: ms, left: ms, endsAt: null };
+  }
+  function timerLeft(t, now) {
+    return t.endsAt == null ? t.left : Math.max(0, t.endsAt - now);
+  }
+  // Tap: start → pause → resume …; a finished timer resets to its full duration.
+  function timerToggle(t, now) {
+    const left = timerLeft(t, now);
+    if (left <= 0) return { ...t, left: t.total, endsAt: null };
+    return t.endsAt == null ? { ...t, left, endsAt: now + left } : { ...t, left, endsAt: null };
+  }
+  function clock(ms) {
+    const s = Math.ceil(ms / 1000);
+    return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  }
+  function timerLabel(t, now) {
+    if (!t) return "⏱️ Chưa có thời gian";
+    const left = timerLeft(t, now);
+    if (left <= 0) return "⏱️ 00:00 Hết giờ";
+    if (t.endsAt != null) return "⏱️ " + clock(left) + " Đang đếm";
+    return "⏱️ " + clock(left) + (left < t.total ? " Tạm dừng" : " · Bấm để hẹn giờ");
+  }
+  // </unsave-and-timers>
   // </m2-real-data>
   // <m3-controls> Pure helpers for controls added inside existing screens.
   const near = (a, b) => Math.abs(Number(a) - Number(b)) < 0.0005;
@@ -531,6 +567,7 @@
     phone: "",
     otp: "",
     order: null,
+    timers: {}, // M2-S07 step timers, "dishId:stepIndex" → stepTimer() state
   };
   const request = window.fetch.bind(window);
   window.M9_AUTH_FETCH = request;
@@ -727,6 +764,7 @@
             items: await Promise.all(
               ids.map((id) => api("/dishes/" + encodeURIComponent(id))),
             ),
+            collections: d.collections || [], // P2.unsave needs which collections hold a dish
           };
         },
       ];
@@ -966,6 +1004,14 @@
               text(x, "Bộ sưu tập" + SOON);
               soon(x, "Nhóm món theo bộ sưu tập chưa mở.");
             });
+            // Small real control inside the existing card: un-save this dish.
+            const off = document.createElement("button");
+            off.type = "button";
+            off.className = "text-[10px] font-bold text-[#BE123C] underline";
+            off.textContent = "Bỏ lưu";
+            off.setAttribute("aria-label", "Bỏ lưu " + (a.name || "món này"));
+            click(off, `event.stopPropagation();P2.unsave('${J(a.id)}')`);
+            n.append(off);
           });
       }
     }
@@ -1065,7 +1111,8 @@
       if (id === "M2-S07") {
         const holder = root.children[2],
           first = holder.firstElementChild.cloneNode(true),
-          other = (holder.children[1] || holder.firstElementChild).cloneNode(true);
+          other = (holder.children[1] || holder.firstElementChild).cloneNode(true),
+          pillTpl = $$(".flex-1 span", first).find((x) => x.textContent.includes("Đang đếm"));
         holder.innerHTML = "";
         (d.steps || []).forEach((a, i) => {
           const n = (i === 0 ? first : other).cloneNode(true);
@@ -1073,10 +1120,25 @@
           text($(".flex-1 > .font-extrabold", n), a.title);
           text($(".flex-1 > p", n), a.text);
           img($("img", n), d.img_key);
-          $$(".flex-1 span", n).forEach((x) => {
-            if (x.textContent.includes("Đang đếm"))
-              text(x, "⏱️ " + (a.duration_min || 0) + " phút");
-          });
+          // The design's clock pill ("⏱️ 05:00 Đang đếm") is the timer control, one per step
+          // ("Bấm vào đồng hồ ở từng bước"): steps whose template has none get a copy of it.
+          let pill = $$(".flex-1 span", n).find((x) => x.textContent.includes("Đang đếm"));
+          if (!pill && pillTpl) $(".flex-1", n)?.append((pill = pillTpl.cloneNode(true)));
+          if (pill) {
+            const key = d.id + ":" + i,
+              t = stepTimer(a.duration_min);
+            if (t && !state.timers[key]) state.timers[key] = { ...t, label: "Bước " + (i + 1) + " · " + (a.title || "") };
+            text(pill, timerLabel(t ? state.timers[key] : null, Date.now()));
+            if (t) {
+              pill.setAttribute("data-step-timer", key);
+              pill.setAttribute("role", "button");
+              pill.setAttribute("tabindex", "0");
+              pill.setAttribute("aria-label", "Hẹn giờ bước " + (i + 1) + ": bấm để bắt đầu, tạm dừng hoặc tiếp tục");
+              pill.style.cursor = "pointer";
+              click(pill, `P2.timer('${J(key)}')`);
+              pill.setAttribute("onkeydown", `if(event.key==='Enter'||event.key===' '){event.preventDefault();P2.timer('${J(key)}')}`);
+            } else soon(pill, "Bước này chưa có thời gian nấu trong dữ liệu món.");
+          }
           holder.append(n);
         });
         click(root.lastElementChild, `P2.feedback('eaten')`);
@@ -1888,6 +1950,27 @@
     if (intro) intro.textContent = (status === 403 ? "Tài khoản hiện tại không có quyền xem mục này." : "Mục này cần đăng nhập.") + " Đăng nhập bằng tài khoản đã được cấp quyền.";
     if (box) box.insertAdjacentHTML("beforeend", `<button type="button" onclick="P2.google()" class="w-full py-2 rounded-xl bg-[#FBBF24] text-[#0F172A] font-extrabold" ${state.google?.enabled && state.google?.ready ? "" : "disabled"}>${state.google?.enabled ? "Google" : "Google · Sắp có"}</button>`);
   };
+  // M2-S07: one loop updates every visible step clock; it stops when no timer runs.
+  let timerLoop = null;
+  function tickTimers() {
+    clearTimeout(timerLoop);
+    const now = Date.now();
+    let running = false;
+    for (const [key, t] of Object.entries(state.timers)) {
+      if (t.endsAt == null) continue;
+      if (timerLeft(t, now) > 0) running = true;
+      else {
+        state.timers[key] = { ...t, left: 0, endsAt: null };
+        status("Hết giờ: " + t.label);
+        navigator.vibrate?.(400);
+      }
+    }
+    $$("[data-step-timer]").forEach((el) => {
+      const t = state.timers[el.getAttribute("data-step-timer")];
+      if (t) el.textContent = timerLabel(t, now);
+    });
+    if (running) timerLoop = setTimeout(tickTimers, 250);
+  }
   window.P2 = {
     async google() {
       if(!state.google?.enabled || !window.google?.accounts?.id) return;
@@ -2026,6 +2109,28 @@
           status("Đã lưu món vào bộ sưu tập.");
         },
       );
+    },
+    unsave(id) {
+      // M2-S08: remove from every own collection, then reload the list from the server.
+      const paths = savedRemovals(state.cache.saved?.data?.collections, id);
+      if (!paths.length) return status("Món này không còn trong danh sách đã lưu.");
+      action(
+        async () => {
+          for (const path of paths) await api(path, "DELETE");
+        },
+        () => {
+          delete state.cache.saved;
+          load("M2-S08", true);
+          status("Đã bỏ lưu món.");
+        },
+      );
+    },
+    timer(key) {
+      // M2-S07: start / pause / resume one step's countdown (client-side only).
+      const t = state.timers[key];
+      if (!t) return;
+      state.timers[key] = timerToggle(t, Date.now());
+      tickTimers();
     },
     feedback(type, id = selected(), place_id = null) {
       action(
