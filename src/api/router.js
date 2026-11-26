@@ -33,6 +33,7 @@ import { getRepository } from '../db/repository.js';
 import { handleFrozenRoute } from './frozenRoutes.js';
 import { handleDishRoutes } from './dishRoutes.js';
 import { currentWeather } from '../services/weatherProvider.js';
+import { areasFromPlaces } from '../services/areas.js';
 
 // User-supplied text: drop HTML tags and stray angle brackets / control chars, trim, cap length.
 // (The UI also escapes on output; this keeps stored data clean for other clients like Flutter.)
@@ -321,6 +322,11 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ====================================================================
   // MODULE M4: PLACES, POSTGIS 3KM SEARCH & CROWDSOURCED REPORTS (M4-S01 .. M4-S06)
   // ====================================================================
+  if (pathname === '/api/v1/areas' && method === 'GET') {
+    const items = areasFromPlaces(await repo.listPlaces());
+    return { status: 200, data: { total: items.length, items } };
+  }
+
   if (pathname === '/api/v1/places' && method === 'GET') {
     const query = parsePlaceQuery(searchParams, profile);
     if (query.error) return { status: 400, data: { error: query.error } };

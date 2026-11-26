@@ -563,7 +563,7 @@ export class PostgresRepository {
   }
 
   async listUsers() {
-    return (await this.q('SELECT id,role,is_guest,created_at FROM users ORDER BY created_at,id')).rows.map(r => ({id:r.id,role:r.role,guest:r.is_guest,created_at:iso(r.created_at)}));
+    return (await this.q('SELECT id,role,is_guest,created_at,email FROM users ORDER BY created_at,id')).rows.map(r => ({id:r.id,role:r.role,guest:r.is_guest,created_at:iso(r.created_at),email:r.email || null}));
   }
 
   async atomic(fn) {

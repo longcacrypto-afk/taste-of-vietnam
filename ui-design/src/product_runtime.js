@@ -18,6 +18,9 @@
   // to switch it on. Flags only enable code paths that already exist below.
   const FEATURES = (window.TOV_FEATURES = {
     placeFilters: false, // M4-S01 chips "Dưới 50k / Máy lạnh / Giao hàng"
+    mealReminders: false, // M1-S10 "Lịch nhắc bữa ăn" → M8-S04 (M8 frozen)
+    adsModeration: false, // M9-S07 "Kiểm duyệt Ads M7" (M7 frozen)
+    adminMetrics: false, // M9 latency/accuracy/safety figures (no metrics source)
     ...(window.TOV_FEATURES || {}),
   });
   const SOON = " · sắp có";
@@ -104,6 +107,34 @@
     };
   }
   // </m2-real-data>
+  // <m3-controls> Pure helpers for controls added inside existing screens.
+  const near = (a, b) => Math.abs(Number(a) - Number(b)) < 0.0005;
+  function areaRows(areas, profile) {
+    const list = (areas || []).map((a) => ({
+      ...a,
+      selected: near(a.lat, profile?.lat) && near(a.lng, profile?.lng),
+    }));
+    const saved = Number.isFinite(profile?.lat) && Number.isFinite(profile?.lng) && !list.some((a) => a.selected);
+    return { list, saved };
+  }
+  const AUDIT_ROLES = ["ops_admin", "super_admin"];
+  function activityBars(totals, now = new Date()) {
+    const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    const max = Math.max(1, ...totals.map((t) => t.count));
+    return totals.map((t) => ({
+      ...t,
+      label: days[new Date(t.day + "T12:00:00+07:00").getUTCDay()],
+      height: Math.round((t.count / max) * 100),
+    }));
+  }
+  function vnDays(n = 7, now = new Date()) {
+    // Calendar days in Asia/Ho_Chi_Minh (UTC+7, no DST), oldest first.
+    const local = new Date(now.getTime() + 7 * 3600000);
+    return Array.from({ length: n }, (_, i) =>
+      new Date(local.getTime() - (n - 1 - i) * 86400000).toISOString().slice(0, 10),
+    );
+  }
+  // </m3-controls>
   const img = (el, key) => {
     if (!el) return;
     const k = /^\d+$/.test(key || "") ? key : "298";
@@ -333,10 +364,20 @@
         "admin",
         async () => {
           const [d, identity] = await Promise.all([api("/admin/dashboard"), api("/auth/me")]);
+          let activity = null;
+          if (AUDIT_ROLES.includes(identity.role))
+            activity = await Promise.all(
+              vnDays(7).map(async (day) => ({
+                day,
+                count: (await api("/admin/audit-logs?limit=1&from=" + encodeURIComponent(day + "T00:00:00+07:00") +
+                  "&to=" + encodeURIComponent(day + "T23:59:59.999+07:00"))).total,
+              })),
+            );
           return {
             ...d,
             catalog: d.catalog || [],
             actor_role: identity.role,
+            activity,
           };
         },
       ];
@@ -370,6 +411,18 @@
       state.cache[key] = { status: "error", error: e };
     }
     if (config(appState.activeScreenId)?.[0] === key) paint();
+  }
+  async function loadAreas(force = false) {
+    if (!force && state.cache.areas?.status === "success") return;
+    state.cache.areas = { status: "loading" };
+    try {
+      const data = await api("/areas");
+      if (!Array.isArray(data?.items)) throw new Error("Dữ liệu chưa hợp lệ.");
+      state.cache.areas = { status: "success", data };
+    } catch (e) {
+      state.cache.areas = { status: "error", error: e };
+    }
+    if (appState.activeScreenId === "M1-S08") paint();
   }
   const originals = {};
   function stateHtml(id, s, nested = false, err = null) {
@@ -783,16 +836,50 @@
       const buttons = $$("button", root).filter((b) =>
         (b.getAttribute("onclick") || "").includes("M3-S01"),
       );
-      buttons.forEach((b, i) => {
-        if (i === 0) click(b, "P2.locate()");
-        else if (i === 1) {
-          click(b, "P2.saveProfile('M3-S01')");
-          text($("span", b), "Dùng vị trí đang lưu");
+      click(buttons[0], "P2.locate()");
+      // The two original area rows are the templates: amber = chosen, grey = other.
+      const chosen = buttons[1], other = buttons[2], holder = chosen?.parentElement;
+      if (holder && other) {
+        const areas = state.cache.areas;
+        const tplOn = chosen.cloneNode(true), tplOff = other.cloneNode(true);
+        chosen.remove();
+        other.remove();
+        const row = (tpl, label, mark, code) => {
+          const n = tpl.cloneNode(true);
+          const [name, end] = $$("span", n);
+          text(name, label);
+          text(end, mark);
+          click(n, code);
+          holder.append(n);
+          return n;
+        };
+        if (areas?.status !== "success") {
+          const msg = document.createElement("p");
+          msg.className = "text-[10px] text-[#64748B]";
+          msg.textContent = areas?.status === "error" ? "Chưa tải được danh sách khu vực." : "Đang tải khu vực có dữ liệu quán…";
+          holder.append(msg);
         } else {
-          b.disabled = true;
-          b.title = "Khu vực này chưa có dữ liệu quán";
+          const { list, saved } = areaRows(areas.data.items, p);
+          if (saved) row(tplOn, "📍 Vị trí đang lưu", "✓", "P2.saveProfile('M3-S01')");
+          list.forEach((a) => {
+            const n = row(a.selected ? tplOn : tplOff, "📍 " + a.name + " · " + a.place_count + " quán", a.selected ? "✓" : "→", `P2.area('${J(a.id)}')`);
+            n.setAttribute("aria-pressed", String(a.selected));
+          });
+          // The original second city row stays. It opens once /areas returns an area there.
+          const city = $("span", tplOff)?.textContent.replace(/^📍\s*/, "").split(",")[0].replace(/^TP\.\s*/, "").trim();
+          if (city && !list.some((a) => a.name.includes(city))) {
+            const n = row(tplOff, $("span", tplOff).textContent + SOON, "", "");
+            n.removeAttribute("onclick");
+            soon(n, "Khu vực này chưa có dữ liệu quán.");
+          }
+          if (!list.length) {
+            const msg = document.createElement("p");
+            msg.className = "text-[10px] text-[#64748B]";
+            msg.textContent = "Chưa có khu vực nào có quán đã xác minh.";
+            holder.append(msg);
+          }
         }
-      });
+      }
     }
     if (id === "M1-S09") {
       text($(".text-base.font-extrabold", root), p.name || "Bạn");
@@ -811,6 +898,21 @@
       if(card) { click(card,"goScreen('M1-S03')");card.setAttribute("aria-label","Chỉnh sửa khẩu vị"); }
     }
     if (id === "M1-S10") {
+      // The original status pill becomes the switch itself: same pill, real saved value.
+      const consentRow = $$(".flex.justify-between", root).find((n) => /Đồng ý cá nhân hóa/.test(n.textContent));
+      const pill = consentRow?.lastElementChild;
+      if (pill) {
+        const on = p.pdpd_consent === true;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.setAttribute("role", "switch");
+        b.setAttribute("aria-checked", String(on));
+        b.setAttribute("aria-label", "Đồng ý cá nhân hóa bằng AI");
+        b.className = pill.className.replace(/bg-\[#DCFCE7\] text-\[#15803D\]/, on ? "bg-[#DCFCE7] text-[#15803D]" : "bg-[#F1F5F9] text-[#475569]");
+        b.textContent = on ? "Đang bật" : "Đang tắt";
+        click(b, `P2.consent(${!on})`);
+        pill.replaceWith(b);
+      }
       const download = $$("span", root).find(
         (n) => n.textContent.trim() === "Tải về",
       );
@@ -818,9 +920,12 @@
         download.outerHTML =
           '<button onclick="P2.exportData()" class="font-bold text-[#1D4ED8]">Tải về</button>';
       click(root.lastElementChild, "P2.deleteAccount()");
-      $$('[onclick*="M8-"]', root).forEach((n) =>
-        n.closest("div.flex")?.remove(),
-      );
+      // Meal reminders live in the frozen M8 module: keep the row, mark it "sắp có".
+      if (!FEATURES.mealReminders)
+        $$('[onclick*="M8-"]', root).forEach((n) => {
+          text(n, "Sắp có");
+          soon(n, "Lịch nhắc bữa ăn chưa mở trong bản này.");
+        });
     }
   }
   function bindPlaces(root, id, items) {
@@ -983,32 +1088,74 @@
     const reports=d.user_reports||[];
     $$("aside nav button",root).forEach(b=>{
       const code=b.getAttribute("onclick")||"";
-      if (!/M9-S0[123456]/.test(code)) b.remove();
+      // Frozen modules (M10, M17) stay out pending the owner's decision; S08/S09 follow permissions.
+      if (!/M9-S0[1234567]/.test(code) &&
+          !(/M9-S08/.test(code) && d.actor_role === "super_admin") &&
+          !(/M9-S09/.test(code) && AUDIT_ROLES.includes(d.actor_role))) b.remove();
+      if (/M9-S07/.test(code) && !FEATURES.adsModeration) {
+        const label=[...$$("span",b)].reverse().find(x=>!x.children.length);
+        if(label && !label.textContent.includes(SOON)) label.textContent+=SOON;
+        soon(b,"Kiểm duyệt quảng cáo chưa mở (M7 đang đóng băng).");
+      }
       const badge=b.lastElementChild;
       if (badge?.tagName==="SPAN" && badge!==b.firstElementChild) {
         if(code.includes("M9-S05")) text(badge,queue.length);
         else if(code.includes("M9-S06")) text(badge,reports.length);
+        else if(code.includes("M9-S04")) text(badge,(d.places||[]).filter(p=>!p.is_verified && p.cms?.status!=="archived").length);
         else badge.remove();
       }
       for(const span of $$("span",b)) if(span.children.length===0) span.textContent=span.textContent.replace(/\(542\)/g,"("+(d.total_dishes??0)+")");
     });
-    $("aside > div:last-child",root)?.remove();
+    const guard=$("aside > div:last-child > div:last-child",root);
+    if(guard && !FEATURES.adminMetrics) guard.innerHTML='<b class="text-[#4ADE80] block">Lá Safety Guard</b>Thống kê vi phạm dị ứng'+SOON;
     const title=$("h3",workspace);
     if(title) title.textContent=title.textContent.replace(/542 Món/g,(d.total_dishes??0)+" Món").replace(/5 Báo cáo/g,reports.length+" Báo cáo");
-    $$("span",workspace.firstElementChild).filter(n=>/LiteLLM/.test(n.textContent)).forEach(n=>n.remove());
+    $$("span",workspace.firstElementChild).filter(n=>/LiteLLM/.test(n.textContent)).forEach(n=>{
+      if(FEATURES.adminMetrics) return;
+      n.textContent="● Độ trễ AI p95"+SOON; soon(n,"Chưa đo độ trễ AI thật.");
+    });
     if(id==="M9-S01") {
       const kpis=workspace.children[1];
       [...kpis.children].forEach((card,i)=>{
         const value=$(".text-base > span",card);
         text(value,[d.total_dishes??0,d.total_verified_places??0,queue.length,reports.length][i]);
-        value?.nextElementSibling?.remove();
+        // Keep the delta slot; numeric sample deltas ("+42 tuần này") have no source yet.
+        const delta=value?.nextElementSibling;
+        if(delta && /\d/.test(delta.textContent)) text(delta,"Xu hướng"+SOON);
       });
       const chart=content.firstElementChild?.firstElementChild;
-      if(chart) chart.innerHTML=stateHtml(id,"empty", true);
+      if(chart) {
+        const head=chart.firstElementChild;
+        text($("span",head),"Thao tác quản trị 7 ngày qua (Audit log)");
+        const pill=head.lastElementChild;
+        if(pill && pill!==head.firstElementChild && !FEATURES.adminMetrics){text(pill,"Realtime p95"+SOON);soon(pill,"Chưa đo độ trễ thật.");}
+        const [oldBars,line]=[...chart.children].slice(1);
+        if(line && !FEATURES.adminMetrics){
+          const value=$(".flex.justify-between > :last-child",line)||$("span:last-child",line);
+          text(value,"Chưa có số liệu"+SOON);
+          soon(line,"Chưa có bộ đo độ chính xác LLM.");
+        }
+        if(!d.activity) {
+          // Same slot, honest state: this role cannot read the audit log.
+          oldBars?.insertAdjacentHTML("afterend",'<p class="p-4 text-center text-[#64748B]">Vai trò này không xem được audit log.</p>');
+          oldBars?.remove();
+        } else {
+          const bars=activityBars(d.activity);
+          oldBars?.insertAdjacentHTML("afterend",K.barChart(bars.map(b=>b.height),bars.map(b=>b.label),"#22C55E",bars.length-1));
+          oldBars?.remove(); // replaced in place by the same chart with real counts
+          $$(".grid-cols-7 > div",chart).forEach((col,i)=>{
+            const v=col.firstElementChild;text(v,bars[i].count);
+            col.title=bars[i].day+": "+bars[i].count+" thao tác";
+          });
+          if(!bars.some(b=>b.count)) line?.insertAdjacentHTML("beforebegin",'<p class="text-[10px] text-[#64748B]">Chưa có thao tác quản trị nào trong 7 ngày qua.</p>');
+        }
+      }
       const links=$$("[onclick]",content);
       links.forEach(n=>{
         const code=n.getAttribute("onclick")||"";
-        if(code.includes("M9-S07")) n.remove();
+        if(code.includes("M9-S07")) {
+          if(!FEATURES.adsModeration){text($(".text-\\[10px\\]",n),"Chưa mở (M7 đang đóng băng)");soon(n,"Kiểm duyệt quảng cáo chưa mở.");}
+        }
         else text($(".text-\\[10px\\]",n),code.includes("M9-S05")?queue.length:reports.length);
       });
     }
@@ -1187,6 +1334,7 @@
       retryWrite?.();
     },
     reload() {
+      if (appState.activeScreenId === "M1-S08") loadAreas(true);
       load(appState.activeScreenId, true);
     },
     async gamePick(kind) {
@@ -1255,6 +1403,23 @@
           state.cache.profile = { status: "success", data: p };
           delete state.cache.today;
           goScreen(next);
+        },
+      );
+    },
+    area(id) {
+      const a = state.cache.areas?.data?.items?.find((x) => x.id === id);
+      if (!a) return status("Khu vực này không còn trong danh sách. Bấm Thử lại để tải lại.", true);
+      Object.assign(state.cache.profile.data, { lat: a.lat, lng: a.lng });
+      P2.saveProfile("M3-S01");
+    },
+    consent(on) {
+      action(
+        () => api("/me/profile", "PATCH", { pdpd_consent: on === true }),
+        (p) => {
+          state.cache.profile = { status: "success", data: p };
+          delete state.cache.today;
+          paint();
+          status(p.pdpd_consent ? "Đã bật đồng ý cá nhân hóa." : "Đã tắt đồng ý cá nhân hóa.");
         },
       );
     },
@@ -1456,6 +1621,7 @@
     if (!/^M[1-59]-/.test(id))
       return status("Tính năng này chưa mở trong bản hiện tại.");
     originalGo(id);
+    if (id === "M1-S08") loadAreas();
     load(id);
     polish($("#stage-container"));
   };
