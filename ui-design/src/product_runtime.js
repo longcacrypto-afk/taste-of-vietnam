@@ -12,6 +12,98 @@
   const $ = (s, r = document) => r.querySelector(s),
     $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const money = (n) => Number(n || 0).toLocaleString("vi-VN") + "đ";
+  // <m2-real-data> Pure helpers: screen text comes from API data, never invented.
+  // Owner rule (26/11): original elements stay in place. A feature that is not live
+  // shows a "chưa mở / sắp có" state; flip its flag (or return data from its hook)
+  // to switch it on. Flags only enable code paths that already exist below.
+  const FEATURES = (window.TOV_FEATURES = {
+    placeFilters: false, // M4-S01 chips "Dưới 50k / Máy lạnh / Giao hàng"
+    ...(window.TOV_FEATURES || {}),
+  });
+  const SOON = " · sắp có";
+  function soon(el, why) {
+    // Visible "not live yet" state for an original element; keeps it in the layout.
+    if (!el) return;
+    el.setAttribute("aria-disabled", "true");
+    el.title = why;
+    el.style.opacity = "0.6";
+    el.removeAttribute("onclick");
+    if (el.tagName === "BUTTON") el.disabled = true;
+  }
+  const REGIONS = ["bac", "trung", "nam"];
+  // Segment under the pointer after the original 1560deg wheelSpin (4 turns + 120deg).
+  const WHEEL_LAND = 4;
+  const meters = (m) => (Number.isFinite(m) ? Math.round(m) + "m" : null);
+  function wheelLabels(names, picked, slots = 8, land = WHEEL_LAND) {
+    const pool = [...new Set((names || []).filter(Boolean))];
+    if (picked && !pool.includes(picked)) pool.unshift(picked);
+    if (!pool.length) return Array(slots).fill("");
+    const start = picked ? pool.indexOf(picked) : 0;
+    // The original wheel fits about 10 characters per segment at font-size 8.
+    const short = (n) => (n.length > 10 ? n.slice(0, 9).trim() + "…" : n);
+    return Array.from({ length: slots }, (_, i) =>
+      short(pool[(((start + i - land) % pool.length) + pool.length) % pool.length]),
+    );
+  }
+  function openStatus(p) {
+    return p?.open_status?.status || (p?.is_currently_open ? "open" : "unknown");
+  }
+  function openChipText(items) {
+    const st = (items || []).map(openStatus);
+    const open = st.filter((s) => s === "open").length,
+      unknown = st.filter((s) => s === "unknown" || s === "stale").length;
+    return open || !unknown
+      ? "● Đang mở (" + open + ")"
+      : "● Chưa rõ giờ mở (" + unknown + ")";
+  }
+  function placeLine(p) {
+    const label = {
+      open: "Đang mở",
+      closed: "Đang đóng",
+      stale: "Giờ mở cần xác minh lại",
+    }[openStatus(p)] || "Hỏi quán để xác nhận";
+    return [meters(p?.distance_m), label].filter(Boolean).join(" · ");
+  }
+  function menuPrice(menu, dishId) {
+    const m = (menu || []).find((x) => x.dish_id === dishId);
+    return m ? money(m.price) + (m.name ? " · " + m.name : "") : "Chưa có giá";
+  }
+  function hoursNote(p) {
+    return {
+      open: "Quán đang mở theo giờ đã xác minh",
+      closed: "Quán đang đóng",
+      stale: "Giờ mở cần xác minh lại",
+    }[openStatus(p)] || "Giờ mở chưa xác minh";
+  }
+  function weatherPill(w) {
+    // live_weather comes from the server weather hook (null until a provider is set).
+    return w?.label ? { text: "🌧️ " + w.label, live: true } : { text: "🌤️ Thời tiết" + SOON, live: false };
+  }
+  function whyText(d) {
+    const s = d?.suggestion,
+      place = s?.nearest_place;
+    const weather = weatherPill(d?.live_weather);
+    if (!s)
+      return {
+        title: "Món này không có trong gợi ý hôm nay",
+        message: d?.description || "",
+        price: d?.ref_price,
+        pills: [weather.text, "📍 Chưa có quán gợi ý", "🚫 Chưa lọc dị ứng (món ngoài gợi ý)"],
+        weather,
+      };
+    const where = place
+      ? [place.place_name, meters(place.distance_m) && "cách " + meters(place.distance_m)].filter(Boolean).join(" · ")
+      : "Chưa có quán gần bạn bán món này, có thể tự nấu";
+    return {
+      title: s.reason || "Hợp điều kiện bữa ăn bạn đã chọn",
+      message: where + " · Giá " + money(s.price_vnd ?? d.ref_price) + (s.is_sponsored ? " · Gợi ý có tài trợ" : ""),
+      price: s.price_vnd ?? d.ref_price,
+      pills: [weather.text, place && meters(place.distance_m) ? "📍 Cách " + meters(place.distance_m) : "📍 Chưa có quán gần", "🚫 Đã lọc theo dị ứng đã khai báo"],
+      weather,
+      place,
+    };
+  }
+  // </m2-real-data>
   const img = (el, key) => {
     if (!el) return;
     const k = /^\d+$/.test(key || "") ? key : "298";
@@ -161,7 +253,39 @@
   function config(id) {
     if (/^M1-S(0[3-9]|10)$/.test(id))
       return ["profile", () => api("/me/profile")];
-    if (["M2-S01", "M2-S02", "M2-S03"].includes(id))
+    if (id === "M2-S03")
+      return [
+        "regions",
+        async () => {
+          // Count per region from the API totals, independent of the active Explore filter.
+          const r = await Promise.all(
+            REGIONS.map((g) => api("/dishes?limit=1&region=" + g)),
+          );
+          return { counts: Object.fromEntries(REGIONS.map((g, i) => [g, r[i].total])) };
+        },
+      ];
+    if (id === "M3-S02")
+      return [
+        "why:" + selected() + ":" + appState.servings,
+        async () => {
+          const cached = state.cache.today?.status === "success" ? state.cache.today.data : null;
+          const [dish, today] = await Promise.all([
+            api("/dishes/" + encodeURIComponent(selected()) + "?servings=" + (appState.servings || 2)),
+            cached || api("/suggestions/today").catch(() => null),
+          ]);
+          if (!cached && Array.isArray(today?.items)) {
+            state.cache.today = { status: "success", data: today };
+            appState.liveToday = today;
+          }
+          return {
+            ...dish,
+            suggestion: today?.items?.find((a) => a.dish_id === dish.id) || null,
+            live_weather: today?.live_weather ?? null,
+          };
+        },
+      ];
+    if (id === "M3-S03") return ["spin-pool", () => api("/suggestions/spin")];
+    if (["M2-S01", "M2-S02"].includes(id))
       return [
         "dishes:" + state.query + ":" + state.region,
         () =>
@@ -171,7 +295,7 @@
               (state.region ? "&region=" + encodeURIComponent(state.region) : ""),
           ),
       ];
-    if (/^M2-S0[4-7]$/.test(id) || ["M3-S02", "M3-S06"].includes(id))
+    if (/^M2-S0[4-7]$/.test(id) || id === "M3-S06")
       return [
         "dish:" + selected() + ":" + appState.servings,
         () =>
@@ -235,7 +359,9 @@
       const data = await get();
       if (!data || typeof data !== "object" ||
           (/^(dishes:|places:|today$|saved$|history$)/.test(key) && !Array.isArray(data.items)) ||
-          (key.startsWith("dish:") && !data.id) ||
+          ((key.startsWith("dish:") || key.startsWith("why:")) && !data.id) ||
+          (key === "regions" && !REGIONS.every((g) => Number.isInteger(data.counts?.[g]))) ||
+          (key === "spin-pool" && !Array.isArray(data.candidates)) ||
           (key === "admin" && !Array.isArray(data.ocr_queue)))
         throw new Error("Dữ liệu chưa hợp lệ. Vui lòng thử lại.");
       state.cache[key] = { status: "success", data };
@@ -367,13 +493,13 @@
       }
     }
     if (id === "M2-S03") {
-      const all = d.items || [];
-      $$("[onclick]", root).forEach((n, i) => {
-        const reg = ["bac", "trung", "nam"][i];
+      // Only the three region cards; the header's buttons are not region cards.
+      $$('[onclick*="M2-S04"]', root).forEach((n, i) => {
+        const reg = REGIONS[i];
         const overlay=$(".absolute.inset-0",n);if(overlay)overlay.style.backgroundColor="rgba(0,0,0,0.7)";
         click(n, `P2.region('${reg}')`);
         const pill = $("span", n);
-        text(pill, all.filter((a) => a.region === reg).length + " món");
+        text(pill, (d.counts?.[reg] ?? 0) + " món");
       });
     }
     if (/^M2-S0[4-7]$/.test(id) || id === "M3-S02") {
@@ -479,10 +605,26 @@
         click(root.lastElementChild, `P2.feedback('eaten')`);
       }
       if (id === "M3-S02") {
+        const why = whyText(d);
         const photo = $("img", root)?.parentElement;
         text($("b", photo), d.name);
-        const shown = appState.liveToday?.items?.find((a) => a.dish_id === d.id);
-        text($('b[class*="D97736"]', photo), money(shown?.price_vnd ?? d.ref_price));
+        text($('b[class*="D97736"]', photo), money(why.price));
+        const bubble = $(".rounded-bl-sm", root);
+        text($(".font-extrabold", bubble), why.title);
+        text($(".text-\\[\\#334155\\]", bubble), why.message);
+        // All three original chips stay; weather is "sắp có" until the provider hook returns data.
+        const pills = $$(".flex-wrap > span", photo);
+        pills.forEach((n, i) => text(n, why.pills[i] ?? n.textContent));
+        if (!why.weather.live) soon(pills[0], "Chưa có nguồn thời tiết thật; sẽ bật khi nối nhà cung cấp thời tiết.");
+        const [go, cook] = $$(".grid-cols-2 > button", root);
+        if (go) {
+          text(go, why.place ? "🛵 Đi ăn" + (meters(why.place.distance_m) ? " (" + meters(why.place.distance_m) + ")" : "") : "🛵 Tìm quán");
+          click(go, why.place ? `P2.place('${J(why.place.place_id)}')` : "goScreen('M4-S01')");
+        }
+        if (cook) {
+          text(cook, "👩‍🍳 Tự nấu" + (d.prep_minutes ? " (" + d.prep_minutes + "p)" : ""));
+          click(cook, `P2.dish('${J(d.id)}')`);
+        }
       }
     }
     if(id==="M3-S05" && !state.chat.length) return stateHtml(id,"empty");
@@ -504,6 +646,11 @@
       }
     }
     if (id === "M3-S03") {
+      const names = (d.candidates || []).map((c) => c.name);
+      const labels = wheelLabels(names, state.spin?.name);
+      $$("#m3-wheel-svg text", root)
+        .filter((t) => t.textContent.trim() !== "QUAY")
+        .forEach((t, i) => text(t, labels[i] || ""));
       text(
         $("#m3-spin-title", root),
         state.spin?.name || "Bấm quay để chọn một món",
@@ -512,7 +659,9 @@
         $("#m3-spin-sub", root),
         state.spin
           ? "Xem công thức hoặc quán bán món này."
-          : "Chưa chọn món nào.",
+          : names.length
+            ? names.length + " món hợp điều kiện của bạn"
+            : (d.reasons || []).map((r) => r.message).filter(Boolean).join(" ") || "Chưa có món hợp điều kiện của bạn.",
       );
     }
     if (id === "M3-S06") {
@@ -689,21 +838,21 @@
       rows(holder, tile, items, (n, p) => {
         img($("img", n), p.img_key);
         text($(".font-extrabold", n), p.name);
-        text(
-          $(".text-\\[10px\\]", n),
-          Math.round(p.distance_m) +
-            "m · " +
-            (p.is_currently_open ? "Đang mở" : "Hỏi quán để xác nhận"),
-        );
-        text(
-          $('[class*="D97736"]', n),
-          money(p.menu?.find((m) => m.dish_id === selected())?.price),
-        );
+        text($(".text-\\[10px\\]", n), placeLine(p));
+        // Price of this dish's own menu row, named, so a combo is not read as a single bowl.
+        text($('[class*="D97736"]', n), menuPrice(p.menu, selected()));
         click(n, `P2.place('${J(p.id)}')`);
       });
       const openChip = $(".overflow-x-auto > span", root);
-      if (openChip)
-        openChip.textContent = "● Đang mở (" + items.filter((p) => p.is_currently_open).length + ")";
+      if (openChip) openChip.textContent = openChipText(items);
+      // Longer real labels must not wrap: the original row scrolls sideways.
+      $$(".overflow-x-auto > span", root).forEach((chip) => (chip.style.whiteSpace = "nowrap"));
+      // The other original filter chips are not wired yet: keep them, marked "sắp có".
+      if (!FEATURES.placeFilters)
+        $$(".overflow-x-auto > span", root).slice(1).forEach((chip) => {
+          if (!chip.textContent.includes(SOON)) chip.textContent += SOON;
+          soon(chip, "Bộ lọc này chưa hoạt động.");
+        });
     }
     if (id === "M4-S02") {
       const pins = $$("button.absolute", root);
@@ -736,7 +885,31 @@
         place.is_currently_open ? "Đang mở theo dữ liệu" : "Hãy gọi xác nhận",
       );
     }
-    if (id === "M4-S04" || id === "M4-S05") {
+    if (id === "M4-S05") {
+      // Original row styles: plain row = available, amber row = not available now.
+      const ok = root.children[1].cloneNode(true),
+        out = (root.children[2] || root.children[1]).cloneNode(true);
+      clearAfter(root, 1);
+      (place.menu || []).forEach((m) => {
+        // Stock counts: the API has no per-dish portions yet. If a menu row ever carries
+        // remaining_portions, the original amber "Sắp hết / Chỉ còn N phần" row is used.
+        const low = m.available && Number.isInteger(m.remaining_portions) && m.remaining_portions <= 10;
+        const n = (m.available && !low ? ok : out).cloneNode(true);
+        text($("b", n), (m.name || m.dish_id) + " (" + money(m.price) + ")");
+        text($(".text-\\[10px\\]", n), low ? "Chỉ còn " + m.remaining_portions + " phần · " + hoursNote(place) : hoursNote(place));
+        const pill = $(":scope > span", n);
+        text(pill, low ? "Sắp hết" : m.available ? "● Còn món" : "Tạm hết");
+        if (pill) pill.style.whiteSpace = "nowrap";
+        if (m.available) {
+          n.setAttribute("onclick", `P2.dish('${J(m.dish_id)}','M5-S01')`);
+          n.classList.add("cursor-pointer");
+        } else n.setAttribute("aria-disabled", "true");
+        root.append(n);
+      });
+      if (!(place.menu || []).length)
+        root.insertAdjacentHTML("beforeend", "<p>Chưa có thực đơn.</p>");
+    }
+    if (id === "M4-S04") {
       const tpl = root.children[1].cloneNode(true),
         plain = (root.children[2] || root.children[1]).cloneNode(true);
       clearAfter(root, 1);
@@ -1326,6 +1499,8 @@
       (d) => {
         state.spin = d.picked_dish;
         state.dish = d.picked_dish?.id;
+        // Wheel labels come from the same pool the pick came from.
+        if (Array.isArray(d.candidates)) state.cache["spin-pool"] = { status: "success", data: d };
         paint();
         const wheel = $("#m3-wheel-svg");
         if (wheel) wheel.classList.add("wheel-spinning");
