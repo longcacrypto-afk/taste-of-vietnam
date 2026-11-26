@@ -9296,7 +9296,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     render();
     const importer = host.querySelector("[data-import-card]");
     importer.innerHTML = C.card("Nhập quán từ CSV",
-      note("UTF-8, tối đa 500 KB / 500 dòng. Header: name,address,lat,lng,phone,opening_hours,menu,source_author,source_url,source_license,evidence,is_example. Giờ/menu trong CSV theo mẫu; dùng trình nhập quán phía trên nếu không dùng CSV. Dòng ví dụ và trùng được bỏ qua; dữ liệu nhập luôn chờ xác minh.") +
+      note("UTF-8, tối đa 500 KB / 500 dòng. Header: name, address, lat, lng, phone, opening_hours, menu, source_author, source_url, source_license, evidence, is_example. Giờ/menu trong CSV theo mẫu; dùng trình nhập quán phía trên nếu không dùng CSV. Dòng ví dụ và trùng được bỏ qua; dữ liệu nhập luôn chờ xác minh.") +
       C.form(field("csv_file", "Chọn tệp CSV", "", "file", 'accept=".csv,text/csv" required') +
         area("import_reason", "Lý do nhập dữ liệu", "") +
         C.button("Chạy thử CSV (không ghi dữ liệu)") +
@@ -9612,6 +9612,10 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       delete scope.dataset.m9Mounted;
       if (root.dataset.m9Mounted) return;
       root.dataset.m9Mounted = id;
+      // The existing desktop admin grid must not be squeezed into the 480px
+      // consumer phone preview at desktop widths. Keep its original fluid shell.
+      const frame = root.closest(".phone-frame");
+      if (frame) frame.style.setProperty("max-width", "100%", "important");
       const actualRole = d.actor_role;
       Object.assign(C,{role:actualRole,canContent:content(actualRole),canOps:ops(actualRole)});
       nav.closest("aside").style.setProperty("display","flex","important");

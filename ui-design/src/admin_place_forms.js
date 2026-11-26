@@ -189,7 +189,7 @@
     render();
     const importer = host.querySelector("[data-import-card]");
     importer.innerHTML = C.card("Nhập quán từ CSV",
-      note("UTF-8, tối đa 500 KB / 500 dòng. Header: name,address,lat,lng,phone,opening_hours,menu,source_author,source_url,source_license,evidence,is_example. Giờ/menu trong CSV theo mẫu; dùng trình nhập quán phía trên nếu không dùng CSV. Dòng ví dụ và trùng được bỏ qua; dữ liệu nhập luôn chờ xác minh.") +
+      note("UTF-8, tối đa 500 KB / 500 dòng. Header: name, address, lat, lng, phone, opening_hours, menu, source_author, source_url, source_license, evidence, is_example. Giờ/menu trong CSV theo mẫu; dùng trình nhập quán phía trên nếu không dùng CSV. Dòng ví dụ và trùng được bỏ qua; dữ liệu nhập luôn chờ xác minh.") +
       C.form(field("csv_file", "Chọn tệp CSV", "", "file", 'accept=".csv,text/csv" required') +
         area("import_reason", "Lý do nhập dữ liệu", "") +
         C.button("Chạy thử CSV (không ghi dữ liệu)") +

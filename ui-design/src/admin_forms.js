@@ -226,6 +226,10 @@
       delete scope.dataset.m9Mounted;
       if (root.dataset.m9Mounted) return;
       root.dataset.m9Mounted = id;
+      // The existing desktop admin grid must not be squeezed into the 480px
+      // consumer phone preview at desktop widths. Keep its original fluid shell.
+      const frame = root.closest(".phone-frame");
+      if (frame) frame.style.setProperty("max-width", "100%", "important");
       const actualRole = d.actor_role;
       Object.assign(C,{role:actualRole,canContent:content(actualRole),canOps:ops(actualRole)});
       nav.closest("aside").style.setProperty("display","flex","important");
