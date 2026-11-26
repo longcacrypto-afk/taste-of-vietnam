@@ -8,6 +8,18 @@ export const ROLES = [
   { id: 'super_admin', name: 'Super Admin', permissions: ['dashboard', 'dishes', 'ocr', 'places', 'reports', 'ads', 'audit', 'rbac'] }
 ];
 export const ADMIN_ROUTES = [
+  ['GET', /^\/api\/v1\/admin\/dishes(?:\/[^/]+(?:\/versions)?)?$/, 'dishes'],
+  ['GET', /^\/api\/v1\/admin\/recipes\/[^/]+(?:\/versions)?$/, 'dishes'],
+  ['PUT', /^\/api\/v1\/admin\/recipes\/[^/]+$/, 'dishes'],
+  ['PATCH', /^\/api\/v1\/admin\/recipes\/[^/]+$/, 'dishes'],
+  ['POST', /^\/api\/v1\/admin\/(dishes|recipes)\/[^/]+\/(verify|publish|archive|restore)$/, 'dishes'],
+  ['GET', /^\/api\/v1\/admin\/places(?:\/[^/]+(?:\/(menu|hours|availability|versions))?)?$/, 'places'],
+  ['POST', /^\/api\/v1\/admin\/places$/, 'places'],
+  ['POST', /^\/api\/v1\/admin\/places\/import$/, 'places'],
+  ['PATCH', /^\/api\/v1\/admin\/places\/[^/]+(?:\/(menu|hours|availability))?$/, 'places'],
+  ['PUT', /^\/api\/v1\/admin\/places\/[^/]+(?:\/(menu|hours|availability))?$/, 'places'],
+  ['DELETE', /^\/api\/v1\/admin\/places\/[^/]+$/, 'places'],
+  ['POST', /^\/api\/v1\/admin\/places\/[^/]+\/archive$/, 'places'],
   ['GET', /^\/api\/v1\/admin\/dashboard$/, 'dashboard'],
   ['POST', /^\/api\/v1\/admin\/dishes$/, 'dishes'],
   ['PUT', /^\/api\/v1\/admin\/dishes\/[^/]+$/, 'dishes'],

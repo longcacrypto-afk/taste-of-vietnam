@@ -125,7 +125,8 @@ test('Restart survival: accounts, tokens, profile, history, collections, recipes
     const recipes = await call('GET', '/api/v1/community/recipes');
     assert.ok(recipes.data.recipes.some(r => r.id === recipe.data.id && r.title === 'Cá kho tộ nhà làm'));
 
-    const newDish = await call('GET', `/api/v1/dishes/${dish.data.id}`);
+    assert.equal((await call('GET', `/api/v1/dishes/${dish.data.id}`)).status,404,'draft remains private after restart');
+    const newDish = await call('GET', `/api/v1/admin/dishes/${dish.data.id}`, {token:admin.data.access_token});
     assert.equal(newDish.data.name, 'Hủ Tiếu Nam Vang');
 
     const places = await call('GET', '/api/v1/places');

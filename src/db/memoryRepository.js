@@ -188,6 +188,7 @@ export class MemoryRepository {
     const dish = await this.getDish(id);
     if (!dish) return null;
     Object.assign(dish, patch);
+    if(patch.safety_status==='pending' && dish.cms) Object.assign(dish.cms,{status:'draft',verified_at:null,verified_by:null,evidence:''});
     return dish;
   }
 
@@ -293,6 +294,21 @@ export class MemoryRepository {
     if(u.role==='super_admin' && role!=='super_admin' && (await this.listUsers()).filter(u=>u.role==='super_admin').length<=1)
       throw new PolicyError(409,'Không thể gỡ quản trị viên cấp cao cuối cùng');
     u.role=role;return u;
+  }
+
+  async savePlace(place) {
+    const index=this.store.places.findIndex(p=>p.id===place.id);
+    if(index<0) this.store.places.push(structuredClone(place));
+    else this.store.places[index]=structuredClone(place);
+    return this.getPlace(place.id);
+  }
+  async saveContentVersion(entity,id,version,snapshot) {
+    const rows=this.store.contentVersions ||= [];
+    if(rows.some(r=>r.entity===entity&&r.target===id&&r.version===version)) throw new PolicyError(409,'Phiên bản đã tồn tại');
+    rows.push({entity,target:id,version,snapshot:structuredClone(snapshot),created_at:new Date().toISOString()});
+  }
+  async listContentVersions(entity,id) {
+    return structuredClone((this.store.contentVersions||[]).filter(v=>v.entity===entity&&v.target===id).sort((a,b)=>b.version-a.version));
   }
 
   // ── OCR moderation ─────────────────────────────────────────────────────────

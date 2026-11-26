@@ -45,6 +45,7 @@ export function dishFromRow(r) {
     allergen_tags: r.allergen_flags,
     diet_flags: r.diet_flags,
     safety_status: r.safety_status,
+    cms: r.cms,
     weather_fit: r.weather_fit,
     tags: r.tags,
     img_key: r.img_key,
@@ -64,7 +65,7 @@ function dishColumns(d) {
     allergen_tags: 'allergen_flags', diet_flags: 'diet_flags', weather_fit: 'weather_fit', tags: 'tags',
     img_key: 'img_key', description: 'description', base_servings: 'base_servings', market_cost_base: 'market_cost_base'
   };
-  const jsonCols = { macros: 'macros', ingredients: 'ingredients', steps: 'recipe_steps' };
+  const jsonCols = { cms: 'cms', macros: 'macros', ingredients: 'ingredients', steps: 'recipe_steps' };
   const cols = {};
   for (const [k, c] of Object.entries(map)) if (d[k] !== undefined) cols[c] = d[k];
   for (const [k, c] of Object.entries(jsonCols)) if (d[k] !== undefined) cols[c] = JSON.stringify(d[k]);
@@ -87,6 +88,7 @@ function placeFromRow(r) {
     address: r.address,
     lat: r.lat == null ? null : Number(r.lat),
     lng: r.lng == null ? null : Number(r.lng),
+    cms: r.cms ?? null,
     opening_hours: r.opening_hours ?? null,
     verified_at: iso(r.verified_at) ?? null,
     open_hour: r.open_hour,
@@ -481,6 +483,32 @@ export class PostgresRepository {
     // Filter BEFORE limit: a near closed place must not crowd out an open one.
     return r.rows.map(placeFromRow).map(p => placeWithStatus(p, now))
       .filter(p => !openOnly || isPlaceEligible(p, now, { requireVerifiedHours })).slice(0, 100);
+  }
+
+  async savePlace(p) {
+    await this.q(`INSERT INTO places
+      (id,name,address,geom,opening_hours,verified_at,is_verified,is_paused,report_count,rating,review_count,
+       has_ac,has_kids_seat,phone,links,img_key,cms)
+      VALUES($1,$2,$3,CASE WHEN $4::float IS NULL OR $5::float IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($5,$4),4326)::geography END,
+       $6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+      ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,address=EXCLUDED.address,geom=EXCLUDED.geom,
+       opening_hours=EXCLUDED.opening_hours,verified_at=EXCLUDED.verified_at,is_verified=EXCLUDED.is_verified,
+       is_paused=EXCLUDED.is_paused,report_count=EXCLUDED.report_count,has_ac=EXCLUDED.has_ac,
+       has_kids_seat=EXCLUDED.has_kids_seat,phone=EXCLUDED.phone,links=EXCLUDED.links,img_key=EXCLUDED.img_key,cms=EXCLUDED.cms`,
+      [p.id,p.name,p.address,p.lat,p.lng,p.opening_hours==null?null:JSON.stringify(p.opening_hours),p.verified_at??null,p.is_verified,
+       p.is_open_override===false,p.closed_report_count||0,p.rating||0,p.review_count||0,p.has_ac||false,p.has_kids_seat||false,
+       p.phone||'',JSON.stringify(p.links||{}),p.img_key??null,JSON.stringify(p.cms)]);
+    await this.q('DELETE FROM place_dishes WHERE place_id=$1',[p.id]);
+    for(const m of p.menu||[]) await this.q(
+      'INSERT INTO place_dishes(place_id,dish_id,menu_name,price_vnd,is_available) VALUES($1,$2,$3,$4,$5)',
+      [p.id,m.dish_id,m.name||null,m.price,m.available]);
+    return this.getPlace(p.id);
+  }
+  async saveContentVersion(entity,id,version,snapshot) {
+    await this.q('INSERT INTO content_versions(entity,target,version,snapshot) VALUES($1,$2,$3,$4)',[entity,id,version,JSON.stringify(snapshot)]);
+  }
+  async listContentVersions(entity,id) {
+    return (await this.q('SELECT * FROM content_versions WHERE entity=$1 AND target=$2 ORDER BY version DESC',[entity,id])).rows;
   }
 
   async reportPlace(placeId, { reason, userId, reporterKey, evidence = '' }) {

@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, integration/release-7 ]
 
 jobs:
   # ─── JOB 1: BACKEND QA & END-TO-END TESTS (NODE 20) ─────────────────────────
