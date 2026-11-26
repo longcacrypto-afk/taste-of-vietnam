@@ -10118,6 +10118,26 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     node.style.opacity = "0.6";
   }
   const WEATHER_SOON = "🌤️ Thời tiết · sắp có";
+  // Open-Meteo licence (CC BY 4.0): a visible link next to every place its data is shown.
+  // One sibling link per element, added with a live reading and removed without one.
+  const WEATHER_CREDITS = { "Open-Meteo": { href: "https://open-meteo.com/", text: "Thời tiết: Open-Meteo.com" } };
+  function weatherCredit(el, w, cls = "text-[10px] underline opacity-80") {
+    if (!el?.parentElement) return null;
+    const credit = w?.label ? WEATHER_CREDITS[w.source] : null;
+    let a = el.nextElementSibling?.hasAttribute?.("data-weather-credit") ? el.nextElementSibling : null;
+    if (!credit) return a?.remove(), null;
+    if (!a) {
+      a = document.createElement("a");
+      a.setAttribute("data-weather-credit", "");
+      a.target = "_blank";
+      a.rel = "noopener";
+      el.after(a);
+    }
+    a.className = cls;
+    a.href = credit.href;
+    a.textContent = credit.text;
+    return a;
+  }
   function desktopWeather() {
     // Desktop Live App header + "Cá nhân hóa theo thời tiết …" line: live_weather hook only.
     const w = appState.liveToday?.live_weather;
@@ -10128,6 +10148,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       badge.title = w?.label ? "Nguồn: " + (w.source || "nhà cung cấp thời tiết") : "Chưa lấy được thời tiết thật.";
       badge.style.opacity = w?.label ? "" : "0.7";
     }
+    weatherCredit(badge, w, "ml-1.5 text-[10px] underline text-white/70");
     $$("#lpanel-today p").forEach((n) => {
       if (!/theo thời tiết/.test(n.textContent)) return;
       // The reading's own " · " would split this " · "-separated line, so use a comma here.
@@ -10140,6 +10161,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         if (parts.length >= 3) { parts[1] = allergyLine(applied); next = parts.join(" · "); }
       }
       if (next !== n.textContent) n.textContent = next;
+      weatherCredit(n, w, "block text-[10px] underline opacity-70");
     });
   }
   // </m4-restore>
@@ -10232,7 +10254,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         done = true;
         frame.dataset.mapState = "live";
         const note = frame.parentElement && $("[data-map-note]", frame.parentElement);
-        if (note) note.textContent = note.dataset.live;
+        if (note) note.textContent = (spec.center ? note.dataset.live : note.dataset.liveNoCenter) || note.dataset.live;
       }
     });
     tiles.on("tileerror", () => { failed += 1; if (!loaded && failed >= 4) fail(); });
@@ -10828,6 +10850,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         pills.forEach((n, i) => text(n, why.pills[i] ?? n.textContent));
         if (!why.weather.live) soon(pills[0], "Chưa lấy được thời tiết thật cho vị trí của bạn; chip sẽ hiện khi có số đo.");
         else pills[0].title = "Nguồn: " + (d.live_weather.source || "nhà cung cấp thời tiết");
+        weatherCredit(pills[0], why.weather.live ? d.live_weather : null, "self-center text-[10px] underline text-[#64748B]");
         const [go, cook] = $$(".grid-cols-2 > button", root);
         if (go) {
           text(go, why.place ? "🛵 Đi ăn" + (meters(why.place.distance_m) ? " (" + meters(why.place.distance_m) + ")" : "") : "🛵 Tìm quán");
@@ -11174,6 +11197,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         mapNote: "",
         fallback: note.textContent,
         live: "Bản đồ OpenStreetMap. Ghim là quán thật có tọa độ trong dữ liệu; chấm xanh là vị trí bạn đã lưu.",
+        liveNoCenter: "Bản đồ OpenStreetMap. Ghim là quán thật có tọa độ trong dữ liệu. Chọn khu vực hoặc bật định vị để thấy vị trí của bạn.",
       });
       root.append(note);
     }
@@ -11650,7 +11674,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     area(id) {
       const a = state.cache.areas?.data?.items?.find((x) => x.id === id);
       if (!a) return status("Khu vực này không còn trong danh sách. Bấm Thử lại để tải lại.", true);
-      Object.assign(state.cache.profile.data, { lat: a.lat, lng: a.lng });
+      Object.assign(state.cache.profile.data, { lat: a.lat, lng: a.lng, location_set: true });
       P2.saveProfile("M3-S01");
     },
     consent(on) {
@@ -11675,6 +11699,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           Object.assign(state.cache.profile.data, {
             lat: pos.coords.latitude,
             lng: pos.coords.longitude,
+            location_set: true,
           });
           P2.saveProfile("M3-S01");
         },

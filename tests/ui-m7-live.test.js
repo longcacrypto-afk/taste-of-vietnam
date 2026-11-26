@@ -8,6 +8,7 @@ import vm from 'node:vm';
 import { handleApiRequest } from '../src/api/router.js';
 import { createInitialStore } from '../src/data/seed.js';
 import { currentWeather, setWeatherFetch, parseOpenMeteo, weatherCondition } from '../src/services/weatherProvider.js';
+import { defaultProfile, validateProfilePatch, locationChosen } from '../src/services/profileService.js';
 
 const runtime = fs.readFileSync('ui-design/src/product_runtime.js', 'utf8');
 const between = (a, b) => {
@@ -92,6 +93,7 @@ test('/suggestions/today: the reading (and only it) drives weather, ranking bonu
   const seen = [];
   setWeatherFetch(async (url) => { seen.push(url); return ok(HOT)(); });
   const store = createInitialStore();
+  store.userProfile.location_set = true; // the user picked an area / shared GPS
   const r = await handleApiRequest(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
   assert.equal(r.status, 200);
   assert.equal(r.data.live_weather.label, '32°C · Trời quang');
@@ -108,6 +110,7 @@ test('/suggestions/today: the reading (and only it) drives weather, ranking bonu
 
 test('/places returns the search centre used, for the map', async () => {
   const store = createInitialStore();
+  store.userProfile.location_set = true;
   const r = await handleApiRequest(store, 'GET', '/api/v1/places', new URLSearchParams('dish_id=DISH-101'));
   assert.equal(r.status, 200);
   assert.deepEqual(r.data.center, { lat: store.userProfile.lat, lng: store.userProfile.lng, radius_m: store.userProfile.radius_m });
@@ -154,4 +157,67 @@ test('UI map only mounts in M4-S02 and M5-S03; frozen previews never get a live 
   assert.ok(sets[1] > m5 && sets[1] < m54, 'M5-S03');
   for (const f of ['screens_web_m6_m7.js', 'screens_m3_m4_m5_m8.js', 'screens_m9_m10_expansion.js'])
     assert.doesNotMatch(fs.readFileSync('ui-design/src/' + f, 'utf8'), /data-live-map/, f + ' design files untouched');
+});
+
+test('default seed point is not the user\'s location: no weather call, no reading, no map centre', async () => {
+  let calls = 0;
+  setWeatherFetch(async () => { calls++; return ok(HOT)(); });
+  const store = createInitialStore();
+  assert.equal(store.userProfile.location_set, false);
+  assert.equal(defaultProfile('u1').location_set, false);
+  assert.equal(locationChosen(store.userProfile), false);
+  const r = await handleApiRequest(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
+  assert.equal(r.status, 200);
+  assert.equal(r.data.live_weather, null);
+  assert.equal(r.data.weather, null);
+  assert.doesNotMatch(JSON.stringify(r.data.items), /Hợp trời hiện tại/);
+  const spin = await handleApiRequest(store, 'GET', '/api/v1/suggestions/spin', new URLSearchParams());
+  assert.equal(spin.status, 200);
+  assert.equal(calls, 0, 'the provider is never asked about the default point');
+  const places = await handleApiRequest(store, 'GET', '/api/v1/places', new URLSearchParams());
+  assert.equal(places.status, 200);
+  assert.ok(places.data.items.length > 0, 'places still listed (distances as before)');
+  assert.equal(places.data.center, null, 'no "Vị trí của bạn" dot for the default point');
+  const explicit = await handleApiRequest(store, 'GET', '/api/v1/places', new URLSearchParams('lat=10.9&lng=106.8'));
+  assert.deepEqual(explicit.data.center, { lat: 10.9, lng: 106.8, radius_m: 3000 }, 'a position the caller sent is used as is');
+});
+
+test('location_set: set by a real move or the picker/GPS flag, not by re-saving the same point', () => {
+  const p = defaultProfile('u1');
+  assert.equal(validateProfilePatch(p, { lat: p.lat, lng: p.lng, spice_level: 2 }).profile.location_set, false, 'full-profile save');
+  assert.equal(validateProfilePatch(p, { lat: 10.8, lng: 106.7 }).profile.location_set, true, 'moved point');
+  assert.equal(validateProfilePatch(p, { lat: p.lat, lng: p.lng, location_set: true }).profile.location_set, true, 'area equal to the default point');
+  assert.match(validateProfilePatch(p, { location_set: 'yes' }).error, /location_set/);
+  const area = between('    area(id) {', '    consent(on) {');
+  assert.match(area, /location_set: true/);
+  const locate = between('    locate() {', '    save(id = selected()) {');
+  assert.match(locate, /location_set: true/);
+});
+
+test('UI weather: a visible Open-Meteo link sits next to each live reading and goes away without one', () => {
+  const helper = between('  const WEATHER_CREDITS = ', '  function desktopWeather() {');
+  class El {
+    constructor(tag) { this.tagName = tag; this.attrs = {}; this.parentElement = null; }
+    setAttribute(k, v) { this.attrs[k] = v; }
+    hasAttribute(k) { return k in this.attrs; }
+    get nextElementSibling() { const c = this.parentElement.children; return c[c.indexOf(this) + 1] || null; }
+    after(n) { const c = this.parentElement.children; n.parentElement = this.parentElement; c.splice(c.indexOf(this) + 1, 0, n); }
+    remove() { const c = this.parentElement.children; c.splice(c.indexOf(this), 1); }
+  }
+  const parent = { children: [] };
+  const chip = new El('SPAN'); chip.parentElement = parent; parent.children.push(chip);
+  const ctx = vm.createContext({ document: { createElement: (t) => new El(t.toUpperCase()) } });
+  vm.runInContext(helper, ctx);
+  const live = { label: '32°C · Trời quang', source: 'Open-Meteo' };
+  const a = ctx.weatherCredit(chip, live);
+  assert.equal(a.tagName, 'A');
+  assert.equal(a.href, 'https://open-meteo.com/');
+  assert.match(a.textContent, /Open-Meteo\.com/);
+  assert.equal(parent.children.length, 2);
+  ctx.weatherCredit(chip, live);
+  assert.equal(parent.children.length, 2, 'idempotent on repaint');
+  ctx.weatherCredit(chip, null);
+  assert.equal(parent.children.length, 1, 'no reading → no credit');
+  for (const call of ['weatherCredit(badge, w', 'weatherCredit(n, w', 'weatherCredit(pills[0]'])
+    assert.ok(runtime.includes(call), call + ' (desktop badge, desktop line, M3-S02 chip)');
 });

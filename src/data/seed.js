@@ -13,6 +13,8 @@ export function createInitialStore() {
       phone: '+84912345678',
       lat: 10.9574,
       lng: 106.8426,
+      // Seed point only (distance queries); not a location this user chose.
+      location_set: false,
       radius_m: 3000,
       regions: ['bac', 'nam', 'trung'],
       spice_level: 1,
