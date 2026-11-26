@@ -9885,7 +9885,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
               (s.body || []).map((p) => `<p class="text-[11px] leading-relaxed">${ctx.H(p)}</p>`).join(""));
           }
           if (d.items.length > 1) {
-            const chips = d.items.map((it) => `<button type="button" onclick="P2.live.M14.pick('${ctx.J(it.id)}')" class="px-2.5 py-1 rounded-full border text-[10px] font-bold ${it.id === s.id ? "bg-[#18181B] text-white border-[#18181B]" : "bg-white border-[#E2E8F0]"}">${ctx.H(it.title)}</button>`).join("");
+            const chips = d.items.map((it) => `<button type="button" onclick="P2.live.M14.pick('${ctx.J(it.id)}')" class="shrink-0 whitespace-nowrap px-2.5 py-1 rounded-full border text-[10px] font-bold ${it.id === s.id ? "bg-[#18181B] text-white border-[#18181B]" : "bg-white border-[#E2E8F0]"}">${ctx.H(it.title)}</button>`).join("");
             ctx.$("button[onclick*=\"M14-S02\"]", root)?.insertAdjacentHTML("beforebegin", `<div class="flex gap-1.5 overflow-x-auto pb-1" data-story-chips>${chips}</div>`);
           }
           return root;
