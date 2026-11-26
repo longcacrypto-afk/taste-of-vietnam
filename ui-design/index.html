@@ -9664,7 +9664,13 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   const money = (n) => Number(n || 0).toLocaleString("vi-VN") + "đ";
   const img = (el, key) => {
     if (!el) return;
-    el.setAttribute("data-img", /^\d+$/.test(key || "") ? key : "298");
+    const k = /^\d+$/.test(key || "") ? key : "298";
+    // The original stylesheet shrinks img[data-img="034"] to the 36px logo.
+    // A dish photo that uses the same picture must keep its card size.
+    if (k === "034" && window.CHATGPT_IMAGES?.[k]) {
+      el.removeAttribute("data-img");
+      el.src = window.CHATGPT_IMAGES[k];
+    } else el.setAttribute("data-img", k);
     el.alt = "Ảnh minh họa";
   };
   const text = (el, v) => {
@@ -11002,7 +11008,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   });
   $$("[data-ai-badge]").forEach((n) => n.remove());
   const style = document.createElement("style");
-  style.textContent = `.product-mode{--text-muted:#5B6A80}.product-mode #p2-action-status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;max-width:calc(100vw - 24px);width:420px;box-shadow:0 8px 30px #0003}.product-mode :focus-visible{outline:3px solid #B45309;outline-offset:3px}.product-mode input{min-width:0}.product-mode [onclick]{touch-action:manipulation}.product-mode .phone-frame .flex-1{min-width:0}.product-mode .phone-frame{overflow:hidden}.product-mode #main-liveapp{min-width:0}.product-mode [data-p2-layout]{min-width:0}@media(max-width:768px){.product-mode #stage-container .min-w-\\[1100px\\],.product-mode #stage-container .min-w-\\[1000px\\]{min-width:0!important}.product-mode #stage-container table{display:block;max-width:100%;overflow:auto}.product-mode #stage-container aside nav{display:flex;flex-wrap:wrap;max-height:none}.product-mode #stage-container aside nav button{width:auto}.product-mode #stage-container .w-64{width:auto}.product-mode #stage-container .min-w-0{max-width:100%}}`;
+  style.textContent = `.product-mode #p2-action-status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;max-width:calc(100vw - 24px);width:420px;box-shadow:0 8px 30px #0003}.product-mode :focus-visible{outline:3px solid #B45309;outline-offset:3px}.product-mode input{min-width:0}.product-mode [onclick]{touch-action:manipulation}.product-mode .phone-frame .flex-1{min-width:0}.product-mode .phone-frame{overflow:hidden}.product-mode #main-liveapp{min-width:0}.product-mode [data-p2-layout]{min-width:0}@media(max-width:768px){.product-mode #stage-container .min-w-\\[1100px\\],.product-mode #stage-container .min-w-\\[1000px\\]{min-width:0!important}.product-mode #stage-container table{display:block;max-width:100%;overflow:auto}.product-mode #stage-container aside nav{display:flex;flex-wrap:wrap;max-height:none}.product-mode #stage-container aside nav button{width:auto}.product-mode #stage-container .min-w-0{max-width:100%}}`;
   document.head.append(style);
   window.M9Forms?.syncRole();
   polish(document.body);
