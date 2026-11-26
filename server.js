@@ -1,6 +1,6 @@
 // =============================================================================
 // FULL-STACK PRODUCTION SERVER FOR "HÔM NAY ĂN GÌ · TASTE OF VIETNAM v0.2"
-// + WebSocket Live Merchant Dashboard (ws://127.0.0.1:3000/ws/merchant)
+// Merchant WebSocket is disabled for the MVP (M6 frozen).
 // =============================================================================
 
 import http from 'node:http';
@@ -10,27 +10,50 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInitialStore } from './src/data/seed.js';
 import { handleApiRequest } from './src/api/router.js';
-import { setupWebSocket, getWsTestPayload } from './src/services/websocketService.js';
+import {
+  HttpError, parseOrigins, clientIp, createRateLimiter, rateGroups,
+  applySecurityHeaders, allowOrigin, readJsonBody, logHttpFailure, requestId
+} from './src/services/httpSecurity.js';
 import { initRepository } from './src/db/repository.js';
 import { getJwtSecret } from './src/services/authService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const store = createInitialStore();
 
-export function createAppServer() {
+export function createAppServer({ apiHandler = handleApiRequest, logError = console.error, rateLimiter = createRateLimiter() } = {}) {
+  const origins = parseOrigins(process.env.CORS_ALLOWED_ORIGINS);
+  const trustedHops = Number(process.env.TRUST_PROXY_HOPS || 0);
+  if (!Number.isInteger(trustedHops) || trustedHops < 0 || trustedHops > 5) {
+    throw new Error('TRUST_PROXY_HOPS must be an integer between 0 and 5');
+  }
+  const production = process.env.NODE_ENV === 'production';
   const server = http.createServer(async (req, res) => {
-    const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost:3000'}`);
+    const id = requestId();
+    const started = performance.now();
+    applySecurityHeaders(res, id);
+    res.on('finish', () => {
+      if (res.statusCode >= 500) logHttpFailure({
+        requestId: id, method: req.method, status: res.statusCode, durationMs: performance.now() - started
+      }, logError);
+    });
+    const sendError = (status, error) => {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', Connection: 'close' });
+      res.end(JSON.stringify({ error, request_id: id }));
+    };
+    try {
+    const urlObj = new URL(req.url, 'http://localhost');
     const pathname = urlObj.pathname;
 
-    // CORS & Production Security headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-
+    if (pathname.startsWith('/api/v1/')) {
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Vary', 'Origin, Authorization');
+      if (!allowOrigin(req, res, origins, production)) return sendError(403, 'Nguồn truy cập không được phép');
+      const retryAfter = rateLimiter(clientIp(req, trustedHops), rateGroups(req.method, pathname));
+      if (retryAfter) {
+        res.setHeader('Retry-After', String(retryAfter));
+        return sendError(429, 'Bạn thao tác quá nhanh, vui lòng thử lại sau');
+      }
+    }
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       return res.end();
@@ -53,29 +76,21 @@ export function createAppServer() {
       }, null, 2));
     }
 
-    // 1. WebSocket test payload (REST endpoint)
-    if (pathname === '/api/v1/ws/test-payload' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(JSON.stringify(getWsTestPayload(store), null, 2));
+    // M6 is frozen: neither live frames nor the unauthenticated REST snapshot.
+    if (pathname === '/api/v1/ws/test-payload' || pathname === '/ws/merchant') {
+      return sendError(404, 'Not Found');
     }
 
     // 2. REST API Gateway (/api/v1/*)
     if (pathname.startsWith('/api/v1/')) {
-      let body = {};
-      if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-        const chunks = [];
-        for await (const chunk of req) chunks.push(chunk);
-        const raw = Buffer.concat(chunks).toString('utf8');
-        if (raw) {
-          try { body = JSON.parse(raw); } catch { body = {}; }
-        }
-      }
-      const result = await handleApiRequest(store, req.method, pathname, urlObj.searchParams, body, req.headers);
+      const body = await readJsonBody(req);
+      const result = await apiHandler(store, req.method, pathname, urlObj.searchParams, body, req.headers);
       res.writeHead(result.status, {
         'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'no-store'
+        'Cache-Control': 'private, no-store'
       });
-      return res.end(JSON.stringify(result.data, null, 2));
+      const data = result.status >= 500 ? { error: 'Dịch vụ tạm thời chưa sẵn sàng', request_id: id } : result.data;
+      return res.end(JSON.stringify(data, null, 2));
     }
 
     // 3. Serve PWA Web Manifest & Service Worker
@@ -125,11 +140,19 @@ export function createAppServer() {
     if (serveUiPage(req, res, pathname)) return;
 
     res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ error: 'Not Found', path: pathname }));
+    res.end(JSON.stringify({ error: 'Not Found' }));
+    } catch (err) {
+      if (res.headersSent) { res.destroy(); return; }
+      const status = err instanceof HttpError ? err.status : 500;
+      sendError(status, status === 500 ? 'Có lỗi xảy ra, vui lòng thử lại sau' : err.message);
+    }
   });
-
-  // Wire up WebSocket on the same HTTP server
-  setupWebSocket(server, store);
+  server.requestTimeout = 30_000;
+  server.headersTimeout = 15_000;
+  server.on('upgrade', (_req, socket) => {
+    socket.on('error', () => {});
+    socket.end('HTTP/1.1 404 Not Found\\r\\nConnection: close\\r\\nContent-Length: 0\\r\\n\\r\\n');
+  });
 
   // Storage: call initRepository(store) before listening (done below when run directly).
   // Without it the API uses the in-memory store.
@@ -165,8 +188,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
     console.log(`   - REST API Gateway:              http://127.0.0.1:${PORT}/api/v1/suggestions/today`);
     console.log(`   - Gemini AI Chat (M3-S04):       http://127.0.0.1:${PORT}/api/v1/chat`);
     console.log(`   - Dish Cultural Story (M14):     http://127.0.0.1:${PORT}/api/v1/dishes/DISH-101/story`);
-    console.log(`   - WebSocket Live Dashboard:      ws://127.0.0.1:${PORT}/ws/merchant`);
-    console.log(`   - WS Test Payload (REST):        http://127.0.0.1:${PORT}/api/v1/ws/test-payload`);
+    console.log('   - Merchant WebSocket: disabled (MVP)');
     if (process.env.GEMINI_API_KEY) {
       console.log(`   ✨ Gemini 2.0 Flash API: ACTIVE`);
     } else {
