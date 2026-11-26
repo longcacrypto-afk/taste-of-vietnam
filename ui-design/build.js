@@ -37,7 +37,8 @@ const scriptsBlock = jsFiles
 
 const bundled = shellHtml
   .replace('/*__IMAGES_DATA_PLACEHOLDER__*/ {}', JSON.stringify(imagesMap))
-  .replace('<!--/*__SCREENS_JS_PLACEHOLDER__*/-->', scriptsBlock);
+  .replace('<!--/*__SCREENS_JS_PLACEHOLDER__*/-->', scriptsBlock)
+  .replace('<!--/*__PRODUCT_RUNTIME__*/-->', () => `<script>\n${fs.readFileSync(path.join(srcDir, 'product_runtime.js'), 'utf8')}\n</script>`);
 
 const outIndex = path.join(__dirname, 'index.html');
 fs.writeFileSync(outIndex, bundled, 'utf8');

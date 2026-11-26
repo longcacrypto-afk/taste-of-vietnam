@@ -7,6 +7,8 @@
 // The PayOS webhook is public but must carry a valid signature (router).
 // =============================================================================
 
+import { adminAllowed } from '../services/adminPolicy.js';
+
 const ADMIN_PREFIXES = [
   '/api/v1/admin/',
   '/api/v1/analytics/',
@@ -38,6 +40,7 @@ const PERSONAL_PREFIXES = [
 // Non-GET routes that stay public (no stored data of other people changes)
 const PUBLIC_WRITES = new Set([
   'POST /api/v1/auth/login',
+  'POST /api/v1/auth/google',
   'POST /api/v1/auth/otp/request',
   'POST /api/v1/auth/otp/verify',
   'POST /api/v1/auth/guest',
@@ -63,13 +66,15 @@ export function checkAccess(method, pathname, user) {
 
   if (startsWithAny(pathname, ADMIN_PREFIXES)) {
     if (!user) return deny(401, 'Cần đăng nhập quản trị');
-    if (role !== 'admin') return deny(403, 'Chỉ quản trị viên được truy cập');
+    if (pathname.startsWith('/api/v1/admin/')) {
+      if (!adminAllowed(method, pathname, role)) return deny(403, 'Không có quyền thực hiện thao tác này');
+    } else if (role !== 'super_admin') return deny(403, 'Chỉ quản trị viên cấp cao được truy cập');
     return null;
   }
 
   if (startsWithAny(pathname, MERCHANT_PREFIXES) && !USER_ROUTES_UNDER_MERCHANT.some(r => r.test(pathname))) {
     if (!user) return deny(401, 'Cần đăng nhập tài khoản chủ quán');
-    if (role !== 'merchant' && role !== 'admin') return deny(403, 'Chỉ chủ quán hoặc quản trị viên được truy cập');
+    if (!['merchant', 'merchant_owner', 'merchant_staff', 'super_admin'].includes(role)) return deny(403, 'Chỉ chủ quán hoặc quản trị viên được truy cập');
     return null;
   }
 

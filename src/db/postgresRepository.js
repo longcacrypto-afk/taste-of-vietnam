@@ -1,3 +1,4 @@
+import { mergeProfile, mergeCollections } from '../services/profileService.js';
 // =============================================================================
 // POSTGRESQL REPOSITORY — production storage for the core modules (M1–M5, M7
 // payments/campaigns, M9 admin, M20 community recipes). Same interface as
@@ -5,7 +6,14 @@
 // Schema: src/db/migrations/*.sql (run `npm run db:migrate` first).
 // =============================================================================
 
+import { PolicyError, ROLES, bootstrapAllowed } from '../services/adminPolicy.js';
+import crypto from 'node:crypto';
+import { placeWithStatus, validCoordinates } from '../services/placeQuery.js';
+import { isPlaceEligible } from '../services/placeHours.js';
+
 import { removeVietnameseTones } from '../services/textUtils.js';
+
+import { applyCollectionOperation } from '../services/collectionOps.js';
 
 const GUEST_TTL_DAYS = Number(process.env.GUEST_TTL_DAYS || 30);
 const PRUNE_EVERY_MS = 60 * 60 * 1000;
@@ -19,7 +27,7 @@ const hourToTime = (h, fallback) => `${String(Number.isFinite(Number(h)) ? Math.
 // ── row <-> API object mappers ───────────────────────────────────────────────
 function userFromRow(r) {
   if (!r) return null;
-  return { id: r.id, role: r.role, phone: r.phone, guest: r.is_guest, created_at: iso(r.created_at), profile: r.profile };
+  return { id: r.id, role: r.role, phone: r.phone, guest: r.is_guest, created_at: iso(r.created_at), identity_verified: r.identity_verified, email:r.email,google_sub:r.google_sub,profile: r.profile };
 }
 
 export function dishFromRow(r) {
@@ -36,6 +44,7 @@ export function dishFromRow(r) {
     spice_level: r.spice_level,
     allergen_tags: r.allergen_flags,
     diet_flags: r.diet_flags,
+    safety_status: r.safety_status,
     weather_fit: r.weather_fit,
     tags: r.tags,
     img_key: r.img_key,
@@ -50,7 +59,7 @@ export function dishFromRow(r) {
 /** API dish object -> column values (only the keys present in `d`). */
 function dishColumns(d) {
   const map = {
-    name: 'name', region: 'region', meal_slots: 'meal_slots', ref_price: 'estimated_price_vnd', calories: 'calories',
+    safety_status: 'safety_status', name: 'name', region: 'region', meal_slots: 'meal_slots', ref_price: 'estimated_price_vnd', calories: 'calories',
     prep_minutes: 'prep_time_minutes', difficulty: 'difficulty', spice_level: 'spice_level',
     allergen_tags: 'allergen_flags', diet_flags: 'diet_flags', weather_fit: 'weather_fit', tags: 'tags',
     img_key: 'img_key', description: 'description', base_servings: 'base_servings', market_cost_base: 'market_cost_base'
@@ -76,8 +85,10 @@ function placeFromRow(r) {
     id: r.id,
     name: r.name,
     address: r.address,
-    lat: Number(r.lat),
-    lng: Number(r.lng),
+    lat: r.lat == null ? null : Number(r.lat),
+    lng: r.lng == null ? null : Number(r.lng),
+    opening_hours: r.opening_hours ?? null,
+    verified_at: iso(r.verified_at) ?? null,
     open_hour: r.open_hour,
     close_hour: r.close_hour,
     is_open_override: !r.is_paused,
@@ -93,8 +104,7 @@ function placeFromRow(r) {
     menu: r.menu || []
   };
   if (r.distance_m !== undefined) {
-    out.distance_m = Math.round(Number(r.distance_m));
-    out.is_currently_open = Boolean(r.is_verified && !r.is_paused && r.report_count < 3);
+    out.distance_m = r.distance_m == null ? null : Math.round(Number(r.distance_m));
   }
   return out;
 }
@@ -170,6 +180,7 @@ function orderFromRow(r) {
   return {
     id: r.id, user_id: r.user_id, place_id: r.place_id, place_name: r.place_name, dish_id: r.dish_id, dish_name: r.dish_name,
     partner: r.partner, target_deeplink: r.target_deeplink, fallback_web_url: r.fallback_web_url,
+    action_type: r.action_type, clicked_at: iso(r.clicked_at), confirmed_at: iso(r.confirmed_at) || null,
     loopback_confirmed_eaten: r.loopback_confirmed_eaten, created_at: iso(r.created_at)
   };
 }
@@ -198,6 +209,66 @@ export class PostgresRepository {
     }
   }
 
+  async loginGoogle(identity, guestId, fresh) {
+    return this.tx(async c => {
+      // Catalogue barrier MUST precede identity/account locks (same order as M2).
+      // Dish deletion takes it exclusively, preventing merged dangling references.
+      await c.query("SELECT pg_advisory_xact_lock_shared(hashtext('m2-collections-catalogue'))");
+      // Serialize identity creation before looking it up (also across server instances).
+      await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`google:${identity.sub}`]);
+      let row = (await c.query('SELECT * FROM users WHERE google_sub = $1 FOR UPDATE', [identity.sub])).rows[0];
+      const isNew = !row;
+      if (!row) row = (await c.query(`INSERT INTO users
+        (id, role, phone, is_guest, profile, google_sub, email, identity_verified)
+        VALUES ($1, 'user', NULL, FALSE, $2, $3, $4, $5) RETURNING *`,
+        [fresh.id, JSON.stringify(fresh.profile), identity.sub, identity.email, identity.identity_verified])).rows[0];
+      const id = row.id;
+      // A guest can be consumed once only. A body-supplied guest/user id is never used.
+      const guest = guestId ? (await c.query('SELECT * FROM users WHERE id = $1 AND is_guest FOR UPDATE', [guestId])).rows[0] : null;
+      const getCols = async uid => (await c.query('SELECT id,name,dish_ids FROM saved_collections WHERE user_id=$1 ORDER BY position,id FOR UPDATE', [uid])).rows;
+      let cols = isNew ? fresh.savedCollections : await getCols(id);
+      let profile = row.profile;
+      if (guest) {
+        profile = mergeProfile(profile, guest.profile, isNew);
+        cols = mergeCollections(cols, await getCols(guestId));
+      }
+      if (isNew || guest) {
+        const valid = new Set((await c.query('SELECT id FROM dishes')).rows.map(d => d.id));
+        cols = cols.map(col => ({ ...col, dish_ids: (col.dish_ids || []).filter(id => valid.has(id)) }));
+        await c.query('DELETE FROM saved_collections WHERE user_id=$1', [id]);
+        for (let i=0; i<cols.length; i++) await c.query('INSERT INTO saved_collections(user_id,id,name,dish_ids,position) VALUES($1,$2,$3,$4,$5)', [id,cols[i].id,cols[i].name,cols[i].dish_ids,i]);
+      }
+      if (guest) {
+        await c.query('UPDATE suggestion_history SET user_id=$1 WHERE user_id=$2', [id,guestId]);
+        await c.query('UPDATE order_redirects SET user_id=$1 WHERE user_id=$2', [id,guestId]);
+        await c.query('UPDATE place_reports SET user_id=$1 WHERE user_id=$2', [id,guestId]);
+        await c.query('UPDATE community_recipes SET author_id=$1 WHERE author_id=$2', [id,guestId]);
+        await c.query('UPDATE ad_clicks SET user_id=$1 WHERE user_id=$2', [id,guestId]);
+        await c.query('DELETE FROM users WHERE id=$1', [guestId]);
+      }
+      return userFromRow((await c.query('UPDATE users SET profile=$2,email=$3,identity_verified=$4,updated_at=NOW() WHERE id=$1 RETURNING *', [id,JSON.stringify(profile),identity.email,identity.identity_verified])).rows[0]);
+    });
+  }
+
+  async exportUserData(id) {
+    // Consistent snapshot, no shared analytics and no hard limit on history.
+    return this.tx(async c => {
+      await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+      const user = userFromRow((await c.query('SELECT * FROM users WHERE id=$1', [id])).rows[0]);
+      const rows = async (sql) => (await c.query(sql, [id])).rows;
+      return {
+        account: { id: user.id, role: user.role, phone: user.phone, email: user.email, guest: user.guest, created_at: user.created_at },
+        profile: user.profile,
+        suggestion_history: (await rows('SELECT * FROM suggestion_history WHERE user_id=$1 ORDER BY created_at DESC,id DESC')).map(historyFromRow),
+        saved_collections: await rows('SELECT id,name,dish_ids FROM saved_collections WHERE user_id=$1 ORDER BY position,id'),
+        order_redirects: (await rows('SELECT * FROM order_redirects WHERE user_id=$1 ORDER BY created_at DESC,id')).map(orderFromRow),
+        place_reports: await rows('SELECT * FROM place_reports WHERE user_id=$1 ORDER BY created_at DESC,id'),
+        community_recipes: (await rows('SELECT * FROM community_recipes WHERE author_id=$1 ORDER BY id')).map(recipeFromRow),
+        payment_orders: (await rows('SELECT * FROM payment_orders WHERE created_by=$1 ORDER BY created_at,order_id')).map(paymentFromRow)
+      };
+    });
+  }
+
   // ── users & OTP ────────────────────────────────────────────────────────────
   async getUser(id) {
     if (typeof id !== 'string') return null;
@@ -211,8 +282,8 @@ export class PostgresRepository {
   async createUser(user) {
     return this.tx(async (c) => {
       const r = await c.query(
-        `INSERT INTO users (id, role, phone, is_guest, profile, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [user.id, user.role, user.phone, user.guest, JSON.stringify(user.profile || {}), user.created_at || new Date().toISOString()]
+        `INSERT INTO users (id, role, phone, is_guest, profile, created_at, identity_verified) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [user.id, user.role, user.phone, user.guest, JSON.stringify(user.profile || {}), user.created_at || new Date().toISOString(), Boolean(!user.guest && (user.phone || user.identity_verified))]
       );
       let pos = 0;
       for (const col of user.savedCollections || []) {
@@ -244,6 +315,9 @@ export class PostgresRepository {
       if (u.phone) await c.query('DELETE FROM otp_challenges WHERE phone = $1', [u.phone]);
       await c.query('DELETE FROM community_recipes WHERE author_id = $1', [id]);
       await c.query('UPDATE ad_clicks SET user_id = NULL WHERE user_id = $1', [id]);
+      await c.query('UPDATE ad_campaigns SET created_by = NULL WHERE created_by = $1', [id]);
+      if (typeof this.anonymizeAuditActor === 'function') await this.anonymizeAuditActor(id, c);
+      else await c.query("UPDATE rbac_audit_logs SET actor_id = NULL, actor_email = 'deleted-user' WHERE actor_id = $1", [id]);
       await c.query('DELETE FROM users WHERE id = $1', [id]);
       return true;
     });
@@ -303,8 +377,34 @@ export class PostgresRepository {
     return r.rows.map(x => ({ id: x.id, name: x.name, dish_ids: x.dish_ids }));
   }
 
+  async mutateCollection(userId, op) {
+    return this.tx(async c => {
+      // Saves share the catalogue barrier; deletes take it exclusively. This also
+      // prevents a save of dish B copying an old reference to concurrently deleted A.
+      await c.query("SELECT pg_advisory_xact_lock_shared(hashtext('m2-collections-catalogue'))");
+      // Lock the account even for its first save (there may be no collection row).
+      if (!(await c.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId])).rowCount) return null;
+      // Share lock keeps deletion from racing validation/insert.
+      if (['add', 'save_default'].includes(op.type) &&
+          !(await c.query('SELECT id FROM dishes WHERE id = $1 FOR SHARE', [op.dishId])).rowCount) return null;
+      const rows = (await c.query('SELECT id, name, dish_ids FROM saved_collections WHERE user_id = $1 ORDER BY position, id', [userId])).rows;
+      const result = applyCollectionOperation(rows, op);
+      if (!result) return null;
+      await c.query('DELETE FROM saved_collections WHERE user_id = $1', [userId]);
+      for (const [pos, col] of result.collections.entries()) {
+        await c.query('INSERT INTO saved_collections (user_id, id, name, dish_ids, position) VALUES ($1, $2, $3, $4, $5)',
+          [userId, col.id, col.name, col.dish_ids, pos]);
+      }
+      return result;
+    });
+  }
+
   async saveCollections(userId, collections) {
     await this.tx(async (c) => {
+      await c.query("SELECT pg_advisory_xact_lock_shared(hashtext('m2-collections-catalogue'))");
+      if (!(await c.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId])).rowCount) return;
+      const valid = new Set((await c.query('SELECT id FROM dishes')).rows.map(d => d.id));
+      collections = collections.map(col => ({ ...col, dish_ids: (col.dish_ids || []).filter(id => valid.has(id)) }));
       await c.query('DELETE FROM saved_collections WHERE user_id = $1', [userId]);
       let pos = 0;
       for (const col of collections) {
@@ -336,6 +436,7 @@ export class PostgresRepository {
   }
 
   async updateDish(id, patch) {
+    if (['allergen_tags', 'diet_flags', 'ingredients', 'steps'].some(k => patch[k] !== undefined)) patch = { ...patch, safety_status: 'pending' };
     const cols = dishColumns(patch);
     const keys = Object.keys(cols);
     if (!keys.length) return this.getDish(id);
@@ -347,7 +448,12 @@ export class PostgresRepository {
   }
 
   async deleteDish(id) {
-    return (await this.q('DELETE FROM dishes WHERE id = $1', [id])).rowCount > 0;
+    return this.tx(async c => {
+      await c.query("SELECT pg_advisory_xact_lock(hashtext('m2-collections-catalogue'))");
+      const removed = (await c.query('DELETE FROM dishes WHERE id = $1', [id])).rowCount > 0;
+      await c.query('UPDATE saved_collections SET dish_ids = array_remove(dish_ids, $1) WHERE $1 = ANY(dish_ids)', [id]);
+      return removed;
+    });
   }
 
   // ── places (PostGIS) ───────────────────────────────────────────────────────
@@ -361,55 +467,110 @@ export class PostgresRepository {
   }
 
   /** ST_DWithin on the geography column (GiST index), ST_Distance in metres, nearest first. */
-  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true }) {
+  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true, now = new Date(),
+    requireVerifiedHours = process.env.REQUIRE_VERIFIED_HOURS === 'true' }) {
+    const located = validCoordinates(lat, lng);
     const sql = `
-      WITH me AS (SELECT ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography AS g)
+      WITH me AS (SELECT CASE WHEN $4::boolean THEN ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography ELSE NULL END AS g)
       SELECT x.*, ST_Distance(x.geom, me.g) AS distance_m
       FROM (${PLACE_SELECT}) x, me
-      WHERE ST_DWithin(x.geom, me.g, $3)
-        AND (NOT $4::boolean OR (x.is_verified AND NOT x.is_paused AND x.report_count < 3))
+      WHERE (NOT $4::boolean OR ST_DWithin(x.geom, me.g, $3))
         AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM place_dishes pd WHERE pd.place_id = x.id AND pd.dish_id = $5 AND pd.is_available))
-      ORDER BY distance_m ASC
-      LIMIT 100`;
-    const r = await this.q(sql, [Number(lng), Number(lat), Number(radiusM), Boolean(openOnly), dishId || null]);
-    return r.rows.map(placeFromRow);
+      ORDER BY distance_m ASC NULLS LAST, x.id`;
+    const r = await this.q(sql, [located ? lng : null, located ? lat : null, Number(radiusM), located, dishId || null]);
+    // Filter BEFORE limit: a near closed place must not crowd out an open one.
+    return r.rows.map(placeFromRow).map(p => placeWithStatus(p, now))
+      .filter(p => !openOnly || isPlaceEligible(p, now, { requireVerifiedHours })).slice(0, 100);
   }
 
-  async reportPlace(placeId, { reason, userId = null }) {
-    return this.tx(async (c) => {
-      const up = (await c.query(
-        `UPDATE places SET report_count = report_count + 1,
-                is_paused = CASE WHEN report_count + 1 >= 3 THEN TRUE ELSE is_paused END
-         WHERE id = $1 RETURNING id, name, report_count`, [placeId])).rows[0];
-      if (!up) return null;
-      const rep = {
-        id: `rep-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        place_id: up.id,
-        place_name: up.name,
-        reason,
-        report_count: up.report_count,
-        status: up.report_count >= 3 ? 'auto_paused' : 'pending_review',
-        created_at: new Date().toISOString()
-      };
-      await c.query('INSERT INTO place_reports (id, place_id, user_id, reason, report_count, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [rep.id, rep.place_id, userId, rep.reason, rep.report_count, rep.status, rep.created_at]);
-      return rep;
+  async reportPlace(placeId, { reason, userId, reporterKey, evidence = '' }) {
+    return this.tx(async c => {
+      const p = (await c.query('SELECT * FROM places WHERE id = $1 FOR UPDATE', [placeId])).rows[0];
+      if (!p) return null;
+      const prior = (await c.query(`SELECT r.* FROM report_dedupe d JOIN place_reports r ON r.id = d.report_id
+        WHERE d.place_id=$1 AND d.reporter_key=$2 AND d.reason=$3
+          AND d.last_at > NOW() - INTERVAL '24 hours'`, [placeId, reporterKey, reason])).rows[0];
+      if (prior) return { ...prior, duplicate: true };
+      const id = `rep-${crypto.randomUUID()}`;
+      await c.query(`INSERT INTO place_reports(id, place_id, user_id, reason, reporter_key, evidence)
+        VALUES($1,$2,$3,$4,$5,$6)`, [id, placeId, userId, reason, reporterKey, evidence]);
+      await c.query(`INSERT INTO report_dedupe(place_id,reporter_key,reason,report_id,last_at)
+        VALUES($1,$2,$3,$4,NOW()) ON CONFLICT(place_id,reporter_key,reason)
+        DO UPDATE SET report_id=EXCLUDED.report_id,last_at=EXCLUDED.last_at`, [placeId, reporterKey, reason, id]);
+      const n = Number((await c.query(`SELECT COUNT(DISTINCT reporter_key) AS n FROM place_reports
+        WHERE place_id=$1 AND reason='closed' AND reporter_key IS NOT NULL
+          AND status IN ('pending_review','auto_paused') AND created_at > NOW() - INTERVAL '24 hours'`, [placeId])).rows[0].n);
+      await c.query('UPDATE places SET report_count=$2,is_paused=(is_paused OR $2 >= 3) WHERE id=$1', [placeId,n]);
+      const r = (await c.query(`UPDATE place_reports SET report_count=$2,
+        status=CASE WHEN $3 THEN 'auto_paused' ELSE 'pending_review' END WHERE id=$1 RETURNING *`, [id,n,reason === 'closed' && n >= 3])).rows[0];
+      if (!p.is_paused && n >= 3) await c.query(`INSERT INTO rbac_audit_logs
+        (actor_email,actor_id,role,action,target,before_data,after_data,reason,request_id,ip_address)
+        VALUES('closure_guard',$1,'system','AUTO_PAUSE_PLACE',$2,$3,$4,'3 distinct verified accounts / 24h',$5,'unknown')`,
+        [userId,placeId,JSON.stringify({is_paused:p.is_paused,report_count:p.report_count}),JSON.stringify({is_paused:true,report_count:n}),crypto.randomUUID()]);
+      return { ...r, place_name:p.name };
     });
   }
 
-  async unpausePlace(placeId) {
-    const ok = await this.tx(async (c) => {
-      const r = await c.query('UPDATE places SET is_verified = TRUE, is_paused = FALSE, report_count = 0 WHERE id = $1', [placeId]);
-      if (!r.rowCount) return false;
-      await c.query('DELETE FROM place_reports WHERE place_id = $1', [placeId]);
-      return true;
-    });
-    return ok ? this.getPlace(placeId) : null;
+  async unpausePlace(placeId, { approve = false } = {}) {
+    const r = await this.q(`UPDATE places SET is_verified=CASE WHEN $2 THEN TRUE ELSE is_verified END,
+      is_paused=CASE WHEN $2 THEN is_paused ELSE FALSE END,
+      report_count=CASE WHEN $2 THEN report_count ELSE 0 END WHERE id=$1 RETURNING id`,[placeId,approve]);
+    if (!r.rowCount) return null;
+    if (!approve) await this.q(`UPDATE place_reports SET status='resolved',resolved_at=NOW()
+      WHERE place_id=$1 AND status IN ('pending_review','auto_paused')`,[placeId]);
+    return this.getPlace(placeId);
   }
+
+  async lockPlace(id) { await this.q('SELECT id FROM places WHERE id=$1 FOR UPDATE',[id]); }
 
   async listUserReports() {
-    const r = await this.q(`SELECT r.*, p.name AS place_name FROM place_reports r JOIN places p ON p.id = r.place_id ORDER BY r.created_at DESC LIMIT 200`);
-    return r.rows.map(reportFromRow);
+    const r = await this.q(`SELECT r.*, p.name AS place_name FROM place_reports r JOIN places p ON p.id = r.place_id ORDER BY r.created_at DESC, r.id DESC`);
+    return r.rows.map(r => ({...r, created_at:iso(r.created_at),resolved_at:iso(r.resolved_at)}));
+  }
+
+  async updateReport(id, { status, reason, actorId }) {
+    return (await this.q(`UPDATE place_reports SET status=$2,resolution_reason=$3,resolved_by=$4,resolved_at=NOW()
+      WHERE id=$1 AND status IN ('pending_review','auto_paused') RETURNING *`,[id,status,reason,actorId])).rows[0] || null;
+  }
+
+  async listUsers() {
+    return (await this.q('SELECT id,role,is_guest,created_at FROM users ORDER BY created_at,id')).rows.map(r => ({id:r.id,role:r.role,guest:r.is_guest,created_at:iso(r.created_at)}));
+  }
+
+  async atomic(fn) {
+    return this.tx(async c => {
+      await c.query("SELECT pg_advisory_xact_lock(hashtext('m9-role-grants'))");
+      const repo = Object.create(this); // preserve repository hooks in the same transaction
+      repo.q = (text,params) => c.query(text,params);
+      repo.inAtomic = true;
+      repo.tx = inner => inner(c);
+      return fn(repo);
+    });
+  }
+
+  async bootstrapSuperAdmin(id) {
+    return this.atomic(async repo => {
+      if ((await repo.listUsers()).some(u => u.role === 'super_admin')) return false;
+      const user = await repo.getUser(id);
+      if (!bootstrapAllowed(user)) return false;
+      await repo.setUserRole(id,'super_admin');
+      await repo.addAudit({actor:id,actor_id:id,role:'system',action:'BOOTSTRAP_SUPER_ADMIN',target:id,
+        before:{role:user.role},after:{role:'super_admin'},reason:'verified identity on bootstrap allowlist',requestId:crypto.randomUUID()});
+      return true;
+    });
+  }
+
+  async assignRole(id, role) {
+    const user = await this.getUser(id);
+    if (!user) throw new PolicyError(404,'Không tìm thấy tài khoản');
+    if (user.guest) throw new PolicyError(400,'Không thể cấp vai trò cho khách');
+    if (!ROLES.some(r=>r.id===role)) throw new PolicyError(400,'Vai trò không hợp lệ');
+    if (user.role === 'super_admin' && role !== 'super_admin' &&
+      (await this.listUsers()).filter(u=>u.role === 'super_admin').length <= 1) {
+      throw new PolicyError(409,'Không thể gỡ quản trị viên cấp cao cuối cùng');
+    }
+    await this.setUserRole(id,role);
+    return this.getUser(id);
   }
 
   // ── OCR moderation ─────────────────────────────────────────────────────────
@@ -527,9 +688,9 @@ export class PostgresRepository {
   // ── M5 order redirects ─────────────────────────────────────────────────────
   async createOrderRedirect(o) {
     await this.q(
-      `INSERT INTO order_redirects (id, user_id, place_id, place_name, dish_id, dish_name, partner, target_deeplink, fallback_web_url, loopback_confirmed_eaten, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [o.id, o.user_id, o.place_id, o.place_name, o.dish_id, o.dish_name, o.partner, o.target_deeplink, o.fallback_web_url, o.loopback_confirmed_eaten, o.created_at]);
+      `INSERT INTO order_redirects (id, user_id, place_id, place_name, dish_id, dish_name, partner, target_deeplink, fallback_web_url, loopback_confirmed_eaten, created_at, action_type, clicked_at, confirmed_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [o.id, o.user_id, o.place_id, o.place_name, o.dish_id, o.dish_name, o.partner, o.target_deeplink, o.fallback_web_url, o.loopback_confirmed_eaten, o.created_at, o.action_type, o.clicked_at, o.confirmed_at]);
     return o;
   }
 
@@ -538,9 +699,26 @@ export class PostgresRepository {
     return r ? orderFromRow(r) : null;
   }
 
-  async confirmOrderEaten(id) {
-    const r = (await this.q('UPDATE order_redirects SET loopback_confirmed_eaten = TRUE WHERE id = $1 RETURNING *', [id])).rows[0];
-    return r ? orderFromRow(r) : null;
+  async listOrderRedirects(userId) {
+    if (!userId) return [];
+    return (await this.q('SELECT * FROM order_redirects WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50', [userId])).rows.map(orderFromRow);
+  }
+
+  async confirmOrderEaten(id, userId) {
+    if (!userId) return null;
+    return this.tx(async c => {
+      const r = (await c.query('SELECT * FROM order_redirects WHERE id = $1 AND user_id = $2 FOR UPDATE', [id, userId])).rows[0];
+      if (!r) return null;
+      if (!r.dish_id) return { no_dish: true };
+      if (r.loopback_confirmed_eaten) return { order: orderFromRow(r), already_confirmed: true };
+      const now = new Date().toISOString();
+      await c.query(
+        `INSERT INTO suggestion_history (id, user_id, dish_id, dish_name, place_id, place_name, price_vnd, action, created_at)
+         VALUES ($1,$2,$3::varchar(32),$4,$5,$6,(SELECT estimated_price_vnd FROM dishes WHERE id = $3::varchar(32)),'eaten',$7)`,
+        [`hist-${id}`, userId, r.dish_id, r.dish_name, r.place_id, r.place_name, now]);
+      const updated = (await c.query('UPDATE order_redirects SET loopback_confirmed_eaten = TRUE, confirmed_at = $2 WHERE id = $1 RETURNING *', [id, now])).rows[0];
+      return { order: orderFromRow(updated), already_confirmed: false };
+    });
   }
 
   // ── M20 community recipes ──────────────────────────────────────────────────
@@ -589,9 +767,26 @@ export class PostgresRepository {
   // ── M9 audit log ───────────────────────────────────────────────────────────
   async addAudit(e) {
     const r = await this.q(
-      `INSERT INTO rbac_audit_logs (actor_email, actor_id, role, action, target, ip_address) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [String(e.actor || 'unknown').slice(0, 255), e.actor_id || null, e.role || 'unknown', e.action, e.target ? String(e.target).slice(0, 255) : null, String(e.ip || 'unknown').slice(0, 45)]);
+      `INSERT INTO rbac_audit_logs (actor_email, actor_id, role, action, target, ip_address,before_data,after_data,reason,request_id) VALUES ($1, $2, $3, $4, $5, $6,$7,$8,$9,$10) RETURNING *`,
+      [String(e.actor || 'unknown').slice(0, 255), e.actor_id || null, e.role || 'unknown', e.action, e.target ? String(e.target).slice(0, 255) : null, String(e.ip || 'unknown').slice(0, 45),JSON.stringify(e.before ?? null),JSON.stringify(e.after ?? null),e.reason || null,e.requestId || crypto.randomUUID()]);
     return auditFromRow(r.rows[0]);
+  }
+
+  // Call through atomic() alongside account deletion. No business fields may change.
+  async anonymizeAuditActor(userId, client = null) {
+    if (client) {
+      const scoped=new PostgresRepository(this.pool);
+      scoped.q=(text,params)=>client.query(text,params);
+      scoped.inAtomic=true;
+      return scoped.anonymizeAuditActor(userId);
+    }
+    if (!this.inAtomic) return this.atomic(tx=>tx.anonymizeAuditActor(userId));
+    const n=Number((await this.q('SELECT COUNT(*) AS n FROM rbac_audit_logs WHERE actor_id=$1',[userId])).rows[0].n);
+    if (!n) return 0;
+    await this.addAudit({actor:'privacy-service',role:'system',action:'ANONYMIZE_ACTOR',target:'deleted-user',
+      before:{entries:n},after:{actor_id:null,actor:'deleted-user'},reason:'Account deletion'});
+    await this.q("UPDATE rbac_audit_logs SET actor_id=NULL,actor_email='deleted-user' WHERE actor_id=$1",[userId]);
+    return n;
   }
 
   async listAudit(limit = 100) {
@@ -600,7 +795,7 @@ export class PostgresRepository {
 }
 
 function auditFromRow(r) {
-  return { id: r.id, actor: r.actor_email, actor_id: r.actor_id, role: r.role, action: r.action, target: r.target, ip: r.ip_address, timestamp: iso(r.created_at) };
+  return { id: r.id, actor: r.actor_email, actor_id: r.actor_id, role: r.role, action: r.action, target: r.target, ip: r.ip_address, before:r.before_data,after:r.after_data,reason:r.reason,request_id:r.request_id,timestamp: iso(r.created_at) };
 }
 
 export { hourToTime };

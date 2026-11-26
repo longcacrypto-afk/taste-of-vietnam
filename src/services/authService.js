@@ -6,6 +6,7 @@
 // =============================================================================
 
 import crypto from 'node:crypto';
+import { defaultProfile } from './profileService.js';
 
 const OTP_TTL_MS = 5 * 60 * 1000;      // code valid 5 minutes
 const OTP_RESEND_MS = 30 * 1000;       // at most one code per phone every 30 s
@@ -76,7 +77,7 @@ function phoneList(envName) {
 
 /** Role from env: ADMIN_PHONES / MERCHANT_PHONES (comma-separated). Default 'user'. */
 export function roleForPhone(phone) {
-  if (phoneList('ADMIN_PHONES').includes(phone)) return 'admin';
+  // ADMIN_PHONES bootstraps the first super_admin after identity verification, never on every login.
   if (phoneList('MERCHANT_PHONES').includes(phone)) return 'merchant';
   return 'user';
 }
@@ -150,8 +151,7 @@ export async function requestOtp(repo, rawPhone) {
 }
 
 function newProfile(template, id, { name, phone }) {
-  const base = JSON.parse(JSON.stringify(template || {}));
-  return { ...base, id, name, phone: phone || null, disliked_dish_ids: [] };
+  return defaultProfile(id, name, phone);
 }
 
 async function createUser(repo, template, { phone = null, role = 'user', guest = false }) {
@@ -199,9 +199,9 @@ export async function verifyOtp(repo, rawPhone, rawCode, template = {}) {
   let user = await repo.findUserByPhone(phone);
   const role = roleForPhone(phone);
   if (!user) user = await createUser(repo, template, { phone, role });
-  else if (user.role !== role) {
-    await repo.setUserRole(user.id, role);
-    user.role = role;
+  if (phoneList('ADMIN_PHONES').includes(phone)) {
+    await repo.bootstrapSuperAdmin(user.id);
+    user = await repo.getUser(user.id);
   }
   return { status: 200, data: { verified: true, access_token: issue(user), token_type: 'Bearer', expires_in_s: TOKEN_TTL_S, role: user.role, user: user.profile } };
 }
@@ -224,7 +224,14 @@ export async function authenticate(repo, headers = {}) {
 
 /** DELETE /me: remove the account and everything personal (see the repository's deleteUser). */
 export async function deleteUser(repo, userId) {
-  return repo.deleteUser(userId);
+  return repo.atomic(async tx => {
+    const user = await tx.getUser(userId);
+    if (user?.role === 'super_admin' && (await tx.listUsers()).filter(u => u.role === 'super_admin').length <= 1) {
+      return false;
+    }
+    // deleteUser owns audit anonymization in this same transaction.
+    return tx.deleteUser(userId);
+  });
 }
 
 /**

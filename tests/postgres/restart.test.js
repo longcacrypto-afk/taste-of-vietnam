@@ -91,7 +91,7 @@ test('Restart survival: accounts, tokens, profile, history, collections, recipes
 
   const aOtp = await call('POST', '/api/v1/auth/otp/request', { body: { phone: ADMIN_PHONE } });
   const admin = await call('POST', '/api/v1/auth/otp/verify', { body: { phone: ADMIN_PHONE, code: aOtp.data.dev_code } });
-  assert.equal(admin.data.role, 'admin');
+  assert.equal(admin.data.role, 'super_admin');
   const dish = await call('POST', '/api/v1/admin/dishes', { token: admin.data.access_token, body: { name: 'Hủ Tiếu Nam Vang', ref_price: 45000 } });
   assert.equal(dish.status, 201);
   const report = await call('POST', '/api/v1/places/PLACE-401/reports', { token, body: { reason: 'Đóng cửa' } });

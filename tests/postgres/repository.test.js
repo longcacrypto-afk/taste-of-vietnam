@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { createInitialStore } from '../../src/data/seed.js';
 import { handleApiRequest } from '../../src/api/router.js';
 import { initRepository } from '../../src/db/repository.js';
-import { runMigrations } from '../../src/db/migrate.js';
+import { runMigrations, listMigrationFiles } from '../../src/db/migrate.js';
 import { haversineDistanceMeters } from '../../src/services/textUtils.js';
 import { signPayosData } from '../../src/services/paymentService.js';
 import { suggestionCache } from '../../src/services/cacheService.js';
@@ -61,7 +61,9 @@ after(async () => {
 
 test('Migrations: ordered, recorded once, re-running is a no-op; seed loaded 12 dishes / 8 places', { skip }, async () => {
   const applied = (await db.query('SELECT version, name FROM schema_migrations ORDER BY version')).rows.map(r => r.name);
-  assert.deepEqual(applied, ['001_baseline', '002_p1_core']);
+  assert.deepEqual(applied, listMigrationFiles().map(m => m.name));
+  assert.ok(applied.includes('003_m9_rbac_reports'));
+  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '003_m9_rbac_reports', '004_m1_google_auth', '006_m5_redirect', '007_m3_safety_approval', '008_m4_places_hours']);
   assert.deepEqual(await runMigrations(db, { log: () => {} }), []);
   assert.equal(await count('SELECT COUNT(*) n FROM dishes'), 12);
   assert.equal(await count('SELECT COUNT(*) n FROM places'), 8);
@@ -73,7 +75,7 @@ test('Server refuses to use a database with pending migrations (no silent fallba
   try {
     await assert.rejects(
       initRepository(createInitialStore(), { databaseUrl: scratch.url, autoMigrate: false, log: () => {} }),
-      /missing migrations: 001_baseline, 002_p1_core.*npm run db:migrate/
+      /missing migrations: 001_baseline, 002_p1_core.*004_m1_google_auth.*npm run db:migrate/
     );
     // DB_AUTO_MIGRATE=true migrates instead
     const s = createInitialStore();
@@ -178,16 +180,18 @@ test('M3 feedback and M5 loopback are stored per user and drive the 3-day cooldo
 });
 
 test('M4 reports auto-pause a place; M9 admin un-pause, dish CRUD and OCR review write the audit log', { skip }, async () => {
-  const u = await guest();
-  for (let i = 0; i < 3; i++) await api('POST', '/api/v1/places/PLACE-404/reports', { headers: u.headers, body: { reason: 'Đóng cửa' } });
+  for (let i = 0; i < 3; i++) {
+    const u = await login('091300000' + i);
+    await api('POST', '/api/v1/places/PLACE-404/reports', { headers: u.headers, body: { reason: 'Đóng cửa' } });
+  }
   const p = await one(`SELECT is_paused, report_count FROM places WHERE id = 'PLACE-404'`);
   assert.deepEqual(p, { is_paused: true, report_count: 3 });
 
   const admin = await login(ADMIN_PHONE);
-  const un = await api('POST', '/api/v1/admin/places/PLACE-404/unpause', { headers: admin.headers });
+  const un = await api('POST', '/api/v1/admin/places/PLACE-404/unpause', { headers: admin.headers,body:{reason:'Đã xác minh mở lại'} });
   assert.equal(un.data.unpaused_place.is_open_override, true);
-  assert.equal(await count(`SELECT COUNT(*) n FROM place_reports WHERE place_id = 'PLACE-404'`), 0);
-  assert.equal((await api('POST', '/api/v1/admin/places/NOPE/unpause', { headers: admin.headers })).status, 404);
+  assert.equal(await count(`SELECT COUNT(*) n FROM place_reports WHERE place_id = 'PLACE-404'`), 3);
+  assert.equal((await api('POST', '/api/v1/admin/places/NOPE/unpause', { headers: admin.headers,body:{reason:'Đã kiểm tra'} })).status, 404);
 
   const created = await api('POST', '/api/v1/admin/dishes', { headers: admin.headers, body: { name: 'Bún Mắm Miền Tây', allergens: ['fish'], spice_level: 9 } });
   assert.equal(created.status, 201);
@@ -210,7 +214,7 @@ test('M4 reports auto-pause a place; M9 admin un-pause, dish CRUD and OCR review
   const logs = await api('GET', '/api/v1/admin/audit-logs', { headers: admin.headers });
   const actions = logs.data.logs.map(l => l.action);
   for (const a of ['UNPAUSE_PLACE', 'CREATE_DISH', 'UPDATE_DISH', 'DELETE_DISH', 'REJECT_OCR_MENU']) assert.ok(actions.includes(a), a);
-  assert.equal(await count(`SELECT COUNT(*) n FROM rbac_audit_logs WHERE actor_id = $1`, [admin.id]), 5);
+  assert.equal(await count(`SELECT COUNT(*) n FROM rbac_audit_logs WHERE actor_id = $1 AND action <> 'BOOTSTRAP_SUPER_ADMIN'`, [admin.id]), 5);
 
   const dash = await api('GET', '/api/v1/admin/dashboard', { headers: admin.headers });
   assert.equal(dash.data.total_dishes, 12);
@@ -315,7 +319,7 @@ test('Upgrading a database set up by hand with the old schema.sql + old seed kee
     await pool.query(fs.readFileSync(new URL('../../src/db/migrations/001_baseline.sql', import.meta.url), 'utf8'));
     await pool.query(`INSERT INTO dishes (id, name, unaccented_name, region, estimated_price_vnd) VALUES ('DISH-101', 'Phở Bò Tái Nạm Hà Nội', 'Phở Bò Tái Nạm Hà Nội', 'bac', 45000)`);
     await pool.query(`INSERT INTO ad_campaigns (id, cpc_vnd, balance_vnd, is_active) VALUES ('CMP-701', 4000, 1500000, true)`);
-    assert.deepEqual(await runMigrations(pool, { log: () => {} }), ['001_baseline', '002_p1_core']);
+    assert.deepEqual(await runMigrations(pool, { log: () => {} }), listMigrationFiles().map(m => m.name));
     assert.equal((await pool.query(`SELECT balance_vnd FROM ad_campaigns WHERE id = 'CMP-701'`)).rows[0].balance_vnd, 1500000, 'money column untouched');
     await seedCatalog(pool, { log: () => {} });
     assert.equal((await pool.query(`SELECT description FROM dishes WHERE id = 'DISH-101'`)).rows[0].description, '', 'plain seed never overwrites');

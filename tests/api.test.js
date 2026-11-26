@@ -85,7 +85,9 @@ test('M2-S06: Recipe Dynamic Portion Scaler scales ingredient grams and calories
   assert.equal(res.data.requested_servings, 6);
   const banhPho = res.data.scaled_ingredients.find(i => i.name.includes('Bánh phở'));
   assert.equal(banhPho.scaled_amount, 1050);
-  assert.equal(res.data.scaled_calories_total, 480 * 3);
+  // TECHNICAL_HANDOFF_SPEC defines calories_per_serving, not per base recipe.
+  assert.equal(res.data.nutrition_basis, 'per_serving');
+  assert.equal(res.data.scaled_calories_total, 480 * 6);
 });
 
 test('M3-S04 & M3-S05: Vietnamese Natural Language Chat extracts party size, budget, kids & returns verified options', async () => {
@@ -101,7 +103,7 @@ test('M3-S04 & M3-S05: Vietnamese Natural Language Chat extracts party size, bud
   assert.ok(res.data.options.length > 0);
 });
 
-test('QA-09, M4-S06 & M9-S06: Closed places are excluded and 3 user reports auto-pause a restaurant', async () => {
+test('QA-09, M4-S06 & M9-S06: Closed places excluded; repeated reports by one person never auto-pause', async () => {
   const store = createInitialStore();
   const openRes = await call(store, 'GET', '/api/v1/places', new URLSearchParams({ open_only: 'true' }));
   assert.ok(!openRes.data.items.some(p => p.id === 'PLACE-405'));
@@ -109,7 +111,8 @@ test('QA-09, M4-S06 & M9-S06: Closed places are excluded and 3 user reports auto
   await call(store, 'POST', '/api/v1/places/PLACE-404/reports', new URLSearchParams(), { reason: 'Đóng cửa' });
   await call(store, 'POST', '/api/v1/places/PLACE-404/reports', new URLSearchParams(), { reason: 'Đóng cửa' });
   const third = await call(store, 'POST', '/api/v1/places/PLACE-404/reports', new URLSearchParams(), { reason: 'Đóng cửa' });
-  assert.equal(third.data.status, 'auto_paused');
+  assert.equal(third.data.duplicate, true);
+  assert.equal(third.data.status, 'pending_review');
 });
 
 test('M5-S01 & M5-S05: Order Deep-Link Redirect logs UTM tracking & Loopback Confirmation updates 3-day cooldown', async () => {
@@ -296,6 +299,7 @@ test('M7 (VietQR & PayOS Webhook): Invoice generation, EMVCo payload, webhook to
 test('M2/M3 (Semantic Dish Search): Concept matching, allergy safety, and similarity scoring', async () => {
   const store = createInitialStore();
 
+  await call(store, 'PATCH', '/api/v1/me/profile', new URLSearchParams(), { hard_allergies: ['shrimp'] });
   // Query: món nước ấm bụng trời mưa
   const searchRes = await call(store, 'GET', '/api/v1/dishes/semantic-search', new URLSearchParams({ q: 'mon nuoc am bung troi mua' }));
   assert.equal(searchRes.status, 200);
@@ -356,13 +360,13 @@ test('M9: Admin OCR Review rejection with reason & Restaurant Un-pause auto-reco
   assert.ok(store.userReports.some(r => r.place_id === 'PLACE-405'));
 
   // 3. Admin un-pauses restaurant PLACE-405
-  const unpauseRes = await call(store, 'POST', '/api/v1/admin/places/PLACE-405/unpause', new URLSearchParams());
+  const unpauseRes = await call(store, 'POST', '/api/v1/admin/places/PLACE-405/unpause', new URLSearchParams(), { reason:'Đã kiểm tra lại quán' });
   assert.equal(unpauseRes.status, 200);
   assert.equal(unpauseRes.data.unpaused_place.is_open_override, true);
   assert.equal(unpauseRes.data.unpaused_place.closed_report_count, 0);
 
-  // 4. Verify userReports no longer contains PLACE-405
-  assert.ok(!store.userReports.some(r => r.place_id === 'PLACE-405'));
+  // 4. Reports remain as evidence, with their resolution status.
+  assert.ok(store.userReports.filter(r => r.place_id === 'PLACE-405').every(r=>r.status==='resolved'));
 });
 
 test('M8 & M3-S06: Notification Queue API & Suggestion Feedback actions (liked, skipped, eaten)', async () => {
@@ -474,13 +478,13 @@ test('E2E Full Loop (M1 -> M3 -> M2 -> M4 -> M5 -> Cooldown -> M8 -> M18 -> M19 
 
   // Step 1: Onboard User with Shrimp allergy & Spicy tolerance level 1
   const updateProfileRes = await call(store, 'PUT', '/api/v1/me/profile', new URLSearchParams(), {
-    allergies: ['shrimp', 'peanut'],
-    spiciness_level: 1,
-    budget_level: 'medium',
-    diet_preference: 'balanced'
+    hard_allergies: ['shrimp', 'peanut'],
+    spice_level: 1,
+    budget_min: 0, budget_max: 65000,
+    diet_mode: 'balanced'
   });
   assert.equal(updateProfileRes.status, 200);
-  assert.deepEqual(updateProfileRes.data.allergies, ['shrimp', 'peanut']);
+  assert.deepEqual(updateProfileRes.data.hard_allergies, ['shrimp', 'peanut']);
 
   // Step 2: Fetch Today's 3 Suggestions (M3-S01)
   const sugRes = await call(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
@@ -574,7 +578,7 @@ test('AUDIT-GAPS: M1 PDPD export, M6 daily-special, M7 fraud-logs, M9 RBAC & M10
   const exportRes = await call(store, 'GET', '/api/v1/me/export', new URLSearchParams());
   assert.equal(exportRes.status, 200);
   assert.equal(exportRes.data.export_format, 'JSON');
-  assert.ok(exportRes.data.pdpd_compliance.includes('13/2023/NĐ-CP'));
+  assert.equal(exportRes.data.analytics_summary, undefined, 'no shared analytics in a personal export');
   assert.ok(exportRes.data.profile);
 
   // M6-S07: Daily Special Tagging
@@ -602,7 +606,7 @@ test('AUDIT-GAPS: M1 PDPD export, M6 daily-special, M7 fraud-logs, M9 RBAC & M10
 
   const rbacUsersRes = await call(store, 'GET', '/api/v1/admin/rbac/users', new URLSearchParams());
   assert.equal(rbacUsersRes.status, 200);
-  assert.ok(rbacUsersRes.data.users.length >= 3);
+  assert.equal(rbacUsersRes.data.users.length, Object.keys(store.users).length);
 
   // M10-S06: A/B Testing
   const abRes = await call(store, 'GET', '/api/v1/analytics/ab-test', new URLSearchParams());

@@ -3,9 +3,10 @@
 // Strategy: Network First with graceful offline fallback & precache (Never crashes)
 // =============================================================================
 
-const CACHE_NAME = 'hnag-v11';
+const CACHE_NAME = 'hnag-v13-existing-ui';
 const PRECACHE_ASSETS = [
   '/',
+  '/app',
   '/manifest.json',
   '/assets/tailwindcss.min.js',
   '/assets/avatar_mam_ai.jpg',
@@ -61,6 +62,9 @@ self.addEventListener('fetch', (event) => {
 
   // Let browser natively handle cross-origin assets (e.g. Google Fonts)
   if (url.origin !== self.location.origin) return;
+
+  // Never persist protected pages or per-user data, including offline fallbacks.
+  if (url.pathname === '/studio' || url.pathname.startsWith('/api/') || url.pathname === '/health') return;
 
   event.respondWith(
     fetch(event.request)

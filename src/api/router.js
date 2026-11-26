@@ -1,16 +1,28 @@
+import { googleConfig, googleLogin } from '../services/googleAuthService.js';
+import { validateProfilePatch } from '../services/profileService.js';
+import { parsePlaceQuery, placeWithStatus, placeDistance } from '../services/placeQuery.js';
 // =============================================================================
 // REST API GATEWAY ROUTER (/api/v1/*) — HÔM NAY ĂN GÌ · TASTE OF VIETNAM
 // Core launch modules (M1–M5, M7 campaigns/payments, M9 admin, M20 recipes)
 // read and write through the repository (src/db/repository.js): PostgreSQL in
 // production, the in-memory store in tests/dev. Frozen modules live in
 // ./frozenRoutes.js.
+// ======================================================================
+import { handleAdminRoute } from './adminRoutes.js';
+import { reportInput } from '../services/reportPolicy.js';
+import { PolicyError } from '../services/adminPolicy.js';
+import { randomUUID } from 'node:crypto';
+import { buildRedirect, redirectAction } from '../services/redirectService.js';
 // =============================================================================
 
+import { createHash } from 'node:crypto';
+import { buildCandidates } from '../services/candidatePipeline.js';
+import { getPlaceOpenStatus } from '../services/placeHours.js';
 import { matchesVietnameseQuery } from '../services/textUtils.js';
 import { getTodaySuggestions, isDishSafeForUser } from '../services/recommender.js';
 import { runAiFoodChat } from '../services/intentParser.js';
 import { updateMealReminderSchedule } from '../services/expansionServices.js';
-import { callGeminiChat, generateDishStory } from '../services/geminiService.js';
+import { generateDishStory } from '../services/geminiService.js';
 import { generateVietQrInvoice, verifyPaymentWebhookSignature } from '../services/paymentService.js';
 import { searchDishesSemantically } from '../services/semanticSearch.js';
 import { suggestionCache } from '../services/cacheService.js';
@@ -18,6 +30,7 @@ import { checkAccess } from './accessPolicy.js';
 import { requestOtp, verifyOtp, createGuest, authenticate, deleteUser, scopeStoreToUser } from '../services/authService.js';
 import { getRepository } from '../db/repository.js';
 import { handleFrozenRoute } from './frozenRoutes.js';
+import { handleDishRoutes } from './dishRoutes.js';
 
 // User-supplied text: drop HTML tags and stray angle brackets / control chars, trim, cap length.
 // (The UI also escapes on output; this keeps stored data clean for other clients like Flutter.)
@@ -56,6 +69,8 @@ async function openPlacesForDish(repo, dishId, profile, radiusM) {
       place_name: p.name,
       address: p.address,
       distance_m: p.distance_m,
+      open_status: p.open_status,
+      is_currently_open: p.is_currently_open,
       price_vnd: item ? item.price : null,
       rating: p.rating,
       has_ac: p.has_ac,
@@ -92,28 +107,29 @@ async function buildView(repo, store, authUser) {
   });
 }
 
-function clientIp(headers) {
-  return String(headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown').split(',')[0].trim();
-}
-
 export async function handleApiRequest(store, method, pathname, searchParams, body = {}, headers = {}) {
   const repo = getRepository(store);
   // Who is calling? (null = anonymous)
   const authUser = await authenticate(repo, headers);
   const denied = checkAccess(method, pathname, authUser);
   if (denied) return denied;
+  const rawBody = body;
   body = body && typeof body === 'object' ? body : {};
 
+  if (pathname.startsWith('/api/v1/admin/')) {
+    try { return await handleAdminRoute(repo, authUser, method, pathname, searchParams, body, headers, store); }
+    catch(e) { if(e instanceof PolicyError) return {status:e.status,data:{error:e.message}}; throw e; }
+  }
   const userId = authUser ? authUser.id : null;
   // The caller's taste profile; anonymous reads use the shared default profile.
   const profile = authUser ? authUser.profile : store.userProfile;
-  const audit = (action, target) => repo.addAudit({
-    actor: authUser.phone || authUser.id, actor_id: authUser.id, role: authUser.role, action, target, ip: clientIp(headers)
-  });
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M1: ACCOUNT, AUTH, ONBOARDING & TASTE PROFILE (M1-S01 .. M1-S10)
-  // ===========================================================================
+  // ====================================================================
+  if (pathname === '/api/v1/auth/google/config' && method === 'GET') return { status: 200, data: googleConfig() };
+  if (pathname === '/api/v1/auth/google' && method === 'POST') return googleLogin(repo, body.id_token, authUser);
+
   // Request an OTP for a phone number (/auth/login kept as an alias)
   if ((pathname === '/api/v1/auth/otp/request' || pathname === '/api/v1/auth/login') && method === 'POST') {
     const res = await requestOtp(repo, body.phone);
@@ -143,27 +159,29 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   if (pathname === '/api/v1/me/profile' && (method === 'PUT' || method === 'PATCH')) {
     if (!authUser) return UNAUTHORIZED;
-    const { id: _id, phone: _phone, role: _role, ...changes } = body;
-    const next = { ...profile, ...changes };
+    const validated = validateProfilePatch(profile, rawBody);
+    if (validated.error) return { status: 400, data: { error: validated.error } };
+    const next = validated.profile;
     if (Buffer.byteLength(JSON.stringify(next)) > MAX_PROFILE_BYTES) {
       return { status: 413, data: { error: 'Hồ sơ quá lớn' } };
     }
-    Object.assign(profile, changes);
-    await repo.saveProfile(authUser.id, profile);
+    await repo.saveProfile(authUser.id, next);
     suggestionCache.invalidateUser(profile.id);
-    return { status: 200, data: profile };
+    return { status: 200, data: next };
   }
 
   if (pathname === '/api/v1/me' && method === 'DELETE') {
     if (!authUser) return UNAUTHORIZED;
     suggestionCache.invalidateUser(authUser.id);
     const deleted = await deleteUser(repo, authUser.id);
+    if (!deleted) return {status:409,data:{error:'Không thể xóa quản trị viên cấp cao cuối cùng'}};
+
     return {
       status: 200,
       data: {
         deleted,
         user_id: authUser.id,
-        pdpd_compliance: 'Nghị định 13/2023/NĐ-CP — Đã xóa toàn bộ hồ sơ vị giác & lịch sử cá nhân ngay lập tức.'
+        message: 'Đã xóa tài khoản và dữ liệu cá nhân. Chứng từ thanh toán được giữ lại nhưng bỏ liên kết tài khoản.'
       }
     };
   }
@@ -171,58 +189,21 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // M1-S09: PDPD Data Export (Nghị định 13/2023/NĐ-CP — Right to Data Portability)
   if (pathname === '/api/v1/me/export' && method === 'GET') {
     if (!authUser) return UNAUTHORIZED;
-    const [history, collections] = await Promise.all([repo.listHistory(userId), repo.listCollections(userId)]);
-    return {
-      status: 200,
-      data: {
-        export_format: 'JSON',
-        pdpd_compliance: 'Nghị định 13/2023/NĐ-CP',
-        exported_at: new Date().toISOString(),
-        account: { id: authUser.id, role: authUser.role, phone: authUser.phone, guest: authUser.guest, created_at: authUser.created_at },
-        profile,
-        suggestion_history: history.slice(0, 50),
-        saved_collections: collections,
-        analytics_summary: {
-          total_dish_views: store.analyticsEvents.dish_view || 0,
-          total_order_clicks: store.analyticsEvents.order_click || 0,
-          onboarding_completed: store.analyticsEvents.onboarding_complete || 0
-        },
-        message: 'Xuất dữ liệu thành công. File JSON tuân thủ PDPD Nghị định 13/2023/NĐ-CP.'
-      }
-    };
+    return { status: 200, data: {
+      export_format: 'JSON', exported_at: new Date().toISOString(),
+      ...(await repo.exportUserData(userId))
+    } };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M2: VIETNAMESE DISH LIBRARY & DYNAMIC RECIPE SCALER (M2-S01 .. M2-S08)
-  // ===========================================================================
-  if (pathname === '/api/v1/dishes/categories' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        categories: [
-          { id: 'breakfast', name: 'Bữa sáng', count: 145, color: '#FEF3C7' },
-          { id: 'lunch', name: 'Cơm trưa', count: 190, color: '#DCFCE7' },
-          { id: 'dinner', name: 'Bữa tối', count: 165, color: '#EDE9FE' },
-          { id: 'snacks', name: 'Ăn vặt', count: 60, color: '#FFE4E6' },
-          { id: 'vegan', name: 'Món chay', count: 40, color: '#FCE7F3' }
-        ],
-        regions: ['Miền Bắc', 'Miền Trung', 'Miền Nam']
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/dishes' && method === 'GET') {
-    const q = searchParams.get('q') || '';
-    const region = searchParams.get('region') || '';
-    const safeOnly = searchParams.get('safe_only') !== 'false';
-    const items = (await repo.listDishes()).filter(d => {
-      if (safeOnly && !isDishSafeForUser(d, profile)) return false;
-      if (region && d.region !== region) return false;
-      if (q && !matchesVietnameseQuery(`${d.name} ${d.description} ${(d.tags || []).join(' ')}`, q)) return false;
-      return true;
-    });
-    return { status: 200, data: { total: items.length, items } };
-  }
+  // ====================================================================
+  const dishResponse = await handleDishRoutes({
+    repo, method, pathname, searchParams, body, userId, profile, cleanText,
+    openPlaces: id => openPlacesForDish(repo, id, profile, profile.radius_m),
+    bump: ev => bump(store, ev)
+  });
+  if (dishResponse) return dishResponse;
 
   if (pathname === '/api/v1/dishes/semantic-search' && method === 'GET') {
     const q = searchParams.get('q') || '';
@@ -233,7 +214,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   const storyMatch = pathname.match(/^\/api\/v1\/(?:dishes\/([^/]+)\/story|stories\/([^/]+))$/);
   if (storyMatch && method === 'GET') {
     const targetId = storyMatch[1] || storyMatch[2];
-    const dish = (await repo.getDish(targetId)) || (await repo.listDishes())[0];
+    const dish = await repo.getDish(targetId);
     if (!dish) return { status: 404, data: { error: 'Dish not found' } };
     return { status: 200, data: await generateDishStory(dish) };
   }
@@ -241,7 +222,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   const similarMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)\/similar$/);
   if (similarMatch && method === 'GET') {
     const dishes = await repo.listDishes();
-    const current = dishes.find(d => d.id === similarMatch[1]) || dishes[0];
+    const current = dishes.find(d => d.id === similarMatch[1]);
     if (!current) return { status: 404, data: { error: 'Dish not found' } };
     const items = dishes.filter(d => d.id !== current.id && isDishSafeForUser(d, profile)).slice(0, 3);
     return { status: 200, data: { base_dish: current.name, items } };
@@ -249,6 +230,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   const regionalVariantsMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)\/regional-variants$/);
   if (regionalVariantsMatch && method === 'GET') {
+    if (!await repo.getDish(regionalVariantsMatch[1])) return { status: 404, data: { error: 'Dish not found' } };
     return {
       status: 200,
       data: {
@@ -262,94 +244,40 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     };
   }
 
-  const dishMatch = pathname.match(/^\/api\/v1\/dishes\/([^/]+)$/);
-  if (dishMatch && method === 'GET') {
-    const dish = (await repo.getDish(dishMatch[1])) || (await repo.listDishes())[0];
-    if (!dish) return { status: 404, data: { error: 'Dish not found' } };
-    const servings = Math.max(1, parseInt(searchParams.get('servings') || dish.base_servings || 2, 10));
-    const scaleFactor = servings / (dish.base_servings || 2);
-
-    const scaledIngredients = (dish.ingredients || []).map(ing => ({
-      ...ing,
-      scaled_amount: ing.unit === 'lít'
-        ? Number((ing.amount * scaleFactor).toFixed(1))
-        : Math.round(ing.amount * scaleFactor)
-    }));
-
-    const places = await openPlacesForDish(repo, dish.id, profile, profile.radius_m);
-    bump(store, 'dish_view');
-
-    return {
-      status: 200,
-      data: {
-        ...dish,
-        requested_servings: servings,
-        scaled_calories_total: Math.round(dish.calories * scaleFactor),
-        scaled_market_cost_vnd: Math.round((dish.market_cost_base || 50000) * scaleFactor),
-        scaled_ingredients: scaledIngredients,
-        open_places: places
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/me/collections' && (method === 'GET' || method === 'POST')) {
-    const collections = await repo.listCollections(userId);
-    if (method === 'POST' && body.dish_id) {
-      const dishId = cleanText(body.dish_id, 32);
-      if (!collections.length) collections.push({ id: 'col-1', name: 'Món yêu thích', dish_ids: [] });
-      if (dishId && !collections[0].dish_ids.includes(dishId)) {
-        collections[0].dish_ids.push(dishId);
-        await repo.saveCollections(userId, collections);
-      }
-      bump(store, 'save_dish');
-    }
-    return { status: 200, data: { collections } };
-  }
-
-  const delColMatch = pathname.match(/^\/api\/v1\/me\/collections\/([^/]+)$/);
-  if (delColMatch && method === 'DELETE') {
-    const dishId = delColMatch[1];
-    const collections = await repo.listCollections(userId);
-    for (const col of collections) {
-      col.dish_ids = (col.dish_ids || []).filter(id => id !== dishId);
-    }
-    await repo.saveCollections(userId, collections);
-    return { status: 200, data: { removed: dishId, collections } };
-  }
-
-  // ===========================================================================
+  // ====================================================================
   // MODULE M3: AI RECOMMENDATION ENGINE, SPIN & AI FOOD CHAT (M3-S01 .. M3-S07)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/suggestions/today' && method === 'GET') {
     bump(store, 'suggestion_shown');
     const view = await buildView(repo, store, authUser);
-    const radiusM = searchParams.get('radius_m') || profile.radius_m;
-    const historyLen = (view.suggestionHistory || []).length;
-    const cacheKey = `sugg:${profile.id || 'default'}:${radiusM}:${profile.meal_slot}:${(profile.hard_allergies || []).join(',')}:${historyLen}`;
+    const opts = Object.fromEntries(['radius_m', 'mode', 'meal_slot', 'diet_mode', 'budget_min', 'budget_max', 'spice_max'].filter(k => searchParams.has(k)).map(k => [k, searchParams.get(k)]));
+    // Hash every gate input, catalogue and history so approval/menu/profile changes
+    // cannot replay an old unsafe result. Retain per-user cache invalidation prefix.
+    const version = createHash('sha256').update(JSON.stringify([profile, opts, view.dishes, view.places,
+      view.campaigns, view.weather, view.suggestionHistory, (view.suggestionHistory || []).filter(h => h.action === 'eaten' && Date.parse(h.created_at) > Date.now() - 72 * 3600000).map(h => h.id || h.dish_id), process.env.REQUIRE_SAFETY_APPROVAL, process.env.REQUIRE_VERIFIED_HOURS,
+      view.places.map(p => getPlaceOpenStatus(p, Date.now()))])).digest('hex');
+    const cacheKey = `sugg:${profile.id || 'default'}:${version}`;
     const cached = suggestionCache.get(cacheKey);
     if (cached) {
       return { status: 200, data: { ...cached, from_cache: true } };
     }
-    const fresh = getTodaySuggestions(view, { radius_m: radiusM });
+    const fresh = getTodaySuggestions(view, opts);
+    if (!fresh.context.valid) return { status: 400, data: fresh };
     suggestionCache.set(cacheKey, fresh, 60);
     return { status: 200, data: fresh };
   }
 
-  if (pathname === '/api/v1/suggestions/spin' && method === 'GET') {
+  // Three existing decision animations share the same safe pool; never fake loot/vouchers.
+  if (['/api/v1/suggestions/spin', '/api/v1/suggestions/game', '/api/v1/suggestions/fortune', '/api/v1/suggestions/blind-box'].includes(pathname) && method === 'GET') {
     const view = await buildView(repo, store, authUser);
-    const today = getTodaySuggestions(view);
-    const candidates = view.dishes.filter(d => isDishSafeForUser(d, profile));
-    const pick = candidates[Math.floor(Math.random() * candidates.length)] || today.items[0];
-    if (!pick) return { status: 404, data: { error: 'Chưa có món nào phù hợp' } };
-    const places = await openPlacesForDish(repo, pick.id || pick.dish_id, profile, profile.radius_m);
-    return {
-      status: 200,
-      data: {
-        picked_dish: pick,
-        nearest_place: places[0] || null,
-        total_safe_candidates: candidates.length
-      }
-    };
+    const opts = Object.fromEntries(['radius_m', 'mode', 'meal_slot', 'diet_mode', 'budget_min', 'budget_max', 'spice_max'].filter(k => searchParams.has(k)).map(k => [k, searchParams.get(k)]));
+    const result = buildCandidates(view, opts);
+    const pick = result.candidates[Math.floor(Math.random() * result.candidates.length)];
+    return { status: result.context.valid ? 200 : 400, data: {
+      picked_dish: pick ? { ...pick.dish, dish_id: pick.dish_id } : null,
+      nearest_place: pick?.nearest_place || null, total_safe_candidates: result.candidates.length,
+      reasons: result.reasons, context: result.context, safety_approval_required: result.safety_approval_required
+    } };
   }
 
   if (pathname === '/api/v1/suggestions/feedback' && method === 'POST') {
@@ -380,111 +308,93 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   if (pathname === '/api/v1/chat' && method === 'POST') {
     bump(store, 'chat_query');
     const view = await buildView(repo, store, authUser);
-    // Try Gemini first, fall back to local engine
-    const aiResult = await callGeminiChat(body.query || 'Hôm nay ăn gì ngon?', profile);
-    const localResult = runAiFoodChat(view, body.query || 'Tối nay 4 người, ngân sách 300k, có trẻ nhỏ, muốn ăn gần nhà');
-    return {
-      status: 200,
-      data: {
-        intent: aiResult.intent,
-        ai_source: aiResult.source,
-        assistant_message: aiResult.response_vi || localResult.assistant_message,
-        options: localResult.options
-      }
-    };
+    const localResult = runAiFoodChat(view, cleanText(body.query || 'Hôm nay ăn gì?', 2000));
+    return { status: localResult.context.valid ? 200 : 400, data: localResult };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M4: PLACES, POSTGIS 3KM SEARCH & CROWDSOURCED REPORTS (M4-S01 .. M4-S06)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/places' && method === 'GET') {
-    const items = await repo.findPlacesNear({
-      lat: profile.lat,
-      lng: profile.lng,
-      radiusM: profile.radius_m || 3000,
-      dishId: searchParams.get('dish_id') || null,
-      openOnly: searchParams.get('open_only') !== 'false'
-    });
+    const query = parsePlaceQuery(searchParams, profile);
+    if (query.error) return { status: 400, data: { error: query.error } };
+    const items = await repo.findPlacesNear(query);
     return { status: 200, data: { total: items.length, items } };
+  }
+
+  const placeMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)$/);
+  if (placeMatch && method === 'GET') {
+    const query = parsePlaceQuery(searchParams, profile);
+    if (query.error) return { status: 400, data: { error: query.error } };
+    const place = await repo.getPlace(placeMatch[1]);
+    if (!place) return { status: 404, data: { error: 'Place not found' } };
+    return { status: 200, data: { ...placeWithStatus(place), distance_m: placeDistance(place, query.lat, query.lng) } };
   }
 
   const reportMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)\/reports$/);
   if (reportMatch && method === 'POST') {
-    const rep = await repo.reportPlace(reportMatch[1], { reason: cleanText(body.reason, 300) || 'Quán đóng cửa', userId });
+    let rep;
+    try { rep = await repo.reportPlace(reportMatch[1], reportInput(authUser,body)); }
+    catch(e) { if(e instanceof PolicyError) return {status:e.status,data:{error:e.message}};throw e; }
     if (!rep) return { status: 404, data: { error: 'Place not found' } };
     bump(store, 'report_issue');
-    return { status: 200, data: rep };
+    const {reporter_key,...publicReport}=rep;
+    return { status: 200, data: publicReport };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M5: EXTERNAL ORDER DEEP-LINK & LOOPBACK CONFIRMATION (M5-S01 .. M5-S05)
-  // ===========================================================================
+  // ====================================================================
+  if (pathname === '/api/v1/orders/redirects' && method === 'GET') {
+    if (!authUser) return UNAUTHORIZED;
+    return { status: 200, data: { items: await repo.listOrderRedirects(userId) } };
+  }
   if (pathname === '/api/v1/orders/redirect' && method === 'POST') {
-    const place = (await repo.getPlace(body.place_id)) || (await repo.listPlaces())[0];
-    const dish = (await repo.getDish(body.dish_id)) || (await repo.listDishes())[0];
-    if (!place || !dish) return { status: 404, data: { error: 'Place or dish not found' } };
-    const partner = /^[a-z_]{2,20}$/.test(body.partner || '') ? body.partner : 'grabfood';
-    const utm = 'utm_source=hom_nay_an_gi&utm_medium=app_mvp';
-    const baseLink = (place.links && place.links[partner]) || `https://maps.google.com/?q=${place.lat},${place.lng}`;
+    const partner = body.partner === undefined ? 'grabfood' : body.partner;
+    // Validate the partner before looking up data; never fall back to a different action.
+    const known = buildRedirect({}, partner);
+    if (known.status === 400) return { status: 400, data: { error: known.error } };
+    if (typeof body.place_id !== 'string' || (body.dish_id !== undefined && typeof body.dish_id !== 'string'))
+      return { status: 404, data: { error: 'Place or dish not found' } };
+    const place = await repo.getPlace(body.place_id);
+    const dish = body.dish_id === undefined ? null : await repo.getDish(body.dish_id);
+    if (!place || (body.dish_id !== undefined && !dish))
+      return { status: 404, data: { error: 'Place or dish not found' } };
+    if (partner !== 'maps' && partner !== 'phone' && !dish)
+      return { status: 400, data: { error: 'Dish required for ordering' } };
+    if (!place.is_verified || place.is_paused || place.is_open_override === false ||
+        (place.status && !['active', 'verified'].includes(place.status)))
+      return { status: 409, data: { error: 'Place unavailable' } };
+    if (dish && !(place.menu || []).some(m => m.dish_id === dish.id && m.available === true))
+      return { status: 409, data: { error: 'Dish unavailable at this place' } };
+    const links = buildRedirect(place, partner);
+    if (links.error) return { status: links.status, data: { error: links.error } };
+    const now = new Date().toISOString();
     const record = await repo.createOrderRedirect({
-      id: `redir-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      user_id: userId,
-      place_id: place.id,
-      place_name: place.name,
-      dish_id: dish.id,
-      dish_name: dish.name,
-      partner,
-      target_deeplink: `${baseLink}${baseLink.includes('?') ? '&' : '?'}${utm}`,
-      fallback_web_url: baseLink,
-      loopback_confirmed_eaten: false,
-      created_at: new Date().toISOString()
+      id: `redir-${randomUUID()}`, user_id: userId,
+      place_id: place.id, place_name: place.name,
+      dish_id: dish?.id || null, dish_name: dish?.name || null,
+      partner, ...links, action_type: redirectAction(partner),
+      clicked_at: now, confirmed_at: null,
+      loopback_confirmed_eaten: false, created_at: now
     });
-    bump(store, partner === 'maps' ? 'direction_click' : partner === 'phone' ? 'call_click' : 'order_click');
     return { status: 200, data: record };
   }
 
   const confirmOrderMatch = pathname.match(/^\/api\/v1\/orders\/([^/]+)\/confirm-eaten$/);
   if (confirmOrderMatch && method === 'POST') {
     if (!authUser) return UNAUTHORIZED;
-    const existing = await repo.getOrderRedirect(confirmOrderMatch[1]);
-    if (existing && existing.user_id && existing.user_id !== userId) {
-      return { status: 404, data: { error: 'Order not found' } };
-    }
-    let ord;
-    if (existing) {
-      ord = await repo.confirmOrderEaten(existing.id);
-    } else {
-      // No redirect on record (e.g. ate there without ordering through the app): log the dish named in the body
-      const dish = (await repo.getDish(body.dish_id || 'DISH-101')) || (await repo.listDishes())[0];
-      const place = (await repo.getPlace(body.place_id || 'PLACE-401')) || (await repo.listPlaces())[0];
-      if (!dish) return { status: 404, data: { error: 'Dish not found' } };
-      ord = {
-        id: confirmOrderMatch[1],
-        dish_id: dish.id,
-        dish_name: dish.name,
-        place_id: place ? place.id : null,
-        place_name: place ? place.name : null,
-        loopback_confirmed_eaten: true
-      };
-    }
-    const dish = await repo.getDish(ord.dish_id);
-    await repo.addHistory(userId, {
-      id: `hist-loopback-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      dish_id: ord.dish_id,
-      dish_name: ord.dish_name,
-      place_id: ord.place_id,
-      place_name: ord.place_name,
-      price_vnd: dish ? dish.ref_price : null,
-      action: 'eaten',
-      created_at: new Date().toISOString()
-    });
+    const result = await repo.confirmOrderEaten(confirmOrderMatch[1], userId);
+    if (!result) return { status: 404, data: { error: 'Order not found' } };
+    if (result.no_dish) return { status: 409, data: { error: 'No dish to confirm; use meal feedback' } };
     suggestionCache.invalidateUser(profile.id || 'default');
-    return { status: 200, data: { confirmed: true, order: ord, cooldown_days_applied: 3 } };
+    return { status: 200, data: { confirmed: true, order: result.order,
+      already_confirmed: result.already_confirmed, confirmation_source: 'self_report', cooldown_days_applied: 3 } };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M7: SPONSORED LISTINGS, ANTI-FRAUD GUARD & VIETQR (M7-S01 .. M7-S08)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/ads/campaigns' && method === 'GET') {
     return {
       status: 200,
@@ -614,9 +524,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 404, data: { error: 'Order not found', order_id: orderId } };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M8: SMART CONTEXTUAL MEAL REMINDERS (M8-S01 .. M8-S04)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/notifications' && method === 'GET') {
     return {
       status: 200,
@@ -637,138 +547,6 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: 200, data: updated };
   }
 
-  // ===========================================================================
-  // MODULE M9: ADMIN CMS, OCR MODERATION & AUDIT LOGS (M9-S01 .. M9-S09)
-  // Every admin write is recorded in the audit log (rbac_audit_logs).
-  // ===========================================================================
-  if (pathname === '/api/v1/admin/dashboard' && method === 'GET') {
-    const [dishes, places, ocrQueue, userReports, campaigns] = await Promise.all([
-      repo.listDishes(), repo.listPlaces(), repo.listOcrQueue(), repo.listUserReports(), repo.listCampaigns()
-    ]);
-    return {
-      status: 200,
-      data: {
-        total_dishes: dishes.length,
-        total_verified_places: places.filter(p => p.is_verified).length,
-        ocr_queue: ocrQueue,
-        user_reports: userReports,
-        campaigns,
-        events: store.analyticsEvents
-      }
-    };
-  }
-
-  // M9-S02: Admin CRUD Thư viện Món ăn Toàn quốc
-  if (pathname === '/api/v1/admin/dishes' && method === 'POST') {
-    const allergens = cleanList(body.allergen_tags || body.allergens);
-    const newDish = await repo.createDish({
-      id: `DISH-${Date.now()}`,
-      name: cleanText(body.name, 120) || 'Món Việt Mới',
-      region: cleanText(body.region, 32) || 'Miền Nam',
-      meal_slots: cleanList(body.meal_slots).length ? cleanList(body.meal_slots) : ['lunch', 'dinner'],
-      calories: cleanNumber(body.calories, 0, 10000, 450),
-      ref_price: cleanNumber(body.ref_price, 0, 1e8, 50000),
-      spice_level: Math.round(cleanNumber(body.spice_level, 0, 3, 1)),
-      allergen_tags: allergens,
-      weather_fit: ['any'],
-      tags: cleanList(body.tags).length ? cleanList(body.tags) : ['Đặc sản'],
-      description: cleanText(body.description, 1000) || 'Món ăn mới từ Admin CMS'
-    });
-    await audit('CREATE_DISH', newDish.id);
-    // `allergens` kept for older clients; the recommender reads `allergen_tags`
-    return { status: 201, data: { ...newDish, allergens: newDish.allergen_tags } };
-  }
-
-  const adminDishMatch = pathname.match(/^\/api\/v1\/admin\/dishes\/([^/]+)$/);
-  if (adminDishMatch && (method === 'PUT' || method === 'PATCH')) {
-    const patch = {};
-    if (body.name !== undefined) patch.name = cleanText(body.name, 120) || 'Món Việt Mới';
-    if (body.calories !== undefined) patch.calories = cleanNumber(body.calories, 0, 10000, 450);
-    if (body.ref_price !== undefined) patch.ref_price = cleanNumber(body.ref_price, 0, 1e8, 50000);
-    if (body.allergens !== undefined || body.allergen_tags !== undefined) patch.allergen_tags = cleanList(body.allergen_tags || body.allergens);
-    if (body.region !== undefined) patch.region = cleanText(body.region, 32);
-    if (body.spice_level !== undefined) patch.spice_level = Math.round(cleanNumber(body.spice_level, 0, 3, 1));
-    if (body.description !== undefined) patch.description = cleanText(body.description, 1000);
-    const dish = await repo.updateDish(adminDishMatch[1], patch);
-    if (!dish) return { status: 404, data: { error: 'Dish not found' } };
-    await audit('UPDATE_DISH', dish.id);
-    return { status: 200, data: { ...dish, allergens: dish.allergen_tags } };
-  }
-
-  if (adminDishMatch && method === 'DELETE') {
-    const deleted = await repo.deleteDish(adminDishMatch[1]);
-    if (!deleted) return { status: 404, data: { error: 'Dish not found' } };
-    await audit('DELETE_DISH', adminDishMatch[1]);
-    return { status: 200, data: { deleted: true, id: adminDishMatch[1] } };
-  }
-
-  if (pathname === '/api/v1/admin/ocr-review' && method === 'POST') {
-    const decision = ['approved', 'rejected', 'pending_review'].includes(body.decision) ? body.decision : 'approved';
-    const item = await repo.reviewOcr(body.ocr_id, decision, body.reason ? cleanText(body.reason, 300) : null);
-    if (!item) return { status: 404, data: { error: 'OCR item not found', updated: null } };
-    await audit(decision === 'rejected' ? 'REJECT_OCR_MENU' : 'APPROVE_OCR_MENU', item.id);
-    return { status: 200, data: { updated: item } };
-  }
-
-  const unpausePlaceMatch = pathname.match(/^\/api\/v1\/admin\/places\/([^/]+)\/(?:approve|unpause)$/);
-  if (unpausePlaceMatch && method === 'POST') {
-    const place = await repo.unpausePlace(unpausePlaceMatch[1]);
-    if (!place) return { status: 404, data: { error: 'Place not found' } };
-    await audit('UNPAUSE_PLACE', place.id);
-    return { status: 200, data: { unpaused_place: place, message: 'Đã mở lại quán và xóa cờ báo lỗi thành công.' } };
-  }
-
-  const moderateAdMatch = pathname.match(/^\/api\/v1\/admin\/ads\/([^/]+)\/moderate$/);
-  if (moderateAdMatch && method === 'POST') {
-    const cmp = await repo.updateCampaign(moderateAdMatch[1], { status: cleanText(body.decision, 32) || 'active' });
-    if (!cmp) return { status: 404, data: { error: 'Campaign not found' } };
-    await audit('MODERATE_AD', `${cmp.id}:${cmp.status}`);
-    return { status: 200, data: { campaign: cmp, hard_allergy_check: 'passed', sponsored_badge_check: 'passed' } };
-  }
-
-  if (pathname === '/api/v1/admin/audit-logs' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        rbac_roles: ['Consumer', 'Merchant Owner', 'Merchant Staff', 'Content Moderator', 'Ops Admin', 'Super Admin'],
-        logs: await repo.listAudit(100)
-      }
-    };
-  }
-
-  // M9-S08: RBAC Roles Management (6 roles)
-  if (pathname === '/api/v1/admin/rbac/roles' && method === 'GET') {
-    return {
-      status: 200,
-      data: {
-        roles: [
-          { id: 'consumer', name: 'Consumer', permissions: ['read_suggestions', 'write_feedback', 'read_places'] },
-          { id: 'merchant_owner', name: 'Merchant Owner', permissions: ['manage_menu', 'manage_campaigns', 'view_analytics'] },
-          { id: 'merchant_staff', name: 'Merchant Staff', permissions: ['update_daily_special', 'view_bookings'] },
-          { id: 'content_moderator', name: 'Content Moderator', permissions: ['approve_ocr', 'reject_ocr', 'moderate_reviews'] },
-          { id: 'ops_admin', name: 'Ops Admin', permissions: ['manage_places', 'unpause_places', 'manage_campaigns', 'view_audit_logs'] },
-          { id: 'super_admin', name: 'Super Admin', permissions: ['*'] }
-        ]
-      }
-    };
-  }
-
-  if (pathname === '/api/v1/admin/rbac/users' && (method === 'GET' || method === 'POST')) {
-    if (method === 'POST') {
-      return { status: 200, data: { updated: true, user_id: body.user_id, new_role: body.role } };
-    }
-    return {
-      status: 200,
-      data: {
-        users: [
-          { id: 'USR-001', name: 'Admin Hệ Thống', role: 'super_admin', email: 'admin@homnayangi.vn' },
-          { id: 'USR-002', name: 'Kiểm Duyệt Nội Dung', role: 'content_moderator', email: 'mod@homnayangi.vn' },
-          { id: 'USR-003', name: 'Điều Hành Vận Hành', role: 'ops_admin', email: 'ops@homnayangi.vn' }
-        ]
-      }
-    };
-  }
-
   // M10-S06: A/B Testing Algorithms
   if (pathname === '/api/v1/analytics/ab-test' && method === 'GET') {
     return {
@@ -784,9 +562,9 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // MODULE M20: CREATOR KITCHEN & COMMUNITY RECIPES (tipping, likes)
-  // ===========================================================================
+  // ====================================================================
   if (pathname === '/api/v1/community/recipes' && method === 'GET') {
     let recipes = await repo.listRecipes();
     if (searchParams.get('tag') === 'zero_waste') recipes = recipes.filter(r => r.zero_waste_tag);
@@ -846,12 +624,24 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   if (recipeCrudMatch && ['PATCH', 'PUT', 'DELETE'].includes(method)) {
     const rec = await repo.getRecipe(recipeCrudMatch[1]);
     if (!rec) return { status: 404, data: { error: 'Recipe not found' } };
-    if (!authUser || (authUser.role !== 'admin' && rec.author_id !== authUser.id)) {
+    if (!authUser || (authUser.role !== 'super_admin' && rec.author_id !== authUser.id)) {
       return { status: 403, data: { error: 'Chỉ tác giả hoặc quản trị viên được sửa/xóa công thức này' } };
     }
+    const mutate = async patch => {
+      if (rec.author_id === authUser.id) return patch === null ? repo.deleteRecipe(rec.id) : repo.updateRecipe(rec.id,patch);
+      return repo.atomic(async tx => {
+        const actor=await tx.getUser(authUser.id);
+        if (actor?.role !== 'super_admin') return null;
+        const before=structuredClone(await tx.getRecipe(rec.id));
+        const after=patch === null ? await tx.deleteRecipe(rec.id) : await tx.updateRecipe(rec.id,patch);
+        await tx.addAudit({actor:actor.id,actor_id:actor.id,role:actor.role,
+          action:patch === null ? 'DELETE_RECIPE' : 'UPDATE_RECIPE',target:rec.id,
+          before,after:patch === null ? null : after,reason:cleanText(body.reason,1000) || 'Community moderation'});
+        return after;
+      });
+    };
     if (method === 'DELETE') {
-      await repo.deleteRecipe(rec.id);
-      if (authUser.role === 'admin' && rec.author_id !== authUser.id) await audit('DELETE_RECIPE', rec.id);
+      if (!await mutate(null)) return {status:403,data:{error:'Quyền quản trị đã thay đổi'}};
       return { status: 200, data: { deleted: true, id: rec.id } };
     }
     const patch = {};
@@ -863,12 +653,14 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     if (body.prep_time_minutes !== undefined) patch.prep_time_minutes = cleanNumber(body.prep_time_minutes, 1, 1440, rec.prep_time_minutes);
     if (body.calories !== undefined) patch.calories = cleanNumber(body.calories, 0, 10000, rec.calories);
     if (body.zero_waste_tag !== undefined) patch.zero_waste_tag = cleanText(body.zero_waste_tag, 40) || null;
-    return { status: 200, data: await repo.updateRecipe(rec.id, patch) };
+    const updated=await mutate(patch);
+    if (!updated) return {status:403,data:{error:'Quyền quản trị đã thay đổi'}};
+    return { status: 200, data: updated };
   }
 
-  // ===========================================================================
+  // ====================================================================
   // FROZEN MODULES (M6, M10–M19) & SYSTEM ROUTES
-  // ===========================================================================
+  // ====================================================================
   const frozen = await handleFrozenRoute(await buildView(repo, store, authUser), method, pathname, searchParams, body);
   if (frozen) return frozen;
 
