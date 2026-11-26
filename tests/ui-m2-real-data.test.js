@@ -81,8 +81,8 @@ test('M3-S02 reason uses the suggestion: weather chip kept as "sắp có", no ma
   assert.deepEqual(JSON.parse(JSON.stringify(w.pills)), ['🌤️ Thời tiết · sắp có', '📍 Cách 628m', '🚫 Đã lọc theo dị ứng đã khai báo']);
   assert.equal(w.weather.live, false);
   for (const v of [w.title, w.message, ...w.pills]) assert.doesNotMatch(v, /°C|98%|trời/i);
-  const live = whyText({ ...dish, suggestion: s, live_weather: { label: '31°C · Nắng' } });
-  assert.equal(live.pills[0], '🌧️ 31°C · Nắng', 'provider hook output is shown as-is once it returns data');
+  const live = whyText({ ...dish, suggestion: s, live_weather: { label: '31°C · Trời quang', emoji: '☀️' } });
+  assert.equal(live.pills[0], '☀️ 31°C · Trời quang', 'provider reading is shown as-is once it returns data (m7: its own emoji)');
   assert.equal(live.weather.live, true);
   const none = whyText({ ...dish, suggestion: null });
   assert.equal(none.title, 'Món này không có trong gợi ý hôm nay');
@@ -162,7 +162,7 @@ test('owner rule: original elements are kept; not-live ones are marked, never re
   assert.match(m4s01, /FEATURES\.placeFilters/);
 });
 
-test('today suggestions expose the weather hook: null until a provider is configured', async () => {
+test('today suggestions expose the weather hook: null when the provider has no reading (tests never hit the network)', async () => {
   const r = await handleApiRequest(createInitialStore(), 'GET', '/api/v1/suggestions/today', new URLSearchParams());
   assert.equal(r.status, 200);
   assert.ok(Object.hasOwn(r.data, 'live_weather'));

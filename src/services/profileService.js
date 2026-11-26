@@ -1,9 +1,16 @@
 // Profile fields mirror the existing M1 screens. No inferred allergies or consent.
 export function defaultProfile(id, name = 'Bạn mới', phone = null) {
-  return { id, name, phone, lat: 10.9574, lng: 106.8426, radius_m: 3000,
+  // lat/lng start at a fixed default point so distance queries work; location_set stays
+  // false until the user picks an area (M1-S08) or shares GPS, and only then is the point
+  // treated as "the user's location" (weather, "Vị trí của bạn" on the map).
+  return { id, name, phone, lat: 10.9574, lng: 106.8426, location_set: false, radius_m: 3000,
     regions: [], spice_level: 0, hard_allergies: [], diet_mode: 'balanced',
     budget_min: 0, budget_max: 1000000, disliked_dish_ids: [], pdpd_consent: false,
     meal_reminders: { lunch: '10:30', dinner: '17:00', max_per_day: 0 } };
+}
+/** True only when the saved lat/lng is a location the user chose or shared (not the default). */
+export function locationChosen(profile) {
+  return profile?.location_set === true && Number.isFinite(Number(profile?.lat)) && Number.isFinite(Number(profile?.lng));
 }
 const enums = {
   regions: ['bac', 'trung', 'nam'],
@@ -29,7 +36,7 @@ export function validateProfilePatch(profile, patch) {
         && (['lat', 'lng'].includes(key) || Number.isInteger(value));
     } else if (key === 'name') {
       valid = typeof value === 'string' && value.trim().length > 0 && value.length <= 120 && !/[<>\u0000-\u001f]/.test(value);
-    } else if (key === 'pdpd_consent') valid = typeof value === 'boolean';
+    } else if (key === 'pdpd_consent' || key === 'location_set') valid = typeof value === 'boolean';
     else if (key === 'disliked_dish_ids') valid = Array.isArray(value) && value.length <= 1000 && value.every(v => typeof v === 'string' && /^DISH-[\w-]{1,50}$/.test(v));
     else if (key === 'meal_reminders') valid = value && typeof value === 'object' && !Array.isArray(value)
       && Object.keys(value).every(k => ['lunch', 'dinner', 'max_per_day'].includes(k))
@@ -39,6 +46,9 @@ export function validateProfilePatch(profile, patch) {
     if (!(Object.hasOwn(changes, key))) changes[key] = structuredClone(value);
   }
   const next = { ...profile, ...changes };
+  // A real move of the saved point (area picker, GPS, another client) is a chosen location.
+  // Re-sending the same lat/lng (full-profile saves) does not count.
+  if (('lat' in changes && changes.lat !== profile?.lat) || ('lng' in changes && changes.lng !== profile?.lng)) next.location_set = true;
   if (next.budget_min > next.budget_max) return { error: 'Ngân sách tối thiểu không được lớn hơn tối đa' };
   return { profile: next };
 }

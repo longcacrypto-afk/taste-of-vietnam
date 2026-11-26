@@ -4,12 +4,8 @@
 
 export function createInitialStore() {
   return {
-    weather: {
-      city: 'P. Bửu Long, TP. Biên Hòa',
-      temp_c: 26,
-      condition: 'rain_cool',
-      label: '🌧️ 26°C · Trời dịu mát'
-    },
+    // No seeded weather: the only weather is a real reading from
+    // src/services/weatherProvider.js (or none).
 
     userProfile: {
       id: 'usr-long-01',
@@ -17,6 +13,8 @@ export function createInitialStore() {
       phone: '+84912345678',
       lat: 10.9574,
       lng: 106.8426,
+      // Seed point only (distance queries); not a location this user chose.
+      location_set: false,
       radius_m: 3000,
       regions: ['bac', 'nam', 'trung'],
       spice_level: 1,

@@ -15,18 +15,23 @@ export function getRecentlyEatenDishIds(store, withinDays = 3) {
 export function findOpenPlacesForDish(store, dishId, lat, lng, radius = 3000) {
   return eligiblePlaces({ ...store, userProfile: { ...store.userProfile, lat, lng } }, dishId, candidateContext(store.userProfile, { radius_m: radius }));
 }
-export function suggestionItem(candidate) {
+// Weather reason only from a real reading (weatherProvider) whose condition the dish fits.
+function weatherReason(dish, weather) {
+  return weather?.condition && weather.label && (dish.weather_fit || []).includes(weather.condition)
+    ? ` · Hợp trời hiện tại (${weather.label.replace(/ · /g, ', ')})` : '';
+}
+export function suggestionItem(candidate, weather = null) {
   const { dish: d, nearest_place: place } = candidate;
   return { dish_id: d.id, name: d.name, description: d.description, price_vnd: candidate.price_vnd,
     calories: d.calories, prep_minutes: d.prep_minutes, difficulty: d.difficulty, tags: d.tags,
     allergen_tags: d.allergen_tags, img_key: d.img_key, is_sponsored: false, badge_label: 'Gợi ý tự nhiên',
-    reason: `${place ? `Quán cách ${Math.round(place.distance_m)}m` : 'Có công thức tự nấu'} · Hợp điều kiện đã chọn`,
+    reason: `${place ? `Quán cách ${Math.round(place.distance_m)}m` : 'Có công thức tự nấu'} · Hợp điều kiện đã chọn${weatherReason(d, weather)}`,
     nearest_place: place, open_places_count: candidate.open_places.length, score: candidate.score };
 }
 export function getTodaySuggestions(store, opts = {}) {
   const start = performance.now();
   const result = buildCandidates(store, opts);
-  const selected = result.candidates.slice(0, 3).map(suggestionItem);
+  const selected = result.candidates.slice(0, 3).map(c => suggestionItem(c, store.weather));
   // Legacy campaigns never bypass the shared gate, budget, radius or actual denominator.
   if (selected.length === 3 && result.context.mode !== 'cook') {
     for (const cmp of store.campaigns || []) {
@@ -35,14 +40,14 @@ export function getTodaySuggestions(store, opts = {}) {
       const place = candidate?.open_places.find(p => p.place_id === cmp.place_id
         && p.distance_m <= Math.min(Number(cmp.radius_m) || result.context.radius_m, result.context.radius_m));
       if (!place) continue;
-      const sponsored = { ...suggestionItem(candidate), nearest_place: place, price_vnd: place.price_vnd,
+      const sponsored = { ...suggestionItem(candidate, store.weather), nearest_place: place, price_vnd: place.price_vnd,
         is_sponsored: true, campaign_id: cmp.id, badge_label: 'Tài trợ' };
       const index = selected.findIndex(c => c.dish_id === cmp.dish_id);
       selected[index < 0 ? 2 : index] = sponsored;
       break;
     }
   }
-  return { weather: store.weather, latency_ms: Number((performance.now() - start).toFixed(2)),
+  return { weather: store.weather || null, latency_ms: Number((performance.now() - start).toFixed(2)),
     sponsored_ratio: selected.length ? Number((selected.filter(c => c.is_sponsored).length / selected.length).toFixed(2)) : 0,
     items: selected, reasons: result.reasons, context: result.context, safety_approval_required: result.safety_approval_required };
 }
