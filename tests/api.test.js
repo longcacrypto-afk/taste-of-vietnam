@@ -131,12 +131,13 @@ test('M5-S01 & M5-S05: Order Deep-Link Redirect logs UTM tracking & Loopback Con
   assert.equal(conf.data.cooldown_days_applied, 3);
 });
 
-test('M6 ingestion stays off; cannot create or auto-approve menu queue items', async () => {
-  const store=createInitialStore(),before=structuredClone(store.ocrQueue);
+test('M6 OCR (live module M6): never writes the M9 queue or auto-approves into the catalogue menu', async () => {
+  const store=createInitialStore(),before=structuredClone(store.ocrQueue),menus=structuredClone(store.places.map(p=>p.menu));
   const res=await call(store,'POST','/api/v1/merchant/menu/ocr',new URLSearchParams(),{raw_text:'Phở bò 50k'});
-  assert.equal(res.status,503);
-  assert.equal(res.data.code,'M6_INGESTION_DISABLED');
+  assert.equal(res.status,201);
+  assert.equal(res.data.status,'draft');
   assert.deepEqual(store.ocrQueue,before);
+  assert.deepEqual(store.places.map(p=>p.menu),menus);
 });
 
 test('M7-S05: Anti-Fraud Sponsored Click Guard deduplicates repeated clicks within 60 seconds', async () => {
