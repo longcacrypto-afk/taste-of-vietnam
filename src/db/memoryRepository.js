@@ -312,14 +312,21 @@ export class MemoryRepository {
   }
 
   // ── OCR moderation ─────────────────────────────────────────────────────────
-  async listOcrQueue() { return this.store.ocrQueue || []; }
+  async listOcrQueue() { return (this.store.ocrQueue || []).map(r=>({...r,version:r.version||1})); }
 
-  async reviewOcr(id, status, reason) {
-    const item = (this.store.ocrQueue || []).find(i => i.id === id);
-    if (!item) return null;
-    item.status = status;
-    if (reason) item.rejection_reason = reason;
-    return item;
+  async saveOcrReview(item,version) {
+    const i=this.store.ocrQueue.findIndex(r=>r.id===item.id);
+    if(i<0 || (this.store.ocrQueue[i].version||1)!==version || this.store.ocrQueue[i].status!=='pending_review')
+      throw new PolicyError(409,'Mục menu đã được xử lý');
+    this.store.ocrQueue[i]=structuredClone(item);
+  }
+  async saveMenuRevision(revision) {
+    const rows=this.store.menuRevisions ||= [];
+    if(rows.some(r=>r.id===revision.id)) throw new PolicyError(409,'Revision đã tồn tại');
+    rows.push(structuredClone(revision));
+  }
+  async listMenuRevisions(placeId) {
+    return structuredClone((this.store.menuRevisions||[]).filter(r=>r.place_id===placeId).reverse());
   }
 
   // ── campaigns, clicks, payments ────────────────────────────────────────────

@@ -1,6 +1,8 @@
 // Backend for the existing M9 screens. All mutations and their audit rows share one
 // transaction; role is loaded again under the same lock used by role assignment.
 import crypto from 'node:crypto';
+import { reviewMenu } from '../services/menuReview.js';
+import { REPORT_REASONS } from '../services/reportPolicy.js';
 import { handleAdminDataRoute } from './adminDataRoutes.js';
 import { ROLES, adminAllowed, PolicyError } from '../services/adminPolicy.js';
 import { cleanText } from './router.js';
@@ -9,6 +11,7 @@ const ok = data => ({status:200,data});
 const number = (v,min,max,fallback) => Number.isFinite(Number(v)) ? Math.min(max,Math.max(min,Number(v))) : fallback;
 const list = v => (Array.isArray(v) ? v : []).slice(0,20).map(x=>cleanText(x,40)).filter(Boolean);
 const requireReason = body => {
+  if(typeof body.reason!=='string'||body.reason.trim().length>1000) throw new PolicyError(400,'Cần lý do bằng chữ, tối đa 1000 ký tự');
   const s=cleanText(body.reason,1000);
   if (!s) throw new PolicyError(400,'Cần nêu lý do xử lý');
   return s;
@@ -67,12 +70,19 @@ async function dispatch(repo,actor,method,path,q,body,store) {
     return ok({...p,logs:p.items,rbac_roles:ROLES.map(r=>r.name)});
   }
   if(path==='/api/v1/admin/reports') {
+    if(q.has('status')&&!['pending_review','auto_paused','resolved','rejected'].includes(q.get('status'))) throw new PolicyError(400,'Trạng thái lọc không hợp lệ');
+    if(q.has('reason')&&!REPORT_REASONS.includes(q.get('reason'))) throw new PolicyError(400,'Lý do lọc không hợp lệ');
     let rows=(await repo.listUserReports()).map(publicReport);
     for(const k of ['status','reason','place_id']) if(q.has(k)) rows=rows.filter(r=>r[k]===q.get(k));
     const p=page(rows,q);return ok({...p,reports:p.items});
   }
   let m=path.match(/^\/api\/v1\/admin\/reports\/([^/]+)$/);
   if(m) {
+    if(method==='GET') {
+      const row=(await repo.listUserReports()).find(r=>r.id===m[1]);
+      if(!row) throw new PolicyError(404,'Không tìm thấy báo cáo');
+      return ok({report:publicReport(row)});
+    }
     const reason=requireReason(body);
     if(!['resolved','rejected'].includes(body.status)) throw new PolicyError(400,'Trạng thái xử lý không hợp lệ');
     const row=(await repo.listUserReports()).find(r=>r.id===m[1]);
@@ -126,13 +136,21 @@ async function dispatch(repo,actor,method,path,q,body,store) {
     const saved=await repo.updateDish(m[1],patch);
     return changed({...saved,allergens:saved.allergen_tags},'UPDATE_DISH',saved.id,before,saved,cleanText(body.reason,1000));
   }
+  if(path==='/api/v1/admin/menu-revisions') {
+    if(!q.get('place_id')) throw new PolicyError(400,'Cần place_id');
+    return ok(page(await repo.listMenuRevisions(q.get('place_id')),q));
+  }
   if(path==='/api/v1/admin/ocr-review') {
-    if(!['approved','rejected','pending_review'].includes(body.decision)) throw new PolicyError(400,'Cần chọn quyết định xử lý');
-    const reason=body.decision==='rejected'?requireReason(body):cleanText(body.reason,1000);
-    const before=structuredClone((await repo.listOcrQueue()).find(r=>r.id===body.ocr_id));
-    if(!before) throw new PolicyError(404,'OCR item not found');
-    const after=await repo.reviewOcr(body.ocr_id,body.decision,reason);
-    return changed({updated:after},body.decision==='rejected'?'REJECT_OCR_MENU':'APPROVE_OCR_MENU',after.id,before,after,reason);
+    if(method==='GET') {
+      let rows=await repo.listOcrQueue();
+      if(q.has('status')) {
+        if(!['pending_review','approved','rejected'].includes(q.get('status'))) throw new PolicyError(400,'Trạng thái lọc không hợp lệ');
+        rows=rows.filter(r=>r.status===q.get('status'));
+      }
+      if(q.has('place_id')) rows=rows.filter(r=>r.place_id===q.get('place_id'));
+      return ok(page(rows,q));
+    }
+    return reviewMenu(repo,actor,body);
   }
   m=path.match(/^\/api\/v1\/admin\/ads\/([^/]+)\/moderate$/);
   if(m) {

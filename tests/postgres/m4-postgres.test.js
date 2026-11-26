@@ -13,7 +13,7 @@ before(async () => {
   store = createInitialStore();
   await initRepository(store, { databaseUrl: TEST_DATABASE_URL, log: () => {} });
   pool = rawPool();
-  await pool.query('DELETE FROM place_reports; DELETE FROM ad_campaigns; DELETE FROM places');
+  await pool.query('TRUNCATE places CASCADE');
   for (const p of fixtures()) {
     await pool.query(`INSERT INTO places(id,name,address,geom,is_verified,is_paused,verified_at,opening_hours)
       VALUES ($1,$2,$3,CASE WHEN $4::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($5,$4),4326)::geography END,$6,$7,$8,$9)`,

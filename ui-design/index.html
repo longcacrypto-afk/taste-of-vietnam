@@ -7603,10 +7603,10 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button onclick="submitOcrReview('${escJs(q.id)}', 'approved')" class="px-3.5 py-1.5 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs hover:bg-[#16A34A] transition">
+                    <button onclick="submitOcrReview('${escJs(q.id)}', 'approved', ${Number(q.version)}, '${escJs(q.matched_dish_id||'')}', ${Number(q.extracted_price)})" class="px-3.5 py-1.5 rounded-xl bg-[#22C55E] text-white font-extrabold text-xs hover:bg-[#16A34A] transition">
                       ✅ Duyệt Ghép Món
                     </button>
-                    <button onclick="submitOcrReview('${escJs(q.id)}', 'rejected')" class="px-3.5 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-bold hover:text-red-400 transition">
+                    <button onclick="submitOcrReview('${escJs(q.id)}', 'rejected', ${Number(q.version)})" class="px-3.5 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-bold hover:text-red-400 transition">
                       ❌ Từ Chối
                     </button>
                   </div>
@@ -7695,19 +7695,19 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       }
     }
 
-    async function submitOcrReview(ocrId, action) {
+    async function submitOcrReview(ocrId, action, version, dish_id, price) {
       let reason = '';
       if (action === 'rejected') {
-        const inputReason = prompt('Nhập lý do từ chối (hoặc bấm OK để dùng lý do mặc định):', 'Ảnh chụp bị mờ / Tên món không rõ ràng');
-        if (inputReason === null) return;
-        reason = inputReason || 'Ảnh chụp bị mờ / Tên món không rõ ràng';
+        const inputReason = prompt('Nhập lý do từ chối:', '');
+        if (inputReason === null || !inputReason.trim()) return;
+        reason = inputReason.trim();
       }
 
       try {
         const res = await fetch('/api/v1/admin/ocr-review', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ocr_id: ocrId, decision: action, reason: reason })
+          body: JSON.stringify({ ocr_id: ocrId, decision: action, reason, version, dish_id, price })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const resData = await res.json();
@@ -8894,6 +8894,12 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       $("#p2-action-status")?.remove();
       await done?.(d);
     } catch (e) {
+      if(e.status===409) {
+        // Reuse the existing retry control to reload, never replay a stale version.
+        retryWrite=()=>{$("#p2-action-status")?.remove();P2.reload();};
+        status("Bản này đã thay đổi hoặc được xử lý. Bấm Thử lại để tải dữ liệu mới.",true);
+        return;
+      }
       status(
         e.status === 403
           ? "Tài khoản chưa có quyền. Hãy đăng nhập bằng số đã được cấp quyền."
@@ -9607,7 +9613,10 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         text(spans[0],a.extracted_name);text(spans[2],a.matched_dish_name||a.suggested_dish_id||"—");
         text(spans[3],a.confidence==null?"—":Math.round(a.confidence*100)+"%");
         text($(".text-\\[11px\\]",n),(a.place_name||a.place_id||"")+" · "+money(a.extracted_price));
-        click($("button",n),`P2.review('${J(a.id)}','approved')`);
+        const button=$("button",n);
+        click(button,`P2.review('${J(a.id)}','approved',${Number(a.version)},'${J(a.matched_dish_id||"")}',${Number(a.extracted_price)})`);
+        button.disabled=!a.matched_dish_id||!Number.isSafeInteger(a.extracted_price)||!Number.isSafeInteger(a.version);
+        button.title="Xác nhận món và giá đang hiển thị; đổi lựa chọn hoặc từ chối qua API vì màn gốc chưa có ô nhập.";
       });
     }
     if(id==="M9-S06") {
@@ -9615,10 +9624,17 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       if(!reports.length) content.innerHTML=stateHtml(id,"empty");
       else rows(content,tpl,reports,(n,a)=>{
         text($("b",n),a.place_name||a.place_id);
-        text($("p",n),a.reason);
-        text($("span",n),a.report_count??1);
-        // Existing button edits opening hours; do not pretend it unpauses a place.
-        $("button",n)?.remove();
+        const stateLabel=({pending_review:"Chờ xử lý",auto_paused:"Đã tạm ẩn",resolved:"Đã xử lý",rejected:"Đã bác bỏ"})[a.status]||a.status;
+        const reasonLabel=({closed:"Báo đóng cửa",wrong_price:"Sai giá",wrong_location:"Sai vị trí",wrong_menu:"Sai thực đơn",other:"Khác"})[a.reason]||a.reason;
+        text($("p",n),[reasonLabel,a.evidence,a.resolution_reason,a.resolved_at].filter(Boolean).join(" · "));
+        text($("span",n),(a.report_count??1)+" báo cáo · "+stateLabel);
+        // No new reason/filter/resolve controls: preserve the original hours button,
+        // but don't mislabel it as unpause or allow a write without a reason.
+        const button=$("button",n);
+        if(button) {
+          button.disabled=true;button.removeAttribute("onclick");
+          button.title="Màn gốc chưa có ô sửa giờ/lý do xử lý. Lọc, xử lý báo cáo và mở lại qua API.";
+        }
       });
     }
     return root.outerHTML;
@@ -9956,23 +9972,27 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       action(()=>api("/admin/places/"+encodeURIComponent(id)+"/approve","POST",{version,reason:"Duyệt hồ sơ theo bằng chứng đã lưu"}),
         ()=>{delete state.cache.admin;goScreen("M9-S04");});
     },
-    review(id, decision) {
+    review(id, decision, version, dish_id, price) {
       action(
-        () => api("/admin/ocr-review", "POST", { ocr_id: id, decision }),
+        () => api("/admin/ocr-review", "POST", { ocr_id: id, decision, version, dish_id, price }),
         () => {
           delete state.cache.admin;
           goScreen("M9-S05");
         },
       );
     },
-    unpause(id) {
+    unpause(id, reason) {
+      if(typeof reason!=="string"||!reason.trim()) {
+        status("Màn gốc chưa có ô lý do mở lại; hãy dùng API có reason.");
+        return;
+      }
       if (confirm("Bạn đã xác nhận quán mở lại?"))
         action(
           () =>
             api(
               "/admin/places/" + encodeURIComponent(id) + "/unpause",
               "POST",
-              {},
+              {reason},
             ),
           () => {
             delete state.cache.admin;

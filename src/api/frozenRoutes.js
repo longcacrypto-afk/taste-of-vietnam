@@ -8,7 +8,7 @@
 // its own tables. Returns null when no route matches.
 // =============================================================================
 
-import { parseMenuOcrText } from '../services/ocrEngine.js';
+
 import {
   runVietnameseIntentBenchmark,
   generateWeeklyMealPlanAndGroceries,
@@ -104,8 +104,7 @@ export async function handleFrozenRoute(store, method, pathname, searchParams, b
   }
 
   if (pathname === '/api/v1/merchant/menu/ocr' && method === 'POST') {
-    const res = parseMenuOcrText(store, body.place_id || 'PLACE-401', body.raw_text || '1. Phở bò tái nạm - 45k\n2. Bún bò Huế đặc biệt - 50k');
-    return { status: 200, data: res };
+    return { status: 503, data: { error: 'M6 ingestion đang tắt; chỉ duyệt fixture/hồ sơ đã có', code:'M6_INGESTION_DISABLED' } };
   }
 
   if (pathname === '/api/v1/merchant/promotions' && method === 'GET') {

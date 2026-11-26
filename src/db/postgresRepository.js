@@ -167,7 +167,8 @@ function ocrFromRow(r) {
     id: r.id, place_id: r.place_id, place_name: r.place_name, raw_text: r.raw_text,
     extracted_name: r.extracted_dish_name, extracted_price: r.extracted_price_vnd,
     matched_dish_id: r.matched_dish_id, matched_dish_name: r.matched_dish_name,
-    confidence: Number(r.confidence_score), status: r.status, rejection_reason: r.rejection_reason
+    confidence: Number(r.confidence_score), status: r.status, rejection_reason: r.rejection_reason,
+    version:r.version,approved_price:r.approved_price,reviewed_by:r.reviewed_by,reviewed_at:iso(r.reviewed_at)
   });
 }
 
@@ -607,12 +608,22 @@ export class PostgresRepository {
     return r.rows.map(ocrFromRow);
   }
 
-  async reviewOcr(id, status, reason) {
-    const r = await this.q(
-      `UPDATE ocr_review_queue SET status = $2, rejection_reason = COALESCE($3, rejection_reason) WHERE id = $1 RETURNING id`,
-      [id, status, reason || null]);
-    if (!r.rowCount) return null;
-    return (await this.listOcrQueue()).find(o => o.id === id);
+  async saveOcrReview(item,version) {
+    const r=await this.q(`UPDATE ocr_review_queue SET status=$2,version=version+1,
+      matched_dish_id=$3,matched_dish_name=$4,approved_price=$5,rejection_reason=$6,reviewed_by=$7,reviewed_at=$8
+      WHERE id=$1 AND version=$9 AND status='pending_review'`,
+      [item.id,item.status,item.matched_dish_id||null,item.matched_dish_name||null,item.approved_price??null,
+       item.rejection_reason||null,item.reviewed_by,item.reviewed_at,version]);
+    if(!r.rowCount) throw new PolicyError(409,'Mục menu đã được xử lý');
+  }
+  async saveMenuRevision(r) {
+    await this.q(`INSERT INTO menu_revisions(id,ocr_id,place_id,before_menu,after_menu,actor_id,reason,created_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [r.id,r.ocr_id,r.place_id,JSON.stringify(r.before_menu),JSON.stringify(r.after_menu),r.actor_id,r.reason,r.created_at]);
+  }
+  async listMenuRevisions(placeId) {
+    return (await this.q('SELECT * FROM menu_revisions WHERE place_id=$1 ORDER BY created_at DESC,id DESC',[placeId]))
+      .rows.map(r=>({...r,created_at:iso(r.created_at)}));
   }
 
   // ── campaigns, clicks, payments ────────────────────────────────────────────

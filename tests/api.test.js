@@ -131,18 +131,12 @@ test('M5-S01 & M5-S05: Order Deep-Link Redirect logs UTM tracking & Loopback Con
   assert.equal(conf.data.cooldown_days_applied, 3);
 });
 
-test('M6-S06 & M9-S05: AI Menu OCR parses Vietnamese menu lines, normalizes VND prices & matches M2 Dish Library', async () => {
-  const store = createInitialStore();
-  const res = await call(store, 'POST', '/api/v1/merchant/menu/ocr', new URLSearchParams(), {
-    place_id: 'PLACE-401',
-    raw_text: '1. Phở Bò Tái Nạm Hà Nội - 45k\n2. Cơm Tấm Sườn Bì Chả 40.000đ'
-  });
-  assert.equal(res.status, 200);
-  assert.equal(res.data.total_extracted, 2);
-  assert.equal(res.data.items[0].extracted_price, 45000);
-  assert.equal(res.data.items[0].matched_dish_id, 'DISH-101');
-  assert.equal(res.data.items[1].extracted_price, 40000);
-  assert.equal(res.data.items[1].matched_dish_id, 'DISH-102');
+test('M6 ingestion stays off; cannot create or auto-approve menu queue items', async () => {
+  const store=createInitialStore(),before=structuredClone(store.ocrQueue);
+  const res=await call(store,'POST','/api/v1/merchant/menu/ocr',new URLSearchParams(),{raw_text:'Phở bò 50k'});
+  assert.equal(res.status,503);
+  assert.equal(res.data.code,'M6_INGESTION_DISABLED');
+  assert.deepEqual(store.ocrQueue,before);
 });
 
 test('M7-S05: Anti-Fraud Sponsored Click Guard deduplicates repeated clicks within 60 seconds', async () => {
@@ -348,7 +342,7 @@ test('M9: Admin OCR Review rejection with reason & Restaurant Un-pause auto-reco
 
   // 1. Admin rejects OCR item with reason
   const rejectRes = await call(store, 'POST', '/api/v1/admin/ocr-review', new URLSearchParams(), {
-    ocr_id: 'ocr-901',
+    ocr_id: 'ocr-901', version:1,
     decision: 'rejected',
     reason: 'Ảnh chụp bị nhòe và giá tiền không rõ'
   });

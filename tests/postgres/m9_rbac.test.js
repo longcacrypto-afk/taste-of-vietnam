@@ -14,7 +14,10 @@ async function setup(t) {
   const repo=await initRepository(store,{databaseUrl:TEST_DATABASE_URL,log:()=>{}});
   t.after(()=>repo.pool.end());
   return {store,repo,ageReports:async(placeId,hours)=>{
-    await repo.q("UPDATE place_reports SET created_at=NOW()-make_interval(hours=>$2) WHERE place_id=$1",[placeId,hours]);
+    // Test-only time travel of immutable evidence, using the disposable DB owner.
+    await repo.q('ALTER TABLE place_reports DISABLE TRIGGER protect_report_evidence');
+    try { await repo.q("UPDATE place_reports SET created_at=NOW()-make_interval(hours=>$2) WHERE place_id=$1",[placeId,hours]); }
+    finally { await repo.q('ALTER TABLE place_reports ENABLE TRIGGER protect_report_evidence'); }
     await repo.q("UPDATE report_dedupe SET last_at=NOW()-make_interval(hours=>$2) WHERE place_id=$1",[placeId,hours]);
   }};
 }
@@ -36,7 +39,7 @@ test('M9 PostgreSQL: audit failure rolls back each admin mutation and automatic 
     ['POST','/api/v1/admin/rbac/users',{user_id:'user1',role:'ops_admin',reason:'Thử rollback'}],
     ['POST','/api/v1/admin/places/PLACE-405/unpause',{reason:'Thử rollback'}],
     ['POST','/api/v1/admin/places/PLACE-405/approve',{reason:'Thử rollback'}],
-    ['POST','/api/v1/admin/ocr-review',{ocr_id:'ocr-901',decision:'rejected',reason:'Thử rollback'}],
+    ['POST','/api/v1/admin/ocr-review',{ocr_id:'ocr-901',version:1,decision:'rejected',reason:'Thử rollback'}],
     ['POST','/api/v1/admin/ads/CMP-701/moderate',{decision:'paused',reason:'Thử rollback'}],
     ['PATCH','/api/v1/community/recipes/REC-M9-AUDIT',{title:'Không được sửa',reason:'Thử rollback'}],
     ['DELETE','/api/v1/community/recipes/REC-M9-AUDIT',{reason:'Thử rollback'}]

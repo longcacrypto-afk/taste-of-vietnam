@@ -63,7 +63,7 @@ test('Migrations: ordered, recorded once, re-running is a no-op; seed loaded 12 
   const applied = (await db.query('SELECT version, name FROM schema_migrations ORDER BY version')).rows.map(r => r.name);
   assert.deepEqual(applied, listMigrationFiles().map(m => m.name));
   assert.ok(applied.includes('003_m9_rbac_reports'));
-  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '003_m9_rbac_reports', '004_m1_google_auth', '006_m5_redirect', '007_m3_safety_approval', '008_m4_places_hours', '009_m9_data_entry']);
+  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '003_m9_rbac_reports', '004_m1_google_auth', '006_m5_redirect', '007_m3_safety_approval', '008_m4_places_hours', '009_m9_data_entry', '010_m9_review_reports']);
   assert.deepEqual(await runMigrations(db, { log: () => {} }), []);
   assert.equal(await count('SELECT COUNT(*) n FROM dishes'), 12);
   assert.equal(await count('SELECT COUNT(*) n FROM places'), 8);
@@ -207,7 +207,7 @@ test('M4 reports auto-pause a place; M9 admin un-pause, dish CRUD and OCR review
   assert.equal((await api('DELETE', `/api/v1/admin/dishes/${created.data.id}`, { headers: admin.headers })).status, 200);
   assert.equal(await count('SELECT COUNT(*) n FROM dishes WHERE id = $1', [created.data.id]), 0);
 
-  const ocr = await api('POST', '/api/v1/admin/ocr-review', { headers: admin.headers, body: { ocr_id: 'ocr-901', decision: 'rejected', reason: 'Ảnh mờ' } });
+  const ocr = await api('POST', '/api/v1/admin/ocr-review', { headers: admin.headers, body: { ocr_id: 'ocr-901', version:1, decision: 'rejected', reason: 'Ảnh mờ' } });
   assert.equal(ocr.data.updated.rejection_reason, 'Ảnh mờ');
   assert.equal((await one(`SELECT status FROM ocr_review_queue WHERE id = 'ocr-901'`)).status, 'rejected');
 

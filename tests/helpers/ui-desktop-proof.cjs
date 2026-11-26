@@ -164,7 +164,7 @@ const loaders = [
   await realSave.w.saveLiveProfile();
   check(()=>assert(realSave.events.some(x=>x.includes('Đã Cập Nhật'))));
   const realAdmin=env(api(admin.headers));
-  await realAdmin.w.submitOcrReview('ocr-901','approved');
+  await realAdmin.w.submitOcrReview('ocr-901','approved',1,'DISH-101',55000);
   await realAdmin.w.loadLiveAdmin();
   check(()=>assert(!realAdmin.e['live-admin-content'].innerHTML.includes('ocr-card-ocr-901'),'reviewed OCR no longer pending'));
   check(()=>assert(realAdmin.e['live-admin-content'].innerHTML.includes('>1 mục')));
