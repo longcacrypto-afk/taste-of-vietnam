@@ -34,6 +34,7 @@ import { handleFrozenRoute } from './frozenRoutes.js';
 import { handleDishRoutes } from './dishRoutes.js';
 import { currentWeather } from '../services/weatherProvider.js';
 import { areasFromPlaces } from '../services/areas.js';
+import { handleModuleRoute, exportModuleData, deleteModuleData } from '../modules/index.js';
 
 // User-supplied text: drop HTML tags and stray angle brackets / control chars, trim, cap length.
 // (The UI also escapes on output; this keeps stored data clean for other clients like Flutter.)
@@ -127,6 +128,19 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   const userId = authUser ? authUser.id : null;
   // The caller's taste profile; anonymous reads use the shared default profile.
   const profile = authUser ? authUser.profile : store.userProfile;
+  const moduleCtx = {
+    repo, store, authUser, userId, profile, method, pathname, searchParams, body,
+    view: () => buildView(repo, store, authUser),
+    util: {
+      cleanText, cleanNumber, cleanList,
+      unauthorized: () => UNAUTHORIZED,
+      bad: error => ({ status: 400, data: { error } }),
+      notFound: (error = 'Không tìm thấy') => ({ status: 404, data: { error } }),
+      forbidden: (error = 'Không có quyền') => ({ status: 403, data: { error } })
+    }
+  };
+  const early = await handleModuleRoute(moduleCtx, 'early');
+  if (early) return early;
 
   // ====================================================================
   // MODULE M1: ACCOUNT, AUTH, ONBOARDING & TASTE PROFILE (M1-S01 .. M1-S10)
@@ -179,6 +193,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     suggestionCache.invalidateUser(authUser.id);
     const deleted = await deleteUser(repo, authUser.id);
     if (!deleted) return {status:409,data:{error:'Không thể xóa quản trị viên cấp cao cuối cùng'}};
+    await deleteModuleData(repo, authUser.id);
 
     return {
       status: 200,
@@ -195,7 +210,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     if (!authUser) return UNAUTHORIZED;
     return { status: 200, data: {
       export_format: 'JSON', exported_at: new Date().toISOString(),
-      ...(await repo.exportUserData(userId))
+      ...(await repo.exportUserData(userId)),
+      modules: await exportModuleData(repo, userId)
     } };
   }
 
@@ -688,6 +704,12 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     if (!updated) return {status:403,data:{error:'Quyền quản trị đã thay đổi'}};
     return { status: 200, data: updated };
   }
+
+  // ====================================================================
+  // LIVE MODULES (src/modules/*) — run before the legacy frozen routes
+  // ====================================================================
+  const live = await handleModuleRoute(moduleCtx, 'late');
+  if (live) return live;
 
   // ====================================================================
   // FROZEN MODULES (M6, M10–M19) & SYSTEM ROUTES

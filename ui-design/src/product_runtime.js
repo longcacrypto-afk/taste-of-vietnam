@@ -52,13 +52,16 @@
     el.removeAttribute("onclick");
     if (el.tagName === "BUTTON") el.disabled = true;
   }
-  // Frozen modules with real wiring would register here (module → true). None today.
-  const FROZEN_LIVE = {};
+  // Frozen modules with real wiring would register here (module → true).
+  // <live-modules> Modules registered through window.TOV_LIVE (ui-design/src/live/*.js)
+  // go live automatically unless TOV_FEATURES.liveModules === false.
+  const FROZEN_LIVE = Object.fromEntries(Object.keys((window.TOV_LIVE || {}).modules || {}).map((m) => [m, true]));
   const moduleOf = (id) => String(id).split("-")[0];
   function frozenMode(id) {
     if (/^M[1-59]-/.test(id)) return "core";
     if (!FEATURES.frozenPreview) return "off";
-    const m = (FEATURES.frozenModules || {})[moduleOf(id)] || "off";
+    let m = (FEATURES.frozenModules || {})[moduleOf(id)] || "off";
+    if (m === "preview" && FROZEN_LIVE[moduleOf(id)] && FEATURES.liveModules !== false) m = "live";
     return m === "live" && !FROZEN_LIVE[moduleOf(id)] ? "preview" : m;
   }
   // API paths owned by frozen modules (payments, orders, merchant, bookings, ...). The
@@ -123,7 +126,11 @@
     stories: ["M14", "M15"], translator: ["M16"], insights: ["M17"], analytics: ["M10"],
     notifications: ["M8"], fridge: ["M18"], health: ["M19"], community: ["M20"],
   };
-  const tabMode = (tab) => (FROZEN_TABS[tab] || []).some((m) => frozenMode(m + "-S01") === "preview") ? "preview" : "off";
+  const tabMode = (tab) => {
+    const mods = FROZEN_TABS[tab] || [];
+    if (mods.length && mods.every((m) => frozenMode(m + "-S01") === "live")) return "live";
+    return mods.some((m) => ["preview", "live"].includes(frozenMode(m + "-S01"))) ? "preview" : "off";
+  };
   // </m5-frozen>
   // <m6-wording> Owner decision 26/11 "Sửa cho đúng thực tế": copy that claims more than
   // the code does is reworded (words only, same element/place/style). Allergy copy says
@@ -659,6 +666,11 @@
     );
   }
   function config(id) {
+    if (!/^M[1-59]-/.test(id) && frozenMode(id) === "live") {
+      const L = window.TOV_LIVE?.screen(id);
+      if (!L || !L.load) return null;
+      return ["live:" + id + (L.key ? ":" + L.key(liveCtx()) : ""), () => L.load(liveCtx())];
+    }
     if (/^M1-S(0[3-9]|10)$/.test(id))
       return ["profile", () => api("/me/profile")];
     if (id === "M2-S03")
@@ -2183,13 +2195,52 @@
         );
     },
   };
+  // <live-modules> Context handed to ui-design/src/live/*.js and the live render path.
+  function liveCtx() {
+    return {
+      api, H, J, $, $$, K, money, img, text, click, status, action, state, appState, polish,
+      goScreen: (id) => goScreen(id),
+      reload(id = appState.activeScreenId) {
+        const cfg = config(id);
+        if (cfg) delete state.cache[cfg[0]];
+        load(id, true);
+      },
+      dom(html) {
+        const t = document.createElement("template");
+        t.innerHTML = String(html || "");
+        return t.content.firstElementChild;
+      },
+      out: (root) => (root && root.outerHTML) || "",
+      demoPill: () => '<span data-demo-pill class="inline-block px-2 py-0.5 rounded-full bg-[#E0F2FE] text-[#075985] text-[10px] font-extrabold">Dữ liệu demo</span>',
+      stateHtml: (id, s, err) => stateHtml(id, s, true, err),
+    };
+  }
+  function liveRender(id, original) {
+    const L = window.TOV_LIVE?.screen(id);
+    if (!L) return original();
+    const cfg = config(id), entry = cfg ? state.cache[cfg[0]] : null;
+    if (cfg && entry?.status !== "success") return stateHtml(id, entry?.status || "loading", false, entry?.error);
+    if (!L.bind) return original();
+    try {
+      const out = L.bind(original(), entry?.data, liveCtx());
+      return typeof out === "string" ? out : (out?.outerHTML || original());
+    } catch (e) {
+      console.error(e);
+      return stateHtml(id, "error", false, e);
+    }
+  }
   // <m5-frozen> Frozen screens keep their original templates; on product routes they are
   // shown through an inert preview wrapper (label + no handlers, links or submits).
   window.P2.frozenNotice = () => status("Tính năng này chưa mở trong bản hiện tại. Màn này là bản xem trước thiết kế.");
   Object.entries(ALL_SCREENS).forEach(([id, scr]) => {
     if (/^M[1-59]-/.test(id)) return;
     const original = scr.render;
-    scr.render = () => (frozenMode(id) === "preview" ? frozenPreviewHtml(id, original(), ALL_SCREENS) : original());
+    originals[id] = original;
+    scr.render = () => {
+      const mode = frozenMode(id);
+      if (mode === "live") return liveRender(id, original);
+      return mode === "preview" ? frozenPreviewHtml(id, original(), ALL_SCREENS) : original();
+    };
   });
   // Bind only core designs. The frozen modules keep their templates (preview above).
   Object.entries(ALL_SCREENS).forEach(([id, scr]) => {
@@ -2220,6 +2271,7 @@
       if (!ALL_SCREENS[id] || frozenMode(id) === "off")
         return status("Tính năng này chưa mở trong bản hiện tại.");
       originalGo(id);
+      if (frozenMode(id) === "live") load(id);
       polish($("#stage-container"));
       widenPreview(id);
       return;
@@ -2311,12 +2363,25 @@
   // Their original loaders and actions call frozen APIs (vouchers, polls, VietQR...):
   // replaced so nothing is fetched or written; the preview shows the module's designs.
   const frozenNoop = () => {};
-  ["loadLiveMealPlan", "renderLivePoll", "loadLiveBooking", "loadLiveStories", "loadLiveTranslator",
-   "loadLiveInsights", "loadLiveAnalytics", "loadLiveNotifications", "loadLiveFridge", "loadLiveHealth",
-   "loadLiveCommunity"].forEach((f) => { if (typeof window[f] === "function") window[f] = frozenNoop; });
-  ["voteLivePoll", "openLiveVietQrModal", "confirmLivePayment", "submitLiveBooking", "stampPassport",
-   "scanLiveFridgeItem", "syncLiveWearable", "tipLiveRecipe", "saveLiveNotifications"].forEach((f) => {
-    if (typeof window[f] === "function") window[f] = () => window.P2.frozenNotice();
+  // Legacy desktop functions → their Live App tab. A live tab keeps (or replaces, via the
+  // module's fns) its functions; a preview tab gets the inert stand-ins.
+  const LEGACY_FN_TAB = {
+    "loadLiveMealPlan": "mealplan", "renderLivePoll": "poll", "loadLiveBooking": "booking", "loadLiveStories": "stories",
+    "loadLiveTranslator": "translator", "loadLiveInsights": "insights", "loadLiveAnalytics": "analytics",
+    "loadLiveNotifications": "notifications", "loadLiveFridge": "fridge", "loadLiveHealth": "health", "loadLiveCommunity": "community",
+    "voteLivePoll": "poll", "openLiveVietQrModal": "merchant", "confirmLivePayment": "merchant", "submitLiveBooking": "booking",
+    "stampPassport": "stories", "scanLiveFridgeItem": "fridge", "syncLiveWearable": "health", "tipLiveRecipe": "community",
+    "saveLiveNotifications": "notifications",
+  };
+  Object.entries(LEGACY_FN_TAB).forEach(([f, tab]) => {
+    if (tabMode(tab) === "live" || typeof window[f] !== "function") return;
+    window[f] = f.startsWith("load") || f === "renderLivePoll" ? frozenNoop : () => window.P2.frozenNotice();
+  });
+  Object.values(window.TOV_LIVE?.modules || {}).forEach((m) => {
+    if (frozenMode(m.id + "-S01") !== "live") return;
+    Object.entries(m.fns || {}).forEach(([f, fn]) => { window[f] = (...a) => fn(liveCtx(), ...a); });
+    window.P2.live = window.P2.live || {};
+    window.P2.live[m.id] = Object.fromEntries(Object.entries(m.actions || {}).map(([k, fn]) => [k, (...a) => fn(liveCtx(), ...a)]));
   });
   function previewPanel(tab) {
     const panel = document.getElementById("lpanel-" + tab);
@@ -2344,7 +2409,10 @@
     setLiveAppTab = function (tab) {
       if (FROZEN_TABS[tab] && tabMode(tab) === "off") return status("Tính năng này chưa mở trong bản hiện tại.");
       originalTab(tab);
-      if (FROZEN_TABS[tab]) previewPanel(tab);
+      if (FROZEN_TABS[tab] && tabMode(tab) === "live") {
+        const T = window.TOV_LIVE?.tab(tab), panel = document.getElementById("lpanel-" + tab);
+        if (T?.mount && panel) Promise.resolve(T.mount(panel, liveCtx())).catch(() => status("Chưa tải được. Kiểm tra mạng rồi thử lại."));
+      } else if (FROZEN_TABS[tab]) previewPanel(tab);
     };
   }
   $$("[data-ai-badge]").forEach((n) => n.remove());

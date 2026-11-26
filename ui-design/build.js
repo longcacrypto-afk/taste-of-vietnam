@@ -35,10 +35,17 @@ const scriptsBlock = jsFiles
   .map(f => `<script>\n${fs.readFileSync(path.join(srcDir, f), 'utf8')}\n</script>`)
   .join('\n');
 
+// Live modules (ui-design/src/live/*.js) load after the registry, before product_runtime.js.
+const liveDir = path.join(srcDir, 'live');
+const liveFiles = fs.existsSync(liveDir)
+  ? fs.readdirSync(liveDir).filter(f => f.endsWith('.js')).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).map(f => path.join('live', f))
+  : [];
+const runtimeFiles = ['admin_dish_forms.js', 'admin_place_forms.js', 'admin_rbac_audit.js', 'admin_forms.js', 'live_modules.js', ...liveFiles, 'product_runtime.js'];
+
 const bundled = shellHtml
   .replace('/*__IMAGES_DATA_PLACEHOLDER__*/ {}', JSON.stringify(imagesMap))
   .replace('<!--/*__SCREENS_JS_PLACEHOLDER__*/-->', scriptsBlock)
-  .replace('<!--/*__PRODUCT_RUNTIME__*/-->', () => `<script>\n${['admin_dish_forms.js', 'admin_place_forms.js', 'admin_rbac_audit.js', 'admin_forms.js', 'product_runtime.js'].map(f => fs.readFileSync(path.join(srcDir, f), 'utf8')).join('\n')}\n</script>`);
+  .replace('<!--/*__PRODUCT_RUNTIME__*/-->', () => `<script>\n${runtimeFiles.map(f => fs.readFileSync(path.join(srcDir, f), 'utf8')).join('\n')}\n</script>`);
 
 const outIndex = path.join(__dirname, 'index.html');
 fs.writeFileSync(outIndex, bundled, 'utf8');
