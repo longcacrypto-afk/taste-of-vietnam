@@ -22,7 +22,9 @@ const flags = () => {
 
 test('every restored element has a named flag, off by default (partners mirror the server allowlist)', () => {
   const f = flags();
-  for (const k of ['phoneLogin', 'zaloLogin', 'appleLogin', 'searchFilters', 'collections']) assert.equal(f[k], false, k);
+  for (const k of ['phoneLogin', 'zaloLogin', 'appleLogin', 'collections']) assert.equal(f[k], false, k);
+  // searchFilters is live since core-filters (only chips with a real API parameter; see ui-core-filters.test.js).
+  assert.equal(f.searchFilters, true);
   const allow = fs.readFileSync('src/services/redirectService.js', 'utf8');
   const serverPartners = [...allow.matchAll(/\['(\w+)', \[/g)].map((m) => m[1]).sort();
   assert.deepEqual([...f.orderPartners].sort(), serverPartners, 'M5-S02 live rows = redirect allowlist');
@@ -48,7 +50,9 @@ test('M2-S02 filter row, M2-S08 collection chip and M9-S02 Vector DB column stay
   const m2s02 = between('      if (id === "M2-S02") {', '      if (id === "M2-S08") {');
   assert.doesNotMatch(m2s02, /children\[2\]\.remove\(\)/);
   assert.match(m2s02, /FEATURES\.searchFilters/);
-  assert.match(m2s02, /replace\(\/\\s\*✓\\s\*\$\/, ""\)/, 'no ✓: nothing is applied');
+  assert.match(m2s02, /const label = chipLabel\(chip\.textContent\);/, 'design ✓ stripped (chipLabel)');
+  assert.match(m2s02, /chip\.textContent = label \+ SOON;/, 'no ✓ on a chip that applies nothing');
+  assert.match(runtime, /const chipLabel = \(t\) => String\(t \|\| ""\)\.replace\(SOON, ""\)\.replace\(\/\\s\*✓\\s\*\$\/, ""\)/);
   const m2s08 = between('      if (id === "M2-S08") {', '    if (id === "M2-S03") {');
   assert.doesNotMatch(m2s08, /x\.remove\(\)/);
   assert.match(m2s08, /FEATURES\.collections/);
