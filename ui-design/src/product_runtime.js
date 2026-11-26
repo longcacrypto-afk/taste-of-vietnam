@@ -21,6 +21,13 @@
     mealReminders: false, // M1-S10 "Lịch nhắc bữa ăn" → M8-S04 (M8 frozen)
     adsModeration: false, // M9-S07 "Kiểm duyệt Ads M7" (M7 frozen)
     adminMetrics: false, // M9 latency/accuracy/safety figures (no metrics source)
+    phoneLogin: false, // M1-S01 phone/OTP card + desktop login phone fields (SMS not set up)
+    zaloLogin: false, // M1-S01 "Zalo" button (no Zalo login)
+    appleLogin: false, // M1-S01 "Apple" button (no Apple login)
+    searchFilters: false, // M2-S02 chip row "Dưới 55k / Món nước / Ẩn Hải sản"
+    collections: false, // M2-S08 per-card collection chip "N món"
+    // M5-S02: partners the server redirect allowlist accepts (src/services/redirectService.js).
+    orderPartners: ["grabfood", "shopeefood"],
     ...(window.TOV_FEATURES || {}),
   });
   const SOON = " · sắp có";
@@ -135,6 +142,46 @@
     );
   }
   // </m3-controls>
+  // <m4-restore> Sample-data slots kept as visible empty placeholders (owner rule 26/11).
+  function emptySlot(node, title) {
+    if (!node) return;
+    [node, ...$$("[onclick]", node)].forEach((n) => n.removeAttribute("onclick"));
+    $$("button", node).forEach((b) => (b.disabled = true));
+    const name = $(".font-extrabold", node);
+    text(name, title);
+    $$('[class*="D97736"]', node).forEach((n) => text(n, "—"));
+    $$("span", node).forEach((n) => {
+      if (/kcal/.test(n.textContent)) n.lastChild.textContent = " — kcal";
+      if (/^Tài trợ$/.test(n.textContent.trim())) text(n, "Trống");
+    });
+    const sub = $(".text-\\[10px\\].truncate", node);
+    if (sub) text(sub, "Chưa có dữ liệu");
+    $$("img", node).forEach((i) => {
+      i.style.filter = "grayscale(1)";
+      i.style.opacity = "0.35";
+      i.alt = "Chưa có món";
+    });
+    node.setAttribute("aria-disabled", "true");
+    node.style.opacity = "0.6";
+  }
+  const WEATHER_SOON = "🌤️ Thời tiết · sắp có";
+  function desktopWeather() {
+    // Desktop Live App header + "Cá nhân hóa theo thời tiết …" line: live_weather hook only.
+    const w = appState.liveToday?.live_weather;
+    const badge = document.getElementById("live-weather-badge");
+    const want = w?.label ? "🌧️ " + w.label : WEATHER_SOON;
+    if (badge && badge.textContent !== want) {
+      badge.textContent = want;
+      badge.title = w?.label ? "" : "Chưa có nguồn thời tiết thật.";
+      badge.style.opacity = w?.label ? "" : "0.7";
+    }
+    $$("#lpanel-today p").forEach((n) => {
+      if (!/theo thời tiết/.test(n.textContent)) return;
+      const next = n.textContent.replace(/theo thời tiết [^·]*·/, "theo thời tiết " + (w?.label || "(sắp có)") + " ·");
+      if (next !== n.textContent) n.textContent = next;
+    });
+  }
+  // </m4-restore>
   const img = (el, key) => {
     if (!el) return;
     const k = /^\d+$/.test(key || "") ? key : "298";
@@ -406,7 +453,7 @@
           (key === "admin" && !Array.isArray(data.ocr_queue)))
         throw new Error("Dữ liệu chưa hợp lệ. Vui lòng thử lại.");
       state.cache[key] = { status: "success", data };
-      if (key === "today") appState.liveToday = data;
+      if (key === "today") { appState.liveToday = data; desktopWeather(); }
     } catch (e) {
       state.cache[key] = { status: "error", error: e };
     }
@@ -466,10 +513,16 @@
       const items = d.items || [];
       if (!items.length) return stateHtml(id, "empty");
       const cards = $$(".grid-cols-2 > .group", root);
+      // Heading count follows the real list ("Gợi ý Hôm nay (3 món AI)" in the design).
+      $$("h4", root).forEach((h) => {
+        if (/Gợi ý Hôm nay \(\d+ món AI\)/.test(h.textContent))
+          h.textContent = h.textContent.replace(/\(\d+ món AI\)/, "(" + items.length + " món AI)");
+      });
       cards.forEach((node, i) => {
         const a = items[i];
         if (!a) {
-          node.remove();
+          // Keep the design's 2-column slot; an empty grid cell would change the layout.
+          emptySlot(node, "Chưa có thêm món phù hợp");
           return;
         }
         img($("img", node), a.img_key);
@@ -482,7 +535,7 @@
       const third = $('[onclick*="M4-S03"]', root);
       if (third) {
         const a = items[2];
-        if (!a) third.remove();
+        if (!a) emptySlot(third, "Chưa có gợi ý thứ ba");
         else {
           img($("img", third), a.img_key);
           click(third, `P2.dish('${J(a.dish_id)}','M4-S01')`);
@@ -515,7 +568,13 @@
       if (id === "M2-S02") {
         const bar = root.children[1];
         bar.innerHTML = `<form onsubmit="event.preventDefault();P2.search(this.query.value)" class="flex gap-2 w-full"><label for="p2-search" class="sr-only">Tìm món</label><input id="p2-search" name="query" value="${H(state.query)}" class="bg-transparent min-w-0 flex-1" placeholder="Tìm món, nguyên liệu…"><button class="font-extrabold">Tìm</button></form>`;
-        root.children[2].remove();
+        // Original filter chips stay in place, marked "sắp có" (no ✓: nothing is applied).
+        const chipRow = root.children[2];
+        if (!FEATURES.searchFilters && chipRow)
+          $$(":scope > span", chipRow).forEach((chip) => {
+            chip.textContent = chip.textContent.replace(/\s*✓\s*$/, "") + SOON;
+            soon(chip, "Bộ lọc tìm kiếm chưa hoạt động.");
+          });
         const tpl = $('[onclick*="M2-S04"]', root);
         if (tpl) {
           const holder = document.createElement("div");
@@ -539,8 +598,11 @@
           rows(grid, tpl, items, (n, a) => {
             cardFill(n, a);
             text($(".font-extrabold", n), a.name);
+            // The design's collection chip ("6 món") stays; collections view is not wired.
             $$("span", n).forEach((x) => {
-              if (x.textContent.includes("món")) x.remove();
+              if (!/món/.test(x.textContent) || FEATURES.collections) return;
+              text(x, "Bộ sưu tập" + SOON);
+              soon(x, "Nhóm món theo bộ sưu tập chưa mở.");
             });
           });
       }
@@ -750,11 +812,21 @@
   }
   function bindProfile(root, id, p) {
     if (id === "M1-S01") {
-      $("input",root)?.closest(".space-y-3")?.remove();
+      // Phone/OTP card stays: no sample number, input and button shown as "sắp có".
+      const phone=$("input",root);
+      if(phone && !FEATURES.phoneLogin) {
+        // Attributes, not properties: this root is serialised to HTML.
+        phone.setAttribute("value",""); phone.setAttribute("placeholder","Số điện thoại"); phone.setAttribute("disabled","");
+        const card=phone.closest(".space-y-3");
+        const send=card && $("button",card);
+        if(send){ text($("span",send)||send,"Nhận mã xác thực OTP"+SOON); soon(send,"Đăng nhập bằng SMS chưa mở."); }
+      }
       $$("button",root).forEach(b=>{
-        if(["Zalo","Apple"].includes(b.textContent.trim())) b.remove();
-        else if(b.textContent.trim()==="Google") {
-          const row=b.parentElement; if(row?.classList.contains("grid-cols-3")) row.classList.replace("grid-cols-3","grid-cols-1");
+        const label=b.textContent.trim();
+        if(label==="Zalo" || label==="Apple") {
+          if(!FEATURES[label==="Zalo"?"zaloLogin":"appleLogin"]) { b.textContent=label+" · Sắp có"; soon(b,"Đăng nhập "+label+" chưa mở."); }
+        }
+        else if(label==="Google") {
           b.disabled=!(state.google?.enabled && state.google?.ready);
           b.textContent=state.google?.enabled?"Google":"Google · Sắp có";
           click(b,"P2.google()");
@@ -971,6 +1043,14 @@
           click(n, `P2.place('${J(items[i].id)}')`);
         }
       });
+      // The quick card under the map showed sample text ("Cách 400m · Đang mở · 45.000đ").
+      const quick = $('.border-2.border-\\[\\#FBBF24\\]', root);
+      if (quick) {
+        img($("img", quick), place.img_key);
+        text($(".font-extrabold", quick), place.name);
+        text($(".text-\\[10px\\]", quick), placeLine(place) + " · " + menuPrice(place.menu, selected()).split(" · ")[0]);
+        click(quick, `P2.place('${J(place.id)}')`);
+      }
       const note = document.createElement("p");
       note.className = "text-[10px] text-[#64748B]";
       note.textContent =
@@ -1041,14 +1121,14 @@
     if (id === "M5-S02") {
       $$('[onclick*="M5-S05"]', root).forEach((n) => {
         const name = $("b", n)?.textContent || "";
-        const partner =
-          name === "GrabFood"
-            ? "grabfood"
-            : name === "ShopeeFood"
-              ? "shopeefood"
-              : null;
-        if (!partner || !place.links?.[partner]) n.remove();
-        else {
+        const partner = { GrabFood: "grabfood", ShopeeFood: "shopeefood", beFood: "befood", "Xanh SM Ngon": "xanhsm" }[name] || null;
+        if (!partner || !place.links?.[partner] || !FEATURES.orderPartners.includes(partner)) {
+          // Row stays in place: no link for this place, or partner not yet allowed by the server.
+          text($(".text-\\[10px\\]", n), place.links?.[partner] ? "Đối tác chưa được kết nối" + SOON : "Quán chưa có liên kết" + SOON);
+          const tag = $(":scope > span", n);
+          if (tag) text(tag, "Sắp có");
+          soon(n, "Chưa mở đặt món qua đối tác này.");
+        } else {
           click(n, `P2.order('${partner}')`);
           text(
             $(".text-\\[10px\\]", n),
@@ -1161,13 +1241,17 @@
     }
     if(id==="M9-S02") {
       const tbody=$("tbody",content), tpl=tbody.firstElementChild.cloneNode(true);
-      $("thead tr",content)?.lastElementChild?.remove();
+      // "Vector DB" column stays; status shown only from a real has_embedding flag.
       rows(tbody,tpl,d.catalog||[],(n,a)=>{
         const cells=[...n.children];
         img($("img",cells[0]),a.img_key);text($("b",cells[0]),a.name);
         text(cells[1],({bac:"Miền Bắc",trung:"Miền Trung",nam:"Miền Nam"})[a.region]||a.region||"—");
         text(cells[2],(a.allergen_tags||[]).join(", ")||"—");
-        text(cells[3],(a.calories??"—")+" kcal · "+money(a.ref_price));cells[4]?.remove();
+        text(cells[3],(a.calories??"—")+" kcal · "+money(a.ref_price));
+        if(cells[4]) {
+          if(a.has_embedding===true) text(cells[4],"pgvector ✔");
+          else { text(cells[4],"Chưa có vector"+SOON); cells[4].style.opacity="0.6"; cells[4].title="Chưa tạo vector tìm kiếm cho món này."; }
+        }
       });
       if(!(d.catalog||[]).length) content.innerHTML=stateHtml(id,"empty", true);
     }
@@ -1251,6 +1335,7 @@
         .replace(/\bAnti-Fraud Active\b/g, "")
         .replace(/542 món|500\+ món|Hoàn tất trong 38 giây!/g, "")
         .replace(/Chào anh Long/g, "Chào bạn")
+        .replace(/Hôm nay Biên Hòa 26°C trời mát lành, em/g, "Em")
         .replace(/Verified Merchant/g,"Thông tin quán")
         .replace(/⭐ 4\.8 \(150\)/g, "Chưa có đánh giá thực tế")
         .replace(/Chặn 100% dị ứng/g,"Lọc theo dị ứng đã khai báo");
@@ -1315,7 +1400,13 @@
   TOV_AUTH.renderLoginRequired = function(container, status, retry) {
     // Same desktop card the app already uses; phone OTP is replaced by the enabled sign-in.
     desktopLoginRequired.call(TOV_AUTH, container, status, retry);
-    container.querySelectorAll('[data-auth="phone"],[data-auth="send"],[data-auth="code"],[data-auth="verify"]').forEach(n=>n.remove());
+    // Phone/OTP fields stay (owner rule); disabled and marked until SMS login is on.
+    if (!FEATURES.phoneLogin) {
+      const phone = container.querySelector('[data-auth="phone"]'), send = container.querySelector('[data-auth="send"]');
+      if (phone) { phone.disabled = true; phone.placeholder = "Số điện thoại" + SOON; }
+      if (send) { send.textContent = "Gửi mã OTP" + SOON; soon(send, "Đăng nhập bằng SMS chưa mở."); }
+      container.querySelectorAll('[data-auth="code"],[data-auth="verify"]').forEach((n) => { n.disabled = true; });
+    }
     const box = container.firstElementChild;
     const intro = box?.children[1];
     if (intro) intro.textContent = (status === 403 ? "Tài khoản hiện tại không có quyền xem mục này." : "Mục này cần đăng nhập.") + " Đăng nhập bằng tài khoản đã được cấp quyền.";
@@ -1703,6 +1794,12 @@
   document.head.append(style);
   window.M9Forms?.syncRole();
   polish(document.body);
+  // The original refreshLiveSuggestions() writes the seeded weather label into the
+  // badge; re-apply the live_weather hook whenever that happens.
+  desktopWeather();
+  const weatherBadge = document.getElementById("live-weather-badge");
+  if (weatherBadge)
+    new MutationObserver(() => desktopWeather()).observe(weatherBadge, { childList: true, characterData: true, subtree: true });
   // Existing dynamic live panels retain their original functions and markup.
   const observed = $("#main-liveapp");
   if (observed) {
