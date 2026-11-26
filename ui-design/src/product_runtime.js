@@ -35,6 +35,7 @@
     order: null,
   };
   const request = window.fetch.bind(window);
+  window.M9_AUTH_FETCH = request;
   let lastButton = null,
     retryWrite = null;
   document.addEventListener(
@@ -201,10 +202,11 @@
       return [
         "admin",
         async () => {
-          const d = await api("/admin/dashboard");
+          const [d, identity] = await Promise.all([api("/admin/dashboard"), api("/auth/me")]);
           return {
             ...d,
             catalog: d.catalog || [],
+            actor_role: identity.role,
           };
         },
       ];
@@ -972,6 +974,7 @@
       if (submit) submit.type = "submit";
     });
     hydrateImages(root);
+    window.M9Forms?.mount(root, appState.activeScreenId, state.cache.admin?.data);
   }
   TOV_AUTH.renderLoginRequired = function(container) {
     container.innerHTML=ALL_SCREENS["M1-S01"].render();polish(container);
@@ -1255,8 +1258,6 @@
     if(id==="M1-S02") id="M1-S01";
     if (!/^M[1-59]-/.test(id))
       return status("Tính năng này chưa mở trong bản hiện tại.");
-    if (id === "M9-S01" && !document.body.classList.contains("pwa-mobile-mode"))
-      return setLiveAppTab("admin");
     if(id==="M1-S09" && TOV_AUTH.role()==="guest") id="M1-S01";
     originalGo(id);
     load(id);
@@ -1336,6 +1337,7 @@
   const style = document.createElement("style");
   style.textContent = `.product-mode{--text-muted:#5B6A80}.product-mode #p2-action-status{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;max-width:calc(100vw - 24px);width:420px;box-shadow:0 8px 30px #0003}.product-mode :focus-visible{outline:3px solid #B45309;outline-offset:3px}.product-mode input{min-width:0}.product-mode [onclick]{touch-action:manipulation}.product-mode .phone-frame .flex-1{min-width:0}.product-mode .phone-frame{overflow:hidden}.product-mode #main-liveapp{min-width:0}.product-mode [data-p2-layout]{min-width:0}@media(max-width:768px){.product-mode #stage-container .min-w-\\[1100px\\],.product-mode #stage-container .min-w-\\[1000px\\]{min-width:0!important}.product-mode #stage-container table{display:block;max-width:100%;overflow:auto}.product-mode #stage-container aside nav{display:flex;flex-wrap:wrap;max-height:none}.product-mode #stage-container aside nav button{width:auto}.product-mode #stage-container .w-64{width:auto}.product-mode #stage-container .min-w-0{max-width:100%}}`;
   document.head.append(style);
+  window.M9Forms?.syncRole();
   polish(document.body);
   // Existing dynamic live panels retain their original functions and markup.
   const observed = $("#main-liveapp");
@@ -1361,7 +1363,7 @@
         const script=document.createElement("script");script.src="https://accounts.google.com/gsi/client";script.async=true;
         script.onload=()=>{google.accounts.id.initialize({client_id:state.google.client_id,callback:credential=>action(
           async()=>{const r=await TOV_AUTH.google(credential.credential);if(!r.ok)throw Object.assign(new Error("Đăng nhập chưa thành công"),{status:r.status});return r.data;},
-          (d)=>{state.cache={};if(document.body.classList.contains("pwa-mobile-mode"))goScreen("M1-S03");else setLiveAppTab((d.role||d.user?.role)==="admin"?"admin":"profile");}
+          (d)=>{state.cache={};window.M9Forms?.syncRole();if(document.body.classList.contains("pwa-mobile-mode"))goScreen("M1-S03");else setLiveAppTab((d.role||d.user?.role)==="admin"?"admin":"profile");}
         )});state.google.ready=true;$$("[onclick='P2.google()']").forEach(b=>b.disabled=false);};
         script.onerror=()=>status("Chưa tải được đăng nhập Google. Kiểm tra mạng rồi thử lại.");
         document.head.append(script);
