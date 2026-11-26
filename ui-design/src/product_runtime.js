@@ -1330,11 +1330,13 @@
     }
     if (id === "M5-S05") {
       const copy = confirmCopy(state.order);
-      text($("h3", root), copy.heading);
-      const tip = root.children[1];
-      if (tip) {
-        text($(".font-extrabold", tip), copy.title);
-        text($("p", tip), copy.text);
+      // Header title is the last span of the mobileHeader title row; the tip bubble
+      // holds the title div then the text div (k.mascotTip).
+      text(root.children[0]?.children[1]?.firstElementChild?.lastElementChild, copy.heading);
+      const bubble = $(".font-extrabold", root.children[1])?.parentElement;
+      if (bubble) {
+        text(bubble.children[0], copy.title);
+        text(bubble.children[1], copy.text);
       }
       const b = root.lastElementChild;
       if (copy.ready) click(b, "P2.confirmMeal()");
