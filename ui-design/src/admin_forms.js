@@ -196,14 +196,16 @@
     const desktop = document.querySelector("#ltab-admin");
     if (!isAdmin(role)) scope?.querySelectorAll("[data-m9-entry]").forEach(n => n.remove());
     if (desktop) {desktop.hidden = !isAdmin(role); desktop.style.display = isAdmin(role) ? "" : "none"; desktop.setAttribute("onclick","goScreen('M9-S01')");}
-    if (document.body.classList.contains("pwa-mobile-mode") && isAdmin(role) && navTemplate &&
-        ["M3-S01","M1-S09","M1-S03"].includes(window.appState.activeScreenId) && !scope.querySelector("[data-m9-entry]")) {
-      const button = navTemplate.cloneNode(true);
-      button.removeAttribute("id"); button.dataset.m9Entry = "1";
+    // Phone: no extra control on Home. Admins get one more row in the profile
+    // screen, a copy of that screen's own settings button.
+    const settings = scope?.querySelector("[onclick*=\"M1-S10\"]");
+    if (document.body.classList.contains("pwa-mobile-mode") && isAdmin(role) && settings &&
+        window.appState.activeScreenId === "M1-S09" && !scope.querySelector("[data-m9-entry]")) {
+      const button = settings.cloneNode(true);
+      button.dataset.m9Entry = "1";
       button.setAttribute("onclick","goScreen('M9-S01')");
-      button.textContent = "Quản trị nội dung";
-      const destination = scope.querySelector(".phone-frame > .flex-1") || scope.firstElementChild;
-      destination?.prepend(button);
+      button.textContent = "🛡️ Quản trị nội dung →";
+      settings.after(button);
     }
   }
   window.M9Forms = {
@@ -228,11 +230,13 @@
       root.dataset.m9Mounted = id;
       // The existing desktop admin grid must not be squeezed into the 480px
       // consumer phone preview at desktop widths. Keep its original fluid shell.
+      // On phones the original hides this sidebar; keep that.
+      const phone = document.body.classList.contains("pwa-mobile-mode") && window.innerWidth <= 768;
       const frame = root.closest(".phone-frame");
-      if (frame) frame.style.setProperty("max-width", "100%", "important");
+      if (frame && !phone) frame.style.setProperty("max-width", "100%", "important");
       const actualRole = d.actor_role;
       Object.assign(C,{role:actualRole,canContent:content(actualRole),canOps:ops(actualRole)});
-      nav.closest("aside").style.setProperty("display","flex","important");
+      if (!phone) nav.closest("aside").style.setProperty("display","flex","important");
       $$("button",nav).forEach(b=>{
         const target = b.getAttribute("onclick") || "";
         if ((!C.canContent && /M9-S0[235]/.test(target)) || (!C.canOps && /M9-S04/.test(target))) b.remove();
