@@ -828,7 +828,7 @@
       const first = t.content.firstElementChild?.firstElementChild;
       if (first && first.matches(".flex.items-center.justify-between.pb-1")) header = first.outerHTML;
     } catch (_) {}
-    if (!header) header = K.mobileHeader(({M1:"Hồ sơ khẩu vị",M2:"Khám phá món ngon",M3:"Gợi ý bữa ăn",M4:"Quán quanh bạn",M5:"Thưởng thức",M9:"Quản trị nội dung"})[id.split("-")[0]], "", "M3-S01");
+    if (!header) header = K.mobileHeader(({M1:"Hồ sơ khẩu vị",M2:"Khám phá món ngon",M3:"Gợi ý bữa ăn",M4:"Quán quanh bạn",M5:"Thưởng thức",M9:"Quản trị nội dung"})[id.split("-")[0]] || (typeof ALL_SCREENS !== "undefined" && ALL_SCREENS[id]?.module) || (typeof ALL_SCREENS !== "undefined" && ALL_SCREENS[id]?.title) || id, "", "M3-S01");
     return `<div class="p-4 space-y-3.5 bg-white text-[#0F172A] text-xs">${header}${card}</div>`;
   }
   function rows(parent, template, items, bind) {
