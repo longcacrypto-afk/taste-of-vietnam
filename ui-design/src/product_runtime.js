@@ -26,6 +26,7 @@
     appleLogin: false, // M1-S01 "Apple" button (no Apple login)
     searchFilters: false, // M2-S02 chip row "Dưới 55k / Món nước / Ẩn Hải sản"
     collections: false, // M2-S08 per-card collection chip "N món"
+    liveMap: true, // M4-S02 / M5-S03: real Leaflet map in the original frame (m7)
     // M5-S02: partners the server redirect allowlist accepts (src/services/redirectService.js).
     orderPartners: ["grabfood", "shopeefood"],
     // <m5-frozen> Owner decision 26/11 "Mở lại, xem được thiết kế": the 54 out-of-scope
@@ -222,7 +223,7 @@
   }
   function weatherPill(w) {
     // live_weather comes from the server weather hook (null until a provider is set).
-    return w?.label ? { text: "🌧️ " + w.label, live: true } : { text: "🌤️ Thời tiết" + SOON, live: false };
+    return w?.label ? { text: (w.emoji || "🌡️") + " " + w.label, live: true } : { text: "🌤️ Thời tiết" + SOON, live: false };
   }
   function whyText(d) {
     const s = d?.suggestion,
@@ -304,15 +305,17 @@
     // Desktop Live App header + "Cá nhân hóa theo thời tiết …" line: live_weather hook only.
     const w = appState.liveToday?.live_weather;
     const badge = document.getElementById("live-weather-badge");
-    const want = w?.label ? "🌧️ " + w.label : WEATHER_SOON;
+    const want = w?.label ? (w.emoji || "🌡️") + " " + w.label : WEATHER_SOON;
     if (badge && badge.textContent !== want) {
       badge.textContent = want;
-      badge.title = w?.label ? "" : "Chưa có nguồn thời tiết thật.";
+      badge.title = w?.label ? "Nguồn: " + (w.source || "nhà cung cấp thời tiết") : "Chưa lấy được thời tiết thật.";
       badge.style.opacity = w?.label ? "" : "0.7";
     }
     $$("#lpanel-today p").forEach((n) => {
       if (!/theo thời tiết/.test(n.textContent)) return;
-      let next = n.textContent.replace(/theo thời tiết [^·]*·/, "theo thời tiết " + (w?.label || "(sắp có)") + " ·");
+      // The reading's own " · " would split this " · "-separated line, so use a comma here.
+      const reading = w?.label ? w.label.replace(/ · /g, ", ") : "(sắp có)";
+      let next = n.textContent.replace(/theo thời tiết [^·]*·/, "theo thời tiết " + reading + " ·");
       // Second segment: the allergens this list was really filtered by (m6-wording).
       const applied = appState.liveToday?.applied_allergies;
       if (Array.isArray(applied)) {
@@ -323,6 +326,133 @@
     });
   }
   // </m4-restore>
+  // <m7-live> Real map inside the original map frames (M4-S02, M5-S03): Leaflet
+  // (vendored in /assets/leaflet) + OpenStreetMap tiles. Pins come only from /places
+  // items that have coordinates. If Leaflet or the tiles do not load, the frame goes
+  // back to exactly what it showed before (design image + pins), nothing invented.
+  // Switch: TOV_FEATURES.liveMap (false = old frame). Tiles: TOV_FEATURES.mapTiles
+  // = { url, attribution, maxZoom } (e.g. a MapTiler URL with a key for production).
+  const MAP_TILES = {
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+    maxZoom: 19,
+    ...(FEATURES.mapTiles || {}),
+  };
+  const coord = (v) => v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v));
+  const hasCoords = (p) => !!p && coord(p.lat) && coord(p.lng) && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180;
+  /** Map spec stored on the frame: centre (search point), radius, and real pins only. */
+  function mapSpec(center, places) {
+    const pins = (places || []).filter(hasCoords).map((p) => ({ id: p.id, lat: Number(p.lat), lng: Number(p.lng) }));
+    const c = hasCoords(center) ? { lat: Number(center.lat), lng: Number(center.lng), radius_m: Number(center.radius_m) || null } : null;
+    return pins.length ? { center: c, pins } : null;
+  }
+  let leafletPromise = null;
+  function loadLeaflet() {
+    if (window.L?.map) return Promise.resolve(window.L);
+    if (leafletPromise) return leafletPromise;
+    leafletPromise = new Promise((resolve, reject) => {
+      if (!document.querySelector('link[href="/assets/leaflet/leaflet.css"]')) {
+        const css = document.createElement("link");
+        css.rel = "stylesheet";
+        css.href = "/assets/leaflet/leaflet.css";
+        document.head.append(css);
+      }
+      const js = document.createElement("script");
+      js.src = "/assets/leaflet/leaflet.js";
+      js.onload = () => (window.L?.map ? resolve(window.L) : reject(new Error("leaflet")));
+      js.onerror = () => reject(new Error("leaflet"));
+      document.head.append(js);
+    }).catch((e) => {
+      leafletPromise = null; // allow a retry on the next render
+      throw e;
+    });
+    return leafletPromise;
+  }
+  function mountLiveMaps(root = document) {
+    if (!FEATURES.liveMap || !root) return;
+    $$("[data-live-map]", root).forEach((frame) => {
+      if (frame.dataset.mapState) return;
+      let spec;
+      try { spec = JSON.parse(frame.dataset.liveMap); } catch (_) { return; }
+      if (!spec?.pins?.length) return;
+      frame.dataset.mapState = "loading";
+      loadLeaflet().then((L) => mountMap(L, frame, spec)).catch(() => mapFallback(frame));
+    });
+  }
+  function mapFallback(frame, map) {
+    // Pins go back to their original absolute slots; pins added for the map only are dropped.
+    const pins = frame._mapPins || $$("[data-map-pin]", frame);
+    try { map?.remove(); } catch (_) {}
+    $$("[data-map-layer]", frame).forEach((n) => n.remove());
+    pins.forEach((n) => {
+      if (n.hasAttribute("data-map-extra")) return n.remove();
+      n.className = n.dataset.pinClass || n.className;
+      n.style.transform = "";
+      n.style.whiteSpace = "";
+      n.style.display = "";
+      frame.append(n);
+    });
+    const note = frame.parentElement && $("[data-map-note]", frame.parentElement);
+    if (note) note.textContent = note.dataset.fallback;
+    frame.dataset.mapState = "fallback";
+  }
+  function mountMap(L, frame, spec) {
+    if (!frame.isConnected) return;
+    const layer = document.createElement("div");
+    layer.setAttribute("data-map-layer", "");
+    layer.setAttribute("role", "region");
+    layer.setAttribute("aria-label", "Bản đồ quán quanh bạn");
+    layer.style.cssText = "position:absolute;inset:0;z-index:0;background:#E2E8F0;font:inherit";
+    frame.append(layer);
+    const map = L.map(layer, { zoomControl: false, scrollWheelZoom: false, attributionControl: true });
+    map.attributionControl.setPrefix(false);
+    let loaded = 0, failed = 0, done = false;
+    const fail = () => { if (!done) { done = true; mapFallback(frame, map); } };
+    const tiles = L.tileLayer(MAP_TILES.url, { attribution: MAP_TILES.attribution, maxZoom: MAP_TILES.maxZoom });
+    tiles.on("tileload", () => {
+      loaded += 1;
+      if (!done) {
+        done = true;
+        frame.dataset.mapState = "live";
+        const note = frame.parentElement && $("[data-map-note]", frame.parentElement);
+        if (note) note.textContent = note.dataset.live;
+      }
+    });
+    tiles.on("tileerror", () => { failed += 1; if (!loaded && failed >= 4) fail(); });
+    setTimeout(() => { if (!loaded) fail(); }, 10000);
+    tiles.addTo(map);
+    const bounds = [];
+    if (spec.center) {
+      if (spec.center.radius_m)
+        L.circle([spec.center.lat, spec.center.lng], { radius: spec.center.radius_m, color: "#FBBF24", weight: 1, fillOpacity: 0.06, interactive: false }).addTo(map);
+      L.circleMarker([spec.center.lat, spec.center.lng], { radius: 6, color: "#fff", weight: 2, fillColor: "#2563EB", fillOpacity: 1, interactive: false })
+        .bindTooltip("Vị trí của bạn", { direction: "top" }).addTo(map);
+      bounds.push([spec.center.lat, spec.center.lng]);
+    }
+    // The original pin elements become the markers (same text, colours and click).
+    // Padding 90px left/right keeps a centred pill label inside the frame.
+    frame._mapPins = $$("[data-map-pin]", frame);
+    frame._mapPins.forEach((el) => {
+      const lat = Number(el.dataset.lat), lng = Number(el.dataset.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      el.dataset.pinClass = el.className;
+      el.className = el.className.replace(/\b(absolute|top-\d+|left-\d+|bottom-\d+|right-\d+)\b/g, "").trim();
+      el.style.transform = "translate(-50%,-50%)";
+      el.style.display = "inline-block"; // a transform is ignored on an inline <span>
+      el.style.whiteSpace = "nowrap";
+      L.marker([lat, lng], { icon: L.divIcon({ html: el, className: "", iconSize: null }), keyboard: false }).addTo(map);
+      bounds.push([lat, lng]);
+    });
+    const fit = () => (bounds.length > 1 ? map.fitBounds(bounds, { padding: [90, 40], maxZoom: 17 }) : map.setView(bounds[0], 16));
+    fit();
+    // The stage animates in, so the frame can still change size after mount: refit until
+    // the user moves the map themselves.
+    let touched = false;
+    map.on("dragstart zoomstart", (e) => { if (e.originalEvent || e.type === "dragstart") touched = true; });
+    if (window.ResizeObserver)
+      new ResizeObserver(() => { if (!layer.isConnected) return; map.invalidateSize(); if (!touched) fit(); }).observe(layer);
+  }
+  // </m7-live>
   const img = (el, key) => {
     if (!el) return;
     const k = /^\d+$/.test(key || "") ? key : "298";
@@ -879,7 +1009,8 @@
         // All three original chips stay; weather is "sắp có" until the provider hook returns data.
         const pills = $$(".flex-wrap > span", photo);
         pills.forEach((n, i) => text(n, why.pills[i] ?? n.textContent));
-        if (!why.weather.live) soon(pills[0], "Chưa có nguồn thời tiết thật; sẽ bật khi nối nhà cung cấp thời tiết.");
+        if (!why.weather.live) soon(pills[0], "Chưa lấy được thời tiết thật cho vị trí của bạn; chip sẽ hiện khi có số đo.");
+        else pills[0].title = "Nguồn: " + (d.live_weather.source || "nhà cung cấp thời tiết");
         const [go, cook] = $$(".grid-cols-2 > button", root);
         if (go) {
           text(go, why.place ? "🛵 Đi ăn" + (meters(why.place.distance_m) ? " (" + meters(why.place.distance_m) + ")" : "") : "🛵 Tìm quán");
@@ -1190,8 +1321,25 @@
             items[i].name + " · " + Math.round(items[i].distance_m) + "m",
           );
           click(n, `P2.place('${J(items[i].id)}')`);
+          // <m7-live> real coordinates for the live map (the pin keeps its slot if the map fails)
+          if (hasCoords(items[i])) Object.assign(n.dataset, { mapPin: "", lat: items[i].lat, lng: items[i].lng });
         }
       });
+      // <m7-live> Every other real place with coordinates gets a pin in the original white
+      // pin style; these exist only on the live map (dropped again if the map falls back).
+      const frame = pins[0]?.parentElement;
+      const spec = FEATURES.liveMap && frame && mapSpec(state.cache["places:" + selected()]?.data?.center, items);
+      if (spec) {
+        const tpl = pins[pins.length - 1];
+        items.slice(pins.length).filter(hasCoords).forEach((p) => {
+          const n = tpl.cloneNode(true);
+          text(n, p.name + " · " + Math.round(p.distance_m) + "m");
+          click(n, `P2.place('${J(p.id)}')`);
+          Object.assign(n.dataset, { mapPin: "", mapExtra: "", lat: p.lat, lng: p.lng });
+          frame.append(n);
+        });
+        frame.dataset.liveMap = JSON.stringify(spec);
+      }
       // The quick card under the map showed sample text ("Cách 400m · Đang mở · 45.000đ").
       const quick = $('.border-2.border-\\[\\#FBBF24\\]', root);
       if (quick) {
@@ -1204,6 +1352,12 @@
       note.className = "text-[10px] text-[#64748B]";
       note.textContent =
         "Nền bản đồ minh họa. Chọn chỉ đường để mở vị trí thật trên bản đồ.";
+      // <m7-live> the same note line, worded for whichever state the frame ends in.
+      Object.assign(note.dataset, {
+        mapNote: "",
+        fallback: note.textContent,
+        live: "Bản đồ OpenStreetMap. Ghim là quán thật có tọa độ trong dữ liệu; chấm xanh là vị trí bạn đã lưu.",
+      });
       root.append(note);
     }
     if (id === "M4-S03") {
@@ -1289,6 +1443,23 @@
     }
     if (id === "M5-S03") {
       text($(".text-\\[10px\\]",root.firstElementChild),Math.round(place.distance_m)+"m");
+      // <m7-live> The route picture becomes a real map of you + this place (no route is drawn:
+      // there is no routing service; the two buttons below open Google Maps for directions).
+      const pic = $('img[data-img]', root);
+      const spec = FEATURES.liveMap && pic && mapSpec(state.cache["places:" + selected()]?.data?.center, [place]);
+      if (spec) {
+        const frame = document.createElement("div");
+        frame.className = "relative w-full h-44 rounded-2xl overflow-hidden border border-[#E2E8F0]";
+        pic.replaceWith(frame);
+        pic.className = "w-full h-full object-cover object-right";
+        frame.append(pic);
+        const pin = document.createElement("span");
+        pin.className = "absolute top-3 left-3 px-3 py-1.5 rounded-full bg-[#18181B] text-[#FBBF24] font-extrabold shadow-lg";
+        pin.textContent = "📍 " + place.name;
+        Object.assign(pin.dataset, { mapPin: "", mapExtra: "", lat: place.lat, lng: place.lng });
+        frame.append(pin);
+        frame.dataset.liveMap = JSON.stringify(spec);
+      }
       $$("button", root)
         .slice(-2)
         .forEach((b) => click(b, "P2.order('maps')"));
@@ -1556,6 +1727,7 @@
     });
     hydrateImages(root);
     window.M9Forms?.mount(root, appState.activeScreenId, state.cache.admin?.data);
+    mountLiveMaps(root); // <m7-live>
   }
   const desktopLoginRequired = TOV_AUTH.renderLoginRequired;
   TOV_AUTH.renderLoginRequired = function(container, status, retry) {
