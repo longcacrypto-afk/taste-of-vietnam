@@ -12,6 +12,11 @@
   const content = r => ["content_moderator", "super_admin"].includes(r);
   const ops = r => ["ops_admin", "super_admin"].includes(r);
   let seq = 0;
+  const selections = {};
+  function rememberSelection() {
+    const picker = document.querySelector("#stage-container [name=dish_picker], #stage-container [name=place_pick]");
+    if (picker) selections[window.appState.activeScreenId] = picker.value;
+  }
   function label(name, title, control) {
     const id = "m9-input-" + (++seq);
     return `<label class="block space-y-1"><span class="font-bold">${H(title)}</span>${control.replace("data-control", `id="${id}" name="${H(name)}" aria-label="${H(title)}"`)}</label>`;
@@ -49,6 +54,8 @@
         const err = new Error(typeof data.error === "string" ? data.error : "Chưa lưu được dữ liệu.");
         err.status = res.status; err.data = data; throw err;
       }
+      if (method === "POST" && ["/admin/dishes", "/admin/places"].includes(path) && data.id)
+        selections[window.appState.activeScreenId] = data.id;
       return data;
     },
     refresh() { window.P2.reload(); },
@@ -56,6 +63,7 @@
       if (form.dataset.busy) return;
       const box = $("[data-feedback]", form);
       const states = $$("button", form).map(b => [b,b.disabled]);
+      rememberSelection();
       form.dataset.busy = "1";
       states.forEach(([b]) => b.disabled = true);
       box.textContent = "Đang xử lý…";
@@ -175,6 +183,7 @@
   const navTemplate = document.querySelector("#ltab-admin")?.cloneNode(true);
   function navigation(scope) {
     const desktop = document.querySelector("#ltab-admin");
+    if (!isAdmin(role)) scope?.querySelectorAll("[data-m9-entry]").forEach(n => n.remove());
     if (desktop) {desktop.hidden = !isAdmin(role); desktop.style.display = isAdmin(role) ? "" : "none"; desktop.setAttribute("onclick","goScreen('M9-S01')");}
     if (document.body.classList.contains("pwa-mobile-mode") && isAdmin(role) && navTemplate &&
         ["M3-S01","M1-S09","M1-S03"].includes(window.appState.activeScreenId) && !scope.querySelector("[data-m9-entry]")) {
@@ -182,7 +191,7 @@
       button.removeAttribute("id"); button.dataset.m9Entry = "1";
       button.setAttribute("onclick","goScreen('M9-S01')");
       button.textContent = "Quản trị nội dung";
-      const destination = scope.querySelector(".phone-frame > div") || scope.firstElementChild;
+      const destination = scope.querySelector(".phone-frame > .flex-1") || scope.firstElementChild;
       destination?.prepend(button);
     }
   }
@@ -219,8 +228,17 @@
         b.dataset.m9Home="1"; b.textContent="← Trang chủ"; b.type="button";
         b.addEventListener("click",()=>goScreen("M3-S01")); nav.append(b);
       }
+      if (id === "M9-S01" && !C.canContent) root.querySelectorAll("button[onclick*=M9-S05]").forEach(n => n.remove());
+      if (id === "M9-S05" && !C.canContent) {
+        root.lastElementChild.lastElementChild.textContent = "Vai trò này không có quyền duyệt menu.";
+        return;
+      }
       Object.values(window.M9FormsParts || {}).forEach(fn=>fn(root,id,d,C));
       review(root,id,d); reports(root,id,d);
+      const picker = root.querySelector("[name=dish_picker], [name=place_pick]");
+      if (picker && selections[id] && [...picker.options].some(o => o.value === selections[id])) {
+        picker.value = selections[id]; picker.dispatchEvent(new Event("change"));
+      }
     }
   };
 })();

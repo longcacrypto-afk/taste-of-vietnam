@@ -970,7 +970,7 @@
     });
     // Native submit buttons on forms need to keep their submission behavior.
     $$("form", root).forEach((f) => {
-      const submit = $('button:not([onclick]),button[onclick=""]', f);
+      const submit = $('button:not([onclick]):not([type]),button[onclick=""]:not([type])', f);
       if (submit) submit.type = "submit";
     });
     hydrateImages(root);
@@ -1202,6 +1202,7 @@
           () => api("/me", "DELETE"),
           () => {
             TOV_AUTH.logout();
+            window.M9Forms?.syncRole();
             state.cache = {};
             goScreen("M1-S01");
             status("Đã xóa tài khoản.");
