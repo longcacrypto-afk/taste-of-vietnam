@@ -63,7 +63,7 @@ test('Migrations: ordered, recorded once, re-running is a no-op; seed loaded 12 
   const applied = (await db.query('SELECT version, name FROM schema_migrations ORDER BY version')).rows.map(r => r.name);
   assert.deepEqual(applied, listMigrationFiles().map(m => m.name));
   assert.ok(applied.includes('003_m9_rbac_reports'));
-  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '003_m9_rbac_reports', '004_m1_google_auth', '006_m5_redirect', '007_m3_safety_approval', '008_m4_places_hours', '009_m9_data_entry', '010_m9_review_reports']);
+  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '003_m9_rbac_reports', '004_m1_google_auth', '006_m5_redirect', '007_m3_safety_approval', '008_m4_places_hours', '009_m9_data_entry', '010_m9_review_reports', '011_catalog_display_backfill']);
   assert.deepEqual(await runMigrations(db, { log: () => {} }), []);
   assert.equal(await count('SELECT COUNT(*) n FROM dishes'), 12);
   assert.equal(await count('SELECT COUNT(*) n FROM places'), 8);
@@ -321,6 +321,10 @@ test('Upgrading a database set up by hand with the old schema.sql + old seed kee
     await pool.query(`INSERT INTO ad_campaigns (id, cpc_vnd, balance_vnd, is_active) VALUES ('CMP-701', 4000, 1500000, true)`);
     assert.deepEqual(await runMigrations(pool, { log: () => {} }), listMigrationFiles().map(m => m.name));
     assert.equal((await pool.query(`SELECT balance_vnd FROM ad_campaigns WHERE id = 'CMP-701'`)).rows[0].balance_vnd, 1500000, 'money column untouched');
+    // 011 fills the display fields such an old row never had (live had every photo missing).
+    const filled = (await pool.query(`SELECT img_key, description FROM dishes WHERE id = 'DISH-101'`)).rows[0];
+    assert.ok(filled.img_key && filled.description.length > 10, 'migration 011 restores original photo key + description');
+    await pool.query(`UPDATE dishes SET description = '' WHERE id = 'DISH-101'`);
     await seedCatalog(pool, { log: () => {} });
     assert.equal((await pool.query(`SELECT description FROM dishes WHERE id = 'DISH-101'`)).rows[0].description, '', 'plain seed never overwrites');
     await seedCatalog(pool, { log: () => {}, update: true });
