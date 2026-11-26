@@ -2259,7 +2259,10 @@
     // Same as the M9 admin shell (admin_forms.js): a desktop design is not squeezed
     // into the 480px phone preview at desktop widths; phones keep the original layout.
     if (ALL_SCREENS[id]?.platform !== "desktop" || window.innerWidth <= 768) return;
-    const pv = $("#stage-container [data-frozen-preview]"), frame = pv?.closest(".phone-frame");
+    // Frozen preview wrapper, or a live (opened) frozen-module desktop screen.
+    const pv = $("#stage-container [data-frozen-preview]") ||
+      (!/^M[1-59]-/.test(id) && frozenMode(id) === "live" ? $("#stage-container .phone-frame > *") : null);
+    const frame = pv?.closest(".phone-frame");
     if (frame) frame.style.setProperty("max-width", "100%", "important");
     const aside = pv && $("aside", pv);
     if (aside && $("nav", aside)) aside.style.setProperty("display", "flex", "important");
