@@ -901,7 +901,7 @@ window.SCREENS_M3_M4_M5_M8 = {
       return `
         <div class="p-4 space-y-3.5 bg-white text-[#0F172A] text-xs text-center">
           ${k.mobileHeader('Xác Nhận Thành Công', 'M5-S05 · Khép kín vòng lặp AI', 'M3-S01')}
-          ${k.mascotTip('mam', 'Chúc anh ngon miệng nhé!', 'Đánh dấu Đã ăn hôm nay để Măm không gợi ý trùng món Phở bò trong 3 ngày tới!')}
+          ${k.mascotTip('mam', 'Chúc anh ngon miệng nhé!', 'Đánh dấu Đã ăn hôm nay để Măm không gợi ý trùng món này trong 3 ngày tới!')}
           <button onclick="goScreen('M3-S07')" class="w-full py-3 rounded-full bg-[#FBBF24] text-[#0F172A] font-extrabold shadow-md">✓ Đánh dấu Đã ăn & Xem lịch sử</button>
         </div>
       `;
