@@ -154,7 +154,7 @@ test('spin/game endpoints return the safe pool the pick came from (names only, n
 });
 
 test('owner rule: original elements are kept; not-live ones are marked, never removed', () => {
-  const m3s02 = runtime.slice(runtime.indexOf('      if (id === "M3-S02") {\n        const why'), runtime.indexOf('    if(id==="M3-S05"'));
+  const m3s02 = runtime.slice(runtime.indexOf('      if (id === "M3-S02") {\n        const why'), runtime.indexOf('    if (id === "M3-S05") {'));
   assert.doesNotMatch(m3s02, /\.remove\(\)/, 'M3-S02 removes nothing');
   assert.match(m3s02, /soon\(pills\[0\]/);
   const m4s01 = runtime.slice(runtime.indexOf('    if (id === "M4-S01") {'), runtime.indexOf('    if (id === "M4-S02") {'));
