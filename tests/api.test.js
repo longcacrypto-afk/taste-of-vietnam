@@ -406,7 +406,7 @@ test('Giai đoạn 4 / v0.2 (M18, M19, M20): Smart Fridge Scan, Health Wearables
 
   // 1. M18: Scan barcode into fridge & get Zero-Waste suggestion
   const scanRes = await call(store, 'POST', '/api/v1/fridge/scan', new URLSearchParams(), {
-    barcode: '8934567890999',
+    barcode: '8934567890991', // valid EAN-13 check digit (M18 validates it)
     item_name: 'Sữa chua men sống Probi',
     expires_in_days: 1,
     compartment: 'door'
@@ -422,7 +422,8 @@ test('Giai đoạn 4 / v0.2 (M18, M19, M20): Smart Fridge Scan, Health Wearables
   assert.ok(invRes.data.total_items >= 5);
   assert.ok(invRes.data.expiring_soon_count >= 2);
 
-  // 2. M19: Health Wearables Sync & Nutrition Profiling
+  // 2. M19: Health Wearables Sync & Nutrition Profiling (BMR needs the body profile the user enters)
+  await call(store, 'PUT', '/api/v1/health/profile', new URLSearchParams(), { sex: 'male', age: 30, height_cm: 172, weight_kg: 75 });
   const healthRes = await call(store, 'POST', '/api/v1/health/sync', new URLSearchParams(), {
     wearable: 'Apple Health',
     daily_steps: 10450,
@@ -539,7 +540,7 @@ test('E2E Full Loop (M1 -> M3 -> M2 -> M4 -> M5 -> Cooldown -> M8 -> M18 -> M19 
 
   // Step 8: Fridge Scanner (M18) + Wearable Sync (M19) + Community Hub (M20)
   const scanFridge = await call(store, 'POST', '/api/v1/fridge/scan', new URLSearchParams(), {
-    barcode: '8934567890123',
+    barcode: '8934567890120', // valid EAN-13 check digit (M18 validates it)
     item_name: 'Trứng gà ta',
     expires_in_days: 2,
     compartment: 'door'

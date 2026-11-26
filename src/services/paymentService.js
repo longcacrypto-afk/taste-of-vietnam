@@ -148,3 +148,39 @@ export function processSuccessfulPayment(store, { orderId, campaignId, amountVnd
     campaign: updatedCampaign,
   };
 }
+
+// =============================================================================
+// VIETQR TRANSFER TO A GIVEN ACCOUNT (M20 tipping): EMVCo/NAPAS 24/7 payload with
+// CRC16-CCITT, for a recipient account the recipient saved themselves. This only
+// builds the QR content; no money moves through Taste of Vietnam.
+// =============================================================================
+export const VIETQR_BANKS = {
+  '970436': 'Vietcombank', '970415': 'VietinBank', '970418': 'BIDV', '970405': 'Agribank', '970407': 'Techcombank',
+  '970422': 'MB Bank', '970416': 'ACB', '970432': 'VPBank', '970423': 'TPBank', '970403': 'Sacombank',
+  '970437': 'HDBank', '970441': 'VIB', '970443': 'SHB', '970431': 'Eximbank', '970448': 'OCB'
+};
+const tlv = (id, v) => id + String(v.length).padStart(2, '0') + v;
+export function crc16ccitt(str) {
+  let crc = 0xffff;
+  for (const ch of Buffer.from(str, 'utf8')) {
+    crc ^= ch << 8;
+    for (let i = 0; i < 8; i++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+export function buildVietQrTransfer({ bankBin, accountNumber, accountName = '', amountVnd, memo = '' }) {
+  if (!VIETQR_BANKS[bankBin]) throw new Error('unknown bank BIN');
+  if (!/^\d{6,19}$/.test(String(accountNumber))) throw new Error('invalid account number');
+  const amount = Math.round(Number(amountVnd));
+  const info = String(memo).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .replace(/[^A-Za-z0-9 ]/g, '').slice(0, 25).trim();
+  const merchant = tlv('38', tlv('00', 'A000000727') + tlv('01', tlv('00', bankBin) + tlv('01', String(accountNumber))) + tlv('02', 'QRIBFTTA'));
+  const body = tlv('00', '01') + tlv('01', '12') + merchant + tlv('53', '704') + tlv('54', String(amount)) + tlv('58', 'VN') +
+    (info ? tlv('62', tlv('08', info)) : '') + '6304';
+  const payload = body + crc16ccitt(body);
+  return {
+    bank_bin: bankBin, bank_name: VIETQR_BANKS[bankBin], account_number: String(accountNumber), account_name: accountName,
+    amount_vnd: amount, transfer_memo: info, qr_emvco_raw: payload,
+    qr_image_url: `https://img.vietqr.io/image/${bankBin}-${accountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(info)}&accountName=${encodeURIComponent(accountName)}`
+  };
+}
