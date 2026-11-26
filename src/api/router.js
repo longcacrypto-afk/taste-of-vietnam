@@ -291,15 +291,22 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   if (pathname === '/api/v1/suggestions/feedback' && method === 'POST') {
     if (!authUser) return UNAUTHORIZED;
-    const dish = (await repo.getDish(body.dish_id)) || (await repo.listDishes())[0];
+    // Only the meal the user actually picked is recorded: never a substitute dish or a sample place.
+    const dishId = cleanText(body.dish_id, 32);
+    if (!dishId) return { status: 400, data: { error: 'dish_id is required' } };
+    const dish = await repo.getDish(dishId);
     if (!dish) return { status: 404, data: { error: 'Dish not found' } };
+    const placeId = cleanText(body.place_id, 32);
+    const place = placeId ? await repo.getPlace(placeId) : null;
+    if (placeId && !place) return { status: 404, data: { error: 'Place not found' } };
     const action = ['eaten', 'liked', 'skipped'].includes(body.action) ? body.action : 'eaten';
     const entry = {
       id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       dish_id: dish.id,
       dish_name: dish.name,
-      place_id: cleanText(body.place_id, 32) || 'PLACE-401',
-      place_name: cleanText(body.place_name, 120) || 'Phở Gia Truyền Phát Tài',
+      // No place given: stored as unknown (null), not filled in.
+      place_id: place?.id || null,
+      place_name: place?.name || null,
       price_vnd: dish.ref_price,
       action,
       skip_reason: cleanText(body.skip_reason, 200) || null,

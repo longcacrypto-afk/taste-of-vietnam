@@ -1149,6 +1149,32 @@
         });
     }
   }
+  // <m5-confirm>
+  // M5-S05 names only the meal the user really chose (from the redirect record or the
+  // catalogue already loaded); with no order it says so instead of showing a sample dish.
+  function confirmCopy(order) {
+    if (!order?.dish_id)
+      return {
+        ready: false,
+        heading: "Chưa có lượt đặt món",
+        title: "Chưa có món để xác nhận",
+        text: "Hãy chọn quán rồi đặt món, gọi điện hoặc chỉ đường. Sau khi thực sự dùng bữa, quay lại đây để đánh dấu Đã ăn.",
+      };
+    const dish = order.dish_name ? "món " + order.dish_name : "món bạn đã chọn";
+    const at = order.place_name ? " tại " + order.place_name : "";
+    return {
+      ready: true,
+      heading: "Liên kết đã sẵn sàng",
+      title: "Bạn chưa đặt món trong ứng dụng này",
+      text: "Mở dịch vụ bên ngoài để xem giá và xác nhận. Chỉ đánh dấu Đã ăn sau khi bạn thực sự dùng bữa " + dish + at + ". Măm sẽ không gợi ý lại món này trong 3 ngày.",
+    };
+  }
+  // </m5-confirm>
+  function knownDishName(id) {
+    for (const [k, v] of Object.entries(state.cache))
+      if (/^(dish|why):/.test(k) && v?.data?.id === id && v.data.name) return v.data.name;
+    return (window.appState.liveToday?.items || []).find((a) => a.dish_id === id)?.name || null;
+  }
   function bindPlaces(root, id, items) {
     const place = items.find((p) => p.id === state.place) || items[0];
     if (!place) {
@@ -1303,13 +1329,16 @@
       }
     }
     if (id === "M5-S05") {
-      text($("h3", root), "Liên kết đã sẵn sàng");
+      const copy = confirmCopy(state.order);
+      text($("h3", root), copy.heading);
       const tip = root.children[1];
       if (tip) {
-        text($(".font-extrabold", tip), "Bạn chưa đặt món trong ứng dụng này");
-        text($("p", tip), "Mở dịch vụ bên ngoài để xem giá và xác nhận. Chỉ đánh dấu Đã ăn sau khi bạn thực sự dùng bữa.");
+        text($(".font-extrabold", tip), copy.title);
+        text($("p", tip), copy.text);
       }
-      click(root.lastElementChild, "P2.confirmMeal()");
+      const b = root.lastElementChild;
+      if (copy.ready) click(b, "P2.confirmMeal()");
+      else soon(b, "Chưa có lượt đặt món, gọi điện hay chỉ đường để xác nhận.");
     }
   }
   function bindAdmin(root, id, d) {
@@ -1706,10 +1735,10 @@
         },
       );
     },
-    feedback(type, id = selected()) {
+    feedback(type, id = selected(), place_id = null) {
       action(
         () =>
-          api("/suggestions/feedback", "POST", { dish_id: id, action: type }),
+          api("/suggestions/feedback", "POST", { dish_id: id, action: type, ...(place_id ? { place_id } : {}) }),
         () => {
           delete state.cache.history;
           delete state.cache.today;
@@ -1763,10 +1792,13 @@
         p = items.find((p) => p.id === state.place) || items[0];
       if (!/^\+?[\d\s-]+$/.test(p?.phone || ""))
         return status("Chưa có số điện thoại hợp lệ.");
+      const dishId = selected();
       state.order = {
         target_deeplink: "tel:" + p.phone.replace(/\s/g, ""),
-        dish_id: selected(),
+        dish_id: dishId,
+        dish_name: knownDishName(dishId),
         place_id: p.id,
+        place_name: p.name,
       };
       location.href=state.order.target_deeplink;
       goScreen("M5-S05");
@@ -1788,7 +1820,11 @@
             goScreen("M3-S07");
           },
         );
-      else P2.feedback("eaten");
+      // After a call there is no redirect id: record the meal and place the user chose.
+      else if (state.order?.dish_id)
+        P2.feedback("eaten", state.order.dish_id, state.order.place_id);
+      // Nothing was ordered, called or routed: there is no real meal to confirm.
+      else status("Chưa có món để xác nhận. Hãy chọn quán rồi đặt món, gọi điện hoặc chỉ đường trước.");
     },
     exportData() {
       action(
