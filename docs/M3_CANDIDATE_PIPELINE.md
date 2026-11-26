@@ -8,7 +8,7 @@ Backend-only change, base `main` 9adf9e0. No new UI; no provider, Render or prod
 Today, chat and GET `/suggestions/{spin,game,fortune,blind-box}` all call it.
 Today/chat return up to three; decision endpoints return a random single `picked_dish`
 (or **200 with null**, not a made-up fallback). `total_safe_candidates` is the eligible
-pool size. `reasons` contains aggregate exclusion counts and an insufficient-candidates
+pool size; the game endpoints also return `candidates` (`dish_id`, `name` of that same pool, in score order) so the M3-S03 wheel labels show real dishes. `reasons` contains aggregate exclusion counts and an insufficient-candidates
 message when fewer than three qualify. Codes describe the first failed gate, not every
 possible failure; do not display these as catalogue statistics.
 

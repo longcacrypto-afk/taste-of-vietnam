@@ -32,6 +32,8 @@ import { requestOtp, verifyOtp, createGuest, authenticate, deleteUser, scopeStor
 import { getRepository } from '../db/repository.js';
 import { handleFrozenRoute } from './frozenRoutes.js';
 import { handleDishRoutes } from './dishRoutes.js';
+import { currentWeather } from '../services/weatherProvider.js';
+import { areasFromPlaces } from '../services/areas.js';
 
 // User-supplied text: drop HTML tags and stray angle brackets / control chars, trim, cap length.
 // (The UI also escapes on output; this keeps stored data clean for other clients like Flutter.)
@@ -259,13 +261,15 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
       view.places.map(p => getPlaceOpenStatus(p, Date.now()))])).digest('hex');
     const cacheKey = `sugg:${profile.id || 'default'}:${version}`;
     const cached = suggestionCache.get(cacheKey);
+    // live_weather: real reading from the provider hook, or null while none is configured.
+    const live_weather = await currentWeather({ lat: profile.lat, lng: profile.lng });
     if (cached) {
-      return { status: 200, data: { ...cached, from_cache: true } };
+      return { status: 200, data: { ...cached, live_weather, from_cache: true } };
     }
     const fresh = getTodaySuggestions(view, opts);
     if (!fresh.context.valid) return { status: 400, data: fresh };
     suggestionCache.set(cacheKey, fresh, 60);
-    return { status: 200, data: fresh };
+    return { status: 200, data: { ...fresh, live_weather } };
   }
 
   // Three existing decision animations share the same safe pool; never fake loot/vouchers.
@@ -277,6 +281,8 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     return { status: result.context.valid ? 200 : 400, data: {
       picked_dish: pick ? { ...pick.dish, dish_id: pick.dish_id } : null,
       nearest_place: pick?.nearest_place || null, total_safe_candidates: result.candidates.length,
+      // Same safe pool the pick came from (ids + names only), so the wheel shows real dishes.
+      candidates: result.candidates.map(c => ({ dish_id: c.dish_id, name: c.dish.name })),
       reasons: result.reasons, context: result.context, safety_approval_required: result.safety_approval_required
     } };
   }
@@ -316,6 +322,11 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ====================================================================
   // MODULE M4: PLACES, POSTGIS 3KM SEARCH & CROWDSOURCED REPORTS (M4-S01 .. M4-S06)
   // ====================================================================
+  if (pathname === '/api/v1/areas' && method === 'GET') {
+    const items = areasFromPlaces(await repo.listPlaces());
+    return { status: 200, data: { total: items.length, items } };
+  }
+
   if (pathname === '/api/v1/places' && method === 'GET') {
     const query = parsePlaceQuery(searchParams, profile);
     if (query.error) return { status: 400, data: { error: query.error } };

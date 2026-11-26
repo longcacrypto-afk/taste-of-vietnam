@@ -266,7 +266,7 @@ export class MemoryRepository {
     Object.assign(r,{status,resolution_reason:reason,resolved_by:actorId,resolved_at:new Date().toISOString()});
     return r;
   }
-  async listUsers() { return Object.values(this.store.users || {}).map(({id,role,guest,created_at})=>({id,role,guest,created_at})); }
+  async listUsers() { return Object.values(this.store.users || {}).map(({id,role,guest,created_at,email})=>({id,role,guest,created_at,email:email || null})); }
   async atomic(fn) {
     const prior=this.pending || Promise.resolve();
     let release; this.pending=new Promise(r=>{release=r;});

@@ -219,7 +219,7 @@
     mount(scope,id,d) {
       if (!scope) return;
       navigation(scope);
-      if (!/^M9-S0[1-6]$/.test(id) || !d || scope.dataset.m9Mounted === id) return;
+      if (!/^M9-S0[1-689]$/.test(id) || !d || scope.dataset.m9Mounted === id) return;
       const nav = scope.querySelector("aside nav");
       if (!nav) return;
       const root = nav.closest("aside").parentElement;
