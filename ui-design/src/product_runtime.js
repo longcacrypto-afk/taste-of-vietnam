@@ -248,6 +248,33 @@
       place,
     };
   }
+  // <core-static-controls> Meal chips (UI_KIT.categoryRow) filter GET /dishes by meal_slot
+  // (docs/M2_API.md). "Tráng miệng" has no meal_slot in the API: the chip stays, "sắp có".
+  const MEAL_CHIPS = { "Bữa sáng": "breakfast", "Bữa trưa": "lunch", "Bữa tối": "dinner", "Ăn vặt": "snack", "Tráng miệng": null };
+  // M1-S07: the range each card saves (P2.budget). A card is ticked only when the saved
+  // profile range is exactly that card's range; any other range ticks none.
+  const BUDGETS = [[0, 35000], [35000, 65000], [60000, 120000]];
+  function budgetIndex(p) {
+    return BUDGETS.findIndex(([min, max]) => p?.budget_min === min && p?.budget_max === max);
+  }
+  // M3-S05: subtitle and cards come from the last POST /chat answer, not the design sample.
+  function chatSubtitle(intent) {
+    const n = intent?.party_size, b = intent?.total_budget_vnd;
+    return ["M3-S05", Number.isInteger(n) && n > 0 ? n + " người" : "",
+      Number.isFinite(b) && b > 0 ? "Ngân sách <= " + money(b) : ""].filter(Boolean).join(" · ");
+  }
+  function chatOptionCard(o, i) {
+    const place = o?.place || null, away = place && meters(place.distance_m);
+    const cost = o?.estimated_group_cost_vnd, prep = o?.prep_minutes;
+    return {
+      pill: "Phương án " + (i + 1) + " · " + (place ? (away ? "Cách " + away : "Ăn tại quán")
+        : "Tự nấu" + (Number.isFinite(prep) && prep > 0 ? " " + prep + "p" : "")),
+      total: Number.isFinite(cost) && cost > 0 ? "Tổng ~" + money(cost) : "Chưa có giá",
+      name: (place ? place.place_name : o?.dish_name) || "",
+      detail: place ? o?.dish_name || "" : "Có công thức tự nấu",
+    };
+  }
+  // </core-static-controls>
   // </m2-real-data>
   // <m3-controls> Pure helpers for controls added inside existing screens.
   const near = (a, b) => Math.abs(Number(a) - Number(b)) < 0.0005;
@@ -346,7 +373,9 @@
     place: null,
     query: "",
     region: "",
+    meal: "", // meal chip filter on M2-S01 (GET /dishes?meal_slot=)
     chat: [],
+    chatIntent: null, // intent of the last /chat answer (M3-S05 subtitle)
     phone: "",
     otp: "",
     order: null,
@@ -514,12 +543,13 @@
     if (id === "M3-S03") return ["spin-pool", () => api("/suggestions/spin")];
     if (["M2-S01", "M2-S02"].includes(id))
       return [
-        "dishes:" + state.query + ":" + state.region,
+        "dishes:" + state.query + ":" + state.region + ":" + state.meal,
         () =>
           api(
             "/dishes?q=" +
               encodeURIComponent(state.query) +
-              (state.region ? "&region=" + encodeURIComponent(state.region) : ""),
+              (state.region ? "&region=" + encodeURIComponent(state.region) : "") +
+              (state.meal ? "&meal_slot=" + encodeURIComponent(state.meal) : ""),
           ),
       ];
     if (/^M2-S0[4-7]$/.test(id) || id === "M3-S06")
@@ -653,6 +683,27 @@
     text($('b,[class*="font-extrabold"]', node), d.name || d.dish_name);
     click(node, `P2.dish('${J(d.id || d.dish_id)}')`);
   }
+  function bindMealChips(root, showActive) {
+    // Original 5 chips stay. Each filters Explore through the real API; no matching slot = "sắp có".
+    $$(".grid.grid-cols-5 > button", root).forEach((b) => {
+      const label = $("span", b), name = label?.textContent.trim();
+      if (!label || !Object.hasOwn(MEAL_CHIPS, name)) return;
+      const slot = MEAL_CHIPS[name];
+      if (!slot) {
+        text(label, name + SOON);
+        soon(b, "Dữ liệu món chưa có nhóm Tráng miệng để lọc.");
+        return;
+      }
+      click(b, `P2.meal('${slot}')`);
+      const on = showActive && state.meal === slot;
+      b.setAttribute("aria-pressed", String(on));
+      if (on) {
+        b.firstElementChild.style.boxShadow = "0 0 0 2px #FFFFFF, 0 0 0 4px #FBBF24";
+        label.style.color = "#B45309";
+        label.style.fontWeight = "800";
+      }
+    });
+  }
   function mobile(id, html, d) {
     const t = document.createElement("template");
     t.innerHTML = html;
@@ -661,6 +712,7 @@
       // Keep the repo's two photo cards + horizontal sponsored card intact.
       const items = d.items || [];
       if (!items.length) return stateHtml(id, "empty");
+      bindMealChips(root, false);
       const cards = $$(".grid-cols-2 > .group", root);
       // Heading count follows the real list ("Gợi ý Hôm nay (3 món AI)" in the design).
       $$("h4", root).forEach((h) => {
@@ -701,7 +753,16 @@
         const featured = $('[onclick*="M2-S04"]', root),
           small = $(".grid.grid-cols-2", root),
           tpl = small?.firstElementChild?.cloneNode(true);
-        if (!items.length) return stateHtml(id, "empty");
+        bindMealChips(root, true);
+        if (!items.length) {
+          if (!state.meal) return stateHtml(id, "empty");
+          // Keep the header and chips so another meal (or none) can be picked.
+          const box = document.createElement("div");
+          box.innerHTML = stateHtml(id, "empty", true);
+          featured?.replaceWith(box);
+          if (small) small.innerHTML = "";
+          return root.outerHTML;
+        }
         cardFill(featured, items[0]);
         text($("b.text-sm", featured), items[0].name);
         text($('b[class*="D97736"]', featured), money(items[0].ref_price));
@@ -891,7 +952,32 @@
         }
       }
     }
-    if(id==="M3-S05" && !state.chat.length) return stateHtml(id,"empty");
+    if (id === "M3-S05") {
+      text($(".pb-1 .text-center > div:last-child", root), chatSubtitle(state.chatIntent));
+      const header = root.firstElementChild;
+      if (!state.chat.length)
+        return `<div class="p-4 space-y-3.5 bg-white text-[#0F172A] text-xs">${header.outerHTML}${stateHtml(id, "empty", true)}</div>`;
+      // The three design cards show the real options; a missing one stays as an empty slot.
+      [...root.children].slice(1).forEach((n, i) => {
+        const o = state.chat[i];
+        if (!o) {
+          emptySlot(n, "Chưa có thêm phương án");
+          text($(".flex.justify-between > span", n), "Phương án " + (i + 1));
+          text($(".flex.justify-between > b", n), "—");
+          text($("div.text-\\[10px\\]", n), "Chưa có dữ liệu");
+          return;
+        }
+        const c = chatOptionCard(o, i);
+        img($("img", n), o.img_key);
+        text($(".flex.justify-between > span", n), c.pill);
+        text($(".flex.justify-between > b", n), c.total);
+        text($("div.font-extrabold", n), c.name);
+        text($("div.text-\\[10px\\]", n), c.detail);
+        click(n, o.place?.place_id
+          ? `P2.dish('${J(o.dish_id)}','M4-S03');P2.place('${J(o.place.place_id)}')`
+          : `P2.dish('${J(o.dish_id)}','M2-S06')`);
+      });
+    }
     if (id === "M3-S04" || id === "M3-S05") {
       const list = $$(".space-y-2", root).find(
         (n) => n.querySelectorAll(':scope > [onclick*="M2-S04"]').length >= 2,
@@ -1036,13 +1122,15 @@
         "diet_mode",
       );
     if (id === "M1-S07") {
-      const holder = root.children[2];
+      const holder = root.children[2],
+        chosen = budgetIndex(p);
       [...holder.children].forEach((n, i) => {
         click(n, `P2.budget(${i})`);
-        n.style.border =
-          i === (p.budget_max <= 35000 ? 0 : p.budget_max <= 65000 ? 1 : 2)
-            ? "2px solid #FBBF24"
-            : "1px solid #E2E8F0";
+        n.style.border = i === chosen ? "2px solid #FBBF24" : "1px solid #E2E8F0";
+        n.setAttribute("aria-pressed", String(i === chosen));
+        // The design's "✓" follows the saved range instead of sitting on one card.
+        const title = $("b", n);
+        if (title) text(title, title.textContent.replace(/\s*✓\s*$/, "") + (i === chosen ? " ✓" : ""));
       });
     }
     const next = {
@@ -1621,12 +1709,21 @@
     },
     search(q) {
       state.query = q;
+      state.meal = "";
       goScreen("M2-S02");
       load("M2-S02", true);
     },
     region(reg) {
       state.region = reg;
       state.query = "";
+      state.meal = "";
+      goScreen("M2-S01");
+    },
+    meal(slot) {
+      // Meal chip → Explore filtered by GET /dishes?meal_slot=; the active chip again clears it.
+      state.meal = appState.activeScreenId === "M2-S01" && state.meal === slot ? "" : slot;
+      state.query = "";
+      state.region = "";
       goScreen("M2-S01");
     },
     choose(key, value, multi) {
@@ -1641,11 +1738,7 @@
     },
     budget(i) {
       const p = state.cache.profile.data;
-      [p.budget_min, p.budget_max] = [
-        [0, 35000],
-        [35000, 65000],
-        [60000, 120000],
-      ][i];
+      [p.budget_min, p.budget_max] = BUDGETS[i];
       paint();
     },
     saveProfile(next) {
@@ -1921,12 +2014,14 @@
     appState.liveChatQuery = q;
     appState.liveChatReply = "Đang tìm món phù hợp…";
     state.chat = [];
+    state.chatIntent = null;
     paint();
     try {
       const d = await api("/chat", "POST", { query: q });
       appState.liveChatReply =
         d.assistant_message || "Chưa có câu trả lời. Hãy thử mô tả rõ hơn.";
       state.chat = d.options || [];
+      state.chatIntent = d.intent || null;
       appState.liveChatOptions = state.chat;
     } catch (e) {
       appState.liveChatReply =
@@ -1934,7 +2029,7 @@
       retryWrite = () => LIVE_APP.sendMamChat(q);
       status(appState.liveChatReply, true);
     }
-    if (appState.activeScreenId === "M3-S04") paint();
+    if (["M3-S04", "M3-S05"].includes(appState.activeScreenId)) paint();
   };
   spinM3Wheel = () =>
     action(
