@@ -210,7 +210,9 @@ test('M12-S03: GPS-Verified Review accepts reviews <= 500m and rejects reviews >
 test('M13, M14, M15, M16 & M17: Expansion modules (Bookings, Cultural Stories, Food Trail, Multilingual Menu AI & B2G Insights)', async () => {
   const store = createInitialStore();
   // M13 Booking
-  const bk = await call(store, 'POST', '/api/v1/bookings', new URLSearchParams(), { place_id: 'PLACE-401', party_size: 4 });
+  // M13 is live (src/modules/m13.js): a booking names a real slot (date + time).
+  const tomorrow = new Date(Date.now() + 7 * 3600000 + 86400000).toISOString().slice(0, 10);
+  const bk = await call(store, 'POST', '/api/v1/bookings', new URLSearchParams(), { place_id: 'PLACE-401', party_size: 4, date: tomorrow, time: '19:00' });
   assert.equal(bk.status, 200);
   assert.equal(bk.data.status, 'confirmed_instant');
 
@@ -676,12 +678,17 @@ test('CRUD-FULL: M6 Menu, M7 Campaign Patch, M9 Dish CRUD, M11 MealPlan PUT, M13
   assert.equal(plan3Meals.data.meals_per_day, 3);
   assert.ok(plan3Meals.data.days[0].meals.breakfast && plan3Meals.data.days[0].meals.lunch && plan3Meals.data.days[0].meals.dinner);
 
-  const putPlan = await call(store, 'PUT', '/api/v1/meal-plans/weekly', new URLSearchParams(), { days: [{ day: 'Thứ 2', dish_name: 'Phở Gà' }] });
+  // M11 is live (src/modules/m11.js): a swap names a catalogue dish that passes the profile gate.
+  const saved = await call(store, 'GET', '/api/v1/meal-plans/weekly', new URLSearchParams());
+  const putPlan = await call(store, 'PUT', '/api/v1/meal-plans/weekly', new URLSearchParams(), { days: [{ date: saved.data.days[0].date, meals: { lunch: 'DISH-105' } }] });
   assert.equal(putPlan.status, 200);
-  assert.equal(putPlan.data.days[0].dish_name, 'Phở Gà');
+  assert.equal(putPlan.data.days[0].meals.lunch.dish_id, 'DISH-105');
+  const freeText = await call(store, 'PUT', '/api/v1/meal-plans/weekly', new URLSearchParams(), { days: [{ date: saved.data.days[0].date, meals: { lunch: 'Phở Gà' } }] });
+  assert.equal(freeText.status, 404, 'a free-text dish that is not in the catalogue is refused');
 
   // M13 Booking GET & Cancel
-  const bkPost = await call(store, 'POST', '/api/v1/bookings', new URLSearchParams(), { place_id: 'PLACE-401', party_size: 4 });
+  const bkDate = new Date(Date.now() + 7 * 3600000 + 86400000).toISOString().slice(0, 10);
+  const bkPost = await call(store, 'POST', '/api/v1/bookings', new URLSearchParams(), { place_id: 'PLACE-401', party_size: 4, date: bkDate, time: '18:30' });
   assert.equal(bkPost.status, 200);
   const bkDel = await call(store, 'DELETE', `/api/v1/bookings/${bkPost.data.booking_id}`, new URLSearchParams());
   assert.equal(bkDel.status, 200);
