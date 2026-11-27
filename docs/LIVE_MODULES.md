@@ -64,3 +64,27 @@ make your API return the shape they read, or replace them through `fns` / `tabs[
   (see tests/m14-live.test.js; login helpers in tests/helpers/auth.js).
 - Postgres: `tests/postgres/<mod>-live.test.js` with `{ skip }` from helpers.js.
 - `npm test` must stay green. `npm run build:ui` regenerates ui-design/index.html.
+
+## Trạng thái (27/11/2026) — tất cả module ngoài core đã live
+
+| Module | Màn | Tab desktop | Phần demo / sandbox |
+|---|---|---|---|
+| W | W-S01..S05 | — | 3 bộ sưu tập demo; Phone/Zalo/Apple login "Sắp có" |
+| M6 | M6-S01..S09 | (merchant, chung M7) | Merchant demo 0900000002; OCR ảnh = sandbox; mời nhân viên không gửi SMS |
+| M7 | M7-S01..S08 | merchant | Số chi tiêu/doanh thu demo; nạp VietQR có nút xác nhận sandbox (`PAYMENTS_SANDBOX=false` để tắt) |
+| M8 | M8-S01..S04 | notifications | Push = sandbox (chỉ trong app); 6 mẫu tin demo |
+| M10 | M10-S01..S06 | analytics | ~1.060 sự kiện demo, 3 A/B demo; NLU benchmark chạy thật |
+| M11 | M11-S01..S03 | mealplan | Không có demo; trừ đồ trong tủ lạnh M18 |
+| M12 | M12-S01..S03 | poll | Phòng demo BH2611 |
+| M13 | M13-S01..S02 | booking | Slot demo theo quán; Zalo/SMS + MoMo/ZaloPay = sandbox, `money_moved:false` |
+| M14 | M14-S01..S02 | stories | 3 story demo |
+| M15 | M15-S01..S02 | stories | 2 trail demo; nhập mã QR thay camera |
+| M16 | M16-S01..S02 | translator | Từ điển tay (không LLM) |
+| M17 | M17-S01..S02 | insights | Số nền demo; ẩn ô < 50 người |
+| M18 | M18-S01..S02 | fridge | 6 món tủ lạnh demo / user; 10 mã vạch demo |
+| M19 | M19-S01..S02 | health | Health/Fit = sandbox; GI demo |
+| M20 | M20-S01..S02 | community | 2 công thức demo; tip VietQR xác nhận bởi người gửi, không đối soát ngân hàng |
+
+Xóa toàn bộ demo khi nạp dữ liệu thật: `DELETE FROM module_records WHERE is_demo;` và đặt `SEED_DEMO_MODULES=false`.
+
+Còn mở (cần quyết định): cooldown 72h hay 3 ngày; endpoint cũ `POST /community/recipes/:id/tip` (1 bước) còn giữ; nhắm mục tiêu theo bữa/thời tiết của M7 chưa áp vào recommender; M6 OCR độ tin thấp chưa vào hàng chờ M9-S05; merchant↔place của core chưa có (M6 dùng record `membership`).
