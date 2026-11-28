@@ -113,11 +113,14 @@ test('M10: NLU benchmark runs the real parser (accuracy = passed/cases) and the 
   const admin = await loginAdmin(store);
   const b = (await api(store, admin, 'GET', '/api/v1/analytics/ai-benchmark')).data;
   assert.equal(b.details.length, b.benchmark_size);
-  assert.equal(b.benchmark_size, 6 + 24);
+  assert.equal(b.benchmark_size, 6 + 26);
   const passed = b.details.filter(d => d.passed).length;
   assert.equal(b.accuracy_pct, Number(((passed / b.details.length) * 100).toFixed(1)));
   assert.equal(b.passed_sla, b.accuracy_pct >= 90);
   assert.ok(b.details.filter(d => !d.passed).every(d => d.failed_fields.length > 0));
+  for (const q of ["Hai vợ chồng có 2 bé ăn tối 400k", "Trưa nay 8 người ngân sách 1,5 triệu", "Trưa nay 10 người công ty ngân sách 1.5 triệu", "Hai vợ chồng ăn trưa 200k không cay", "Tối nay cả nhà 5 người, có 2 bé, ngân sách 500k"]) {
+    assert.equal(b.details.find(d => d.query === q)?.passed, true, q);
+  }
   assert.ok(b.safety.items > 0);
   assert.equal(b.safety.allergy_violations, 0);
   assert.equal(b.safety.repeat_3d_violations, 0);

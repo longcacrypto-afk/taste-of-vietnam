@@ -56,10 +56,10 @@ const EXPERIMENTS = [
 ];
 const NLU_CASES = [
   ['Trưa nay 3 người ăn gì ở Biên Hòa dưới 150k?', { party_size: 3, total_budget_vnd: 150000, has_kids: false, meal_slot: 'lunch' }],
-  ['Tối nay cả nhà 5 người, có 2 bé, ngân sách 500k', { party_size: 5, total_budget_vnd: 500000, has_kids: true, meal_slot: 'dinner' }],
+  ['Tối nay cả nhà 5 người, có 2 bé, ngân sách 500k', { party_size: 5, total_budget_vnd: 500000, has_kids: true, kids_count: 2, meal_slot: 'dinner' }],
   ['Sáng nay 1 người ăn nhanh 30k gần chợ Biên Hòa', { party_size: 1, total_budget_vnd: 30000, has_kids: false, meal_slot: 'breakfast' }],
   ['Nhóm 8 người đi ăn lẩu tối thứ bảy 1 triệu', { party_size: 8, total_budget_vnd: 1000000, has_kids: false, meal_slot: 'dinner' }],
-  ['Hai vợ chồng ăn trưa 200k không cay', { party_size: 2, total_budget_vnd: 200000, has_kids: false, meal_slot: 'lunch' }],
+  ['Hai vợ chồng ăn trưa 200k không cay', { party_size: 2, adults: 2, total_budget_vnd: 200000, has_kids: false, meal_slot: 'lunch' }],
   ['Đi ăn tối 4 người có trẻ nhỏ khoảng 400k gần Vincom Biên Hòa', { party_size: 4, total_budget_vnd: 400000, has_kids: true, meal_slot: 'dinner' }],
   ['Mình ăn trưa một mình 50k thôi', { party_size: 1, total_budget_vnd: 50000, has_kids: false, meal_slot: 'lunch' }],
   ['Tủ lạnh còn trứng với cà chua, nấu gì cho 3 người 80k?', { party_size: 3, total_budget_vnd: 80000, has_kids: false, mode: 'cook' }],
@@ -76,9 +76,11 @@ const NLU_CASES = [
   ['Ăn sáng 2 người 70k gần Amata', { party_size: 2, total_budget_vnd: 70000, has_kids: false, meal_slot: 'breakfast' }],
   ['Nhóm bạn 5 người ăn vặt 150k', { party_size: 5, total_budget_vnd: 150000, has_kids: false, meal_slot: 'snack' }],
   ['Trưa 1 người 45 ngàn', { party_size: 1, total_budget_vnd: 45000, has_kids: false, meal_slot: 'lunch' }],
-  ['Tối nay 4 người trong đó 2 trẻ nhỏ, 350k', { party_size: 4, total_budget_vnd: 350000, has_kids: true, meal_slot: 'dinner' }],
+  ['Tối nay 4 người trong đó 2 trẻ nhỏ, 350k', { party_size: 4, total_budget_vnd: 350000, has_kids: true, kids_count: 2, meal_slot: 'dinner' }],
   ['Muốn ăn bún bò cho 2 người tầm 100 nghìn buổi trưa', { party_size: 2, total_budget_vnd: 100000, has_kids: false, meal_slot: 'lunch' }],
-  ['Đặt bàn 6 khách tối mai 900k', { party_size: 6, total_budget_vnd: 900000, has_kids: false, meal_slot: 'dinner' }]
+  ['Đặt bàn 6 khách tối mai 900k', { party_size: 6, total_budget_vnd: 900000, has_kids: false, meal_slot: 'dinner' }],
+  ['Hai vợ chồng có 2 bé ăn tối 400k', { party_size: 4, adults: 2, kids_count: 2, total_budget_vnd: 400000, has_kids: true, meal_slot: 'dinner' }],
+  ['Trưa nay 8 người ngân sách 1,5 triệu', { party_size: 8, total_budget_vnd: 1500000, has_kids: false, meal_slot: 'lunch' }]
 ];
 
 function demoEvents(now = Date.now()) {
@@ -328,7 +330,7 @@ function abResults(exps, events) {
 }
 
 // ── AI benchmark (real run) ────────────────────────────────────────────────
-const FIELDS = ['party_size', 'total_budget_vnd', 'has_kids', 'meal_slot', 'mode', 'diet_mode'];
+const FIELDS = ['party_size', 'adults', 'kids_count', 'total_budget_vnd', 'has_kids', 'meal_slot', 'mode', 'diet_mode'];
 async function runAi(ctx) {
   const { ms, repo } = ctx;
   const view = await ctx.view();
