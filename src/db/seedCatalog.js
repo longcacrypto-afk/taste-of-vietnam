@@ -38,16 +38,16 @@ export async function seedCatalog(pool, { log = console.log, update = false } = 
       const r = await client.query(
         `INSERT INTO dishes (id, name, unaccented_name, region, meal_slots, diet_flags, allergen_flags, spice_level, calories,
            prep_time_minutes, estimated_price_vnd, ingredients, recipe_steps, description, tags, weather_fit, img_key, macros,
-           difficulty, base_servings, market_cost_base)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+           difficulty, base_servings, market_cost_base, is_soup)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
          ${onConflict(update, 'id', ['name', 'unaccented_name', 'region', 'meal_slots', 'diet_flags', 'allergen_flags', 'spice_level',
     'calories', 'prep_time_minutes', 'estimated_price_vnd', 'ingredients', 'recipe_steps', 'description', 'tags', 'weather_fit',
-    'img_key', 'macros', 'difficulty', 'base_servings', 'market_cost_base'])}`,
+    'img_key', 'macros', 'difficulty', 'base_servings', 'market_cost_base', 'is_soup'])}`,
         [d.id, d.name, removeVietnameseTones(d.name), d.region, d.meal_slots || ['lunch', 'dinner'], d.diet_flags || [],
           d.allergen_tags || [], d.spice_level ?? 0, d.calories ?? 400, d.prep_minutes ?? 25, d.ref_price ?? 50000,
           JSON.stringify(d.ingredients || []), JSON.stringify(d.steps || []), d.description || '', d.tags || [],
           d.weather_fit || ['any'], d.img_key || null, JSON.stringify(d.macros || {}), d.difficulty || null,
-          d.base_servings || 2, d.market_cost_base ?? null]);
+          d.base_servings || 2, d.market_cost_base ?? null, typeof d.is_soup === 'boolean' ? d.is_soup : null]);
       counts.dishes += r.rowCount;
     }
 
@@ -60,7 +60,7 @@ export async function seedCatalog(pool, { log = console.log, update = false } = 
     'phone', 'img_key', 'links', 'has_ac', 'has_kids_seat'])}`,
         [p.id, p.name, p.address, p.lng, p.lat, hourToTime(p.open_hour, 6), hourToTime(p.close_hour, 22), p.rating ?? 4.5,
           p.review_count || 0, p.closed_report_count || 0, p.is_open_override === false, p.is_verified !== false,
-          p.phone || null, p.img_key || null, JSON.stringify(p.links || {}), Boolean(p.has_ac), Boolean(p.has_kids_seat)]);
+          p.phone || null, p.img_key || null, JSON.stringify(p.links || {}), typeof p.has_ac === 'boolean' ? p.has_ac : null, Boolean(p.has_kids_seat)]);
       counts.places += r.rowCount;
       for (const m of p.menu || []) {
         const mr = await client.query(

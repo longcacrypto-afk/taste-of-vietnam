@@ -63,7 +63,7 @@ test('Migrations: ordered, recorded once, re-running is a no-op; seed loaded 12 
   const applied = (await db.query('SELECT version, name FROM schema_migrations ORDER BY version')).rows.map(r => r.name);
   assert.deepEqual(applied, listMigrationFiles().map(m => m.name));
   assert.ok(applied.includes('003_m9_rbac_reports'));
-  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '003_m9_rbac_reports', '004_m1_google_auth', '006_m5_redirect', '007_m3_safety_approval', '008_m4_places_hours', '009_m9_data_entry', '010_m9_review_reports', '011_catalog_display_backfill', '012_module_records']);
+  assert.deepEqual(applied, ['001_baseline', '002_p1_core', '003_m9_rbac_reports', '004_m1_google_auth', '006_m5_redirect', '007_m3_safety_approval', '008_m4_places_hours', '009_m9_data_entry', '010_m9_review_reports', '011_catalog_display_backfill', '012_module_records', '013_core_filters']);
   assert.deepEqual(await runMigrations(db, { log: () => {} }), []);
   assert.equal(await count('SELECT COUNT(*) n FROM dishes'), 12);
   assert.equal(await count('SELECT COUNT(*) n FROM places'), 8);

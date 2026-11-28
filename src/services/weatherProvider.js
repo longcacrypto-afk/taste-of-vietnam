@@ -7,8 +7,10 @@
 // Switches:
 //   WEATHER_PROVIDER=off      → always null (UI shows "sắp có")
 //   WEATHER_PROVIDER=open-meteo (default)
-//   WEATHER_TIMEOUT_MS        → provider timeout (default 2500)
-//   WEATHER_CACHE_SECONDS     → cache for a good reading (default 600)
+//   WEATHER_TIMEOUT_MS        → provider timeout (default 2000)
+//   WEATHER_CACHE_SECONDS     → cache for a good reading (default 1800 = 30 min)
+// weatherForProfile(): the user's chosen/shared location, else the default area
+// (Biên Hòa, DEFAULT_WEATHER_LOCATION); the reading says which one it is for.
 // Under `node --test` the real network is never used unless a fetch is injected
 // with setWeatherFetch(), so the test suite stays offline.
 //
@@ -17,6 +19,8 @@
 
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
 const FAIL_CACHE_MS = 60_000;
+/** Default area when the user has not chosen a location: Biên Hòa, Đồng Nai. */
+export const DEFAULT_WEATHER_LOCATION = Object.freeze({ lat: 10.957, lng: 106.843, name: 'Biên Hòa' });
 
 let injectedFetch = null;
 const cache = new Map(); // key -> { until, value } | { pending }
@@ -94,7 +98,7 @@ function fetchImpl() {
 }
 
 async function fetchReading(lat, lng, doFetch) {
-  const timeoutMs = Number(process.env.WEATHER_TIMEOUT_MS) || 2500;
+  const timeoutMs = Number(process.env.WEATHER_TIMEOUT_MS) || 2000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -126,11 +130,25 @@ export async function currentWeather({ lat, lng } = {}) {
   if (hit?.pending) return hit.pending;
   if (hit && hit.until > Date.now()) return hit.value;
   const pending = fetchReading(la.toFixed(2), ln.toFixed(2), doFetch).then((value) => {
-    const ttl = value ? (Number(process.env.WEATHER_CACHE_SECONDS) || 600) * 1000 : FAIL_CACHE_MS;
+    const ttl = value ? (Number(process.env.WEATHER_CACHE_SECONDS) || 1800) * 1000 : FAIL_CACHE_MS;
     cache.set(key, { value, until: Date.now() + ttl });
     if (cache.size > 500) cache.delete(cache.keys().next().value);
     return value;
   });
   cache.set(key, { pending });
   return pending;
+}
+
+/**
+ * Weather for a profile: at the location the user chose/shared (location_set), otherwise
+ * at the default area. The reading carries `location` {lat, lng, source, name} so the UI
+ * can say "Biên Hòa" for the default; null when there is no real reading.
+ */
+export async function weatherForProfile(profile, { chosen = profile?.location_set === true } = {}) {
+  const own = chosen && Number.isFinite(Number(profile?.lat)) && Number.isFinite(Number(profile?.lng));
+  const at = own ? { lat: Number(profile.lat), lng: Number(profile.lng) } : DEFAULT_WEATHER_LOCATION;
+  const reading = await currentWeather(at);
+  if (!reading) return null;
+  return { ...reading, location: own ? { lat: at.lat, lng: at.lng, source: 'profile', name: null }
+    : { lat: at.lat, lng: at.lng, source: 'default', name: DEFAULT_WEATHER_LOCATION.name } };
 }

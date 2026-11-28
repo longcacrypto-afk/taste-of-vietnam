@@ -44,7 +44,10 @@ export async function handleDishRoutes({ repo, method, pathname, searchParams, b
   let op;
   let status = 200;
   if (method === 'GET' && parts.length <= 1) {
-    const collections = await repo.listCollections(userId);
+    // dish_count (M2-S08 "N món" chip): dishes of the collection that still exist in the catalogue.
+    const known = new Set((await repo.listDishes()).map(d => d.id));
+    const collections = (await repo.listCollections(userId)).map(c => ({ ...c,
+      dish_count: (c.dish_ids || []).filter(id => known.has(id)).length }));
     if (!parts.length) return { status: 200, data: { collections } };
     const collection = collections.find(c => c.id === parts[0]);
     return collection ? { status: 200, data: { collection } } : notFound();

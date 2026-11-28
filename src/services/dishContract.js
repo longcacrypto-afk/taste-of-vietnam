@@ -4,17 +4,27 @@ import { isDishSafeForUser } from './recommender.js';
 
 export const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 export const DIETS = ['balanced', 'vegetarian', 'vegan', 'low_carb', 'eat_clean'];
+// M2-S02 "🚫 Ẩn Hải sản": allergen tags that are seafood. A user preference filter on
+// top of (never instead of) the hard allergy filter in isDishSafeForUser.
+export const SEAFOOD_TAGS = ['shrimp', 'shrimp_paste', 'shellfish', 'fish'];
 export const fail = (status, error) => ({ status, data: { error } });
 export const notFound = () => fail(404, 'Không tìm thấy');
 
 export function parseDishQuery(params) {
   const out = { q: (params.get('q') || '').trim(), safe_only: params.get('safe_only') !== 'false' };
   for (const [key, choices] of Object.entries({
-    region: ['bac', 'trung', 'nam'], meal_slot: MEALS, diet: DIETS, safe_only: ['true', 'false']
+    region: ['bac', 'trung', 'nam'], meal_slot: MEALS, diet: DIETS, safe_only: ['true', 'false'],
+    soup: ['true', 'false'], exclude_seafood: ['true', 'false']
   })) {
     if (params.has(key) && !choices.includes(params.get(key))) return null;
-    if (key !== 'safe_only') out[key] = params.get(key) || '';
+    if (!['safe_only', 'soup', 'exclude_seafood'].includes(key)) out[key] = params.get(key) || '';
   }
+  // soup=true: only dishes recorded as "món nước" (is_soup === true; not entered ≠ match).
+  // soup=false: only dishes recorded as not soup. Absent: no soup filter.
+  out.soup = params.has('soup') ? params.get('soup') === 'true' : null;
+  // exclude_seafood=true: hide any dish with a seafood allergen tag, the "Hải sản" tag,
+  // or no allergen data at all (unknown is never treated as seafood-free).
+  out.exclude_seafood = params.get('exclude_seafood') === 'true';
   for (const [key, fallback, min, max] of [
     ['page', 1, 1, Number.MAX_SAFE_INTEGER], ['limit', 20, 1, 100],
     ['budget_min', 0, 0, Number.MAX_SAFE_INTEGER], ['budget_max', Number.MAX_SAFE_INTEGER, 0, Number.MAX_SAFE_INTEGER]
@@ -28,6 +38,11 @@ export function parseDishQuery(params) {
   return out;
 }
 
+export function isSeafoodFree(d) {
+  if (!Array.isArray(d.allergen_tags)) return false;
+  return !d.allergen_tags.some(t => SEAFOOD_TAGS.includes(t)) && !(d.tags || []).includes('Hải sản');
+}
+
 export function filterDishes(dishes, f, profile) {
   return dishes.filter(d =>
     (!f.safe_only || isDishSafeForUser(d, profile)) &&
@@ -36,6 +51,8 @@ export function filterDishes(dishes, f, profile) {
     (!f.diet || f.diet === 'balanced' || (d.diet_flags || []).includes(f.diet) ||
       (f.diet === 'vegetarian' && (d.diet_flags || []).includes('vegan'))) &&
     Number(d.ref_price) >= f.budget_min && Number(d.ref_price) <= f.budget_max &&
+    (f.soup == null || d.is_soup === f.soup) &&
+    (!f.exclude_seafood || isSeafoodFree(d)) &&
     matchesVietnameseQuery(`${d.name} ${d.description || ''} ${(d.tags || []).join(' ')}`, f.q)
   );
 }

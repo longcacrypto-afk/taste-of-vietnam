@@ -8,7 +8,7 @@ import { mergeProfile, mergeCollections } from '../services/profileService.js';
 import { PolicyError, ROLES, bootstrapAllowed } from '../services/adminPolicy.js';
 import crypto from 'node:crypto';
 import { haversineDistanceMeters } from '../services/textUtils.js';
-import { placeWithStatus, placeDistance } from '../services/placeQuery.js';
+import { placeWithStatus, placeDistance, placeMatchesFilters } from '../services/placeQuery.js';
 import { isPlaceEligible } from '../services/placeHours.js';
 import { recordCampaignClick } from '../services/expansionServices.js';
 import { processSuccessfulPayment } from '../services/paymentService.js';
@@ -208,7 +208,7 @@ export class MemoryRepository {
   async getPlace(id) { return this.store.places.find(p => p.id === id) || null; }
 
   /** Places within radiusM of (lat, lng), nearest first; same rules as the PostGIS query. */
-  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true, now = new Date(),
+  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true, filters = {}, now = new Date(),
     requireVerifiedHours = process.env.REQUIRE_VERIFIED_HOURS === 'true' }) {
     const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
     return this.store.places
@@ -216,6 +216,7 @@ export class MemoryRepository {
       .filter(p => {
         if (openOnly && !isPlaceEligible(p, now, { requireVerifiedHours })) return false;
         if (dishId && !(p.menu || []).some(m => m.dish_id === dishId && m.available)) return false;
+        if (!placeMatchesFilters(p, filters, dishId)) return false;
         return !hasLocation || (p.distance_m !== null && p.distance_m <= radiusM);
       })
       .sort((a, b) => (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity) || a.id.localeCompare(b.id))

@@ -22,7 +22,9 @@ const flags = () => {
 
 test('every restored element has a named flag, off by default (partners mirror the server allowlist)', () => {
   const f = flags();
-  for (const k of ['phoneLogin', 'zaloLogin', 'appleLogin', 'searchFilters', 'collections']) assert.equal(f[k], false, k);
+  for (const k of ['phoneLogin', 'zaloLogin', 'appleLogin']) assert.equal(f[k], false, k);
+  // core-filters: these three are live now (server-side filters / real collection counts).
+  for (const k of ['placeFilters', 'searchFilters', 'collections']) assert.equal(f[k], true, k);
   const allow = fs.readFileSync('src/services/redirectService.js', 'utf8');
   const serverPartners = [...allow.matchAll(/\['(\w+)', \[/g)].map((m) => m[1]).sort();
   assert.deepEqual([...f.orderPartners].sort(), serverPartners, 'M5-S02 live rows = redirect allowlist');
@@ -48,7 +50,7 @@ test('M2-S02 filter row, M2-S08 collection chip and M9-S02 Vector DB column stay
   const m2s02 = between('      if (id === "M2-S02") {', '      if (id === "M2-S08") {');
   assert.doesNotMatch(m2s02, /children\[2\]\.remove\(\)/);
   assert.match(m2s02, /FEATURES\.searchFilters/);
-  assert.match(m2s02, /replace\(\/\\s\*✓\\s\*\$\/, ""\)/, 'no ✓: nothing is applied');
+  assert.match(m2s02, /chipLabel\(chip\.textContent\) \+ SOON/, 'flag off: no ✓, nothing is applied');
   const m2s08 = between('      if (id === "M2-S08") {', '    if (id === "M2-S03") {');
   assert.doesNotMatch(m2s08, /x\.remove\(\)/);
   assert.match(m2s08, /FEATURES\.collections/);

@@ -159,21 +159,21 @@ test('UI map only mounts in M4-S02 and M5-S03; frozen previews never get a live 
     assert.doesNotMatch(fs.readFileSync('ui-design/src/' + f, 'utf8'), /data-live-map/, f + ' design files untouched');
 });
 
-test('default seed point is not the user\'s location: no weather call, no reading, no map centre', async () => {
-  let calls = 0;
-  setWeatherFetch(async () => { calls++; return ok(HOT)(); });
+test('default seed point is not the user\'s location: weather is read for the default area (Biên Hòa) and says so; no map centre', async () => {
+  const urls = [];
+  setWeatherFetch(async (url) => { urls.push(url); return ok(HOT)(); });
   const store = createInitialStore();
   assert.equal(store.userProfile.location_set, false);
   assert.equal(defaultProfile('u1').location_set, false);
   assert.equal(locationChosen(store.userProfile), false);
   const r = await handleApiRequest(store, 'GET', '/api/v1/suggestions/today', new URLSearchParams());
   assert.equal(r.status, 200);
-  assert.equal(r.data.live_weather, null);
-  assert.equal(r.data.weather, null);
-  assert.doesNotMatch(JSON.stringify(r.data.items), /Hợp trời hiện tại/);
+  assert.equal(r.data.live_weather.label, '32°C · Trời quang');
+  assert.deepEqual(r.data.live_weather.location, { lat: 10.957, lng: 106.843, source: 'default', name: 'Biên Hòa' });
+  assert.match(urls[0], /latitude=10\.96&longitude=106\.84/);
   const spin = await handleApiRequest(store, 'GET', '/api/v1/suggestions/spin', new URLSearchParams());
   assert.equal(spin.status, 200);
-  assert.equal(calls, 0, 'the provider is never asked about the default point');
+  assert.equal(urls.length, 1, 'one provider call, cached for the area');
   const places = await handleApiRequest(store, 'GET', '/api/v1/places', new URLSearchParams());
   assert.equal(places.status, 200);
   assert.ok(places.data.items.length > 0, 'places still listed (distances as before)');
