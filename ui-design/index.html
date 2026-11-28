@@ -10454,6 +10454,58 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   });
 })();
 
+/* M9-S04 (Restaurant Verification Queue): small "Yêu cầu nhận quán (M6)" card for
+ * super_admin/admin — approve/reject pending merchant claims (POST /merchant/admin/claims/:id/…).
+ * Mounted through the existing M9 form parts, inside the original screen; no new screen. */
+(function () {
+  const REVIEWERS = ["super_admin", "admin"];
+  function mountClaims(root, id, d, C) {
+    if (id !== "M9-S04" || !REVIEWERS.includes(C.role) || root.querySelector("[data-claim-review]")) return;
+    const content = root.lastElementChild && root.lastElementChild.lastElementChild;
+    if (!content) return;
+    const E = window.escHtml;
+    const host = document.createElement("div");
+    host.dataset.claimReview = "";
+    content.insertBefore(host, content.querySelector("[data-place-editor]"));
+    host.innerHTML = C.card("Yêu cầu nhận quán của chủ quán (M6)", C.form('<div data-claim-list><p class="text-[11px] text-[#64748B]">Đang tải yêu cầu…</p></div>'));
+    const form = host.querySelector("form");
+    const list = host.querySelector("[data-claim-list]");
+    const fmt = (iso) => { try { return new Date(iso).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
+    function draw(items) {
+      if (!items.length) { list.innerHTML = '<p class="text-[11px] text-[#64748B]">Không có yêu cầu nhận quán nào đang chờ duyệt.</p>'; return; }
+      list.innerHTML = '<div class="space-y-1 mb-3">' + items.map((c) => '<div class="text-[11px] text-[#64748B]"><b class="text-[#0F172A]">' + E(c.place_name || c.place_id) + "</b> · " +
+        E((c.claimant && (c.claimant.name || c.claimant.phone_masked)) || "Tài khoản đã xoá") + (c.claimant && c.claimant.phone_masked && c.claimant.name ? " (" + E(c.claimant.phone_masked) + ")" : "") +
+        " · " + E(fmt(c.created_at)) + (c.note ? " · “" + E(c.note) + "”" : "") + (c.is_demo ? " · Dữ liệu demo" : "") + "</div>").join("") + "</div>" +
+        C.select("claim_id", "Yêu cầu cần xử lý", items[0].id, items.map((c) => [c.id, (c.place_name || c.place_id) + " · " + ((c.claimant && (c.claimant.name || c.claimant.phone_masked)) || "")])) +
+        C.area("reason", "Lý do từ chối (bắt buộc khi từ chối)") +
+        '<p class="text-[11px] text-[#64748B]">Duyệt sẽ cấp quyền Chủ quán cho tài khoản gửi yêu cầu tại quán này. Quán đã có chủ thì chỉ có thể từ chối.</p>' +
+        '<div class="flex gap-2 mt-3">' + C.button("✓ Duyệt & cấp quyền chủ quán", "approve-claim") + C.button("Từ chối", "reject-claim") + "</div>";
+    }
+    const load = () => C.api("/merchant/admin/claims").then((r) => { draw(r.items || []); return "Có " + (r.items || []).length + " yêu cầu chờ duyệt."; });
+    C.run(form, load);
+    form.addEventListener("submit", (e) => e.preventDefault());
+    form.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-action]");
+      if (!b || !["approve-claim", "reject-claim"].includes(b.dataset.action)) return;
+      const claimId = form.elements.namedItem("claim_id") && form.elements.namedItem("claim_id").value;
+      if (!claimId) return;
+      C.run(form, async () => {
+        if (b.dataset.action === "approve-claim") {
+          const r = await C.api("/merchant/admin/claims/" + encodeURIComponent(claimId) + "/approve", "POST", {});
+          await load();
+          return "Đã duyệt: " + (r.claim.place_name || r.claim.place_id) + " — đã cấp quyền chủ quán.";
+        }
+        const reason = form.elements.namedItem("reason").value.trim();
+        if (reason.length < 3) throw new Error("Cần ghi lý do từ chối.");
+        const r = await C.api("/merchant/admin/claims/" + encodeURIComponent(claimId) + "/reject", "POST", { reason });
+        await load();
+        return "Đã từ chối yêu cầu nhận " + (r.claim.place_name || r.claim.place_id) + ".";
+      });
+    });
+  }
+  window.M9FormsParts = { ...(window.M9FormsParts || {}), claims: mountClaims };
+})();
+
 /* M7 live wiring — Quảng bá & Chiến dịch tài trợ + VietQR (M7-S01..M7-S08) and the desktop
  * Live App tab "merchant" (#lpanel-merchant, shared design of M6 + M7).
  * Endpoints (src/modules/m7.js): GET /ads/overview, GET /ads/campaigns, GET|POST|DELETE /ads/campaigns/builder,

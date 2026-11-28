@@ -24,6 +24,7 @@ export default {
   seed: () => [{ kind: 'slot', id: 'M13-SLOT-1', data: {...} }],   // FIXED ids
   async route(ctx) {...},            // after the core router, before legacy frozenRoutes.js
   async routeEarly(ctx) {...},       // optional: only to take over a path the core already answers
+  async onDeleteUser({ ms, repo }, userId, user) {...}, // optional: PDPD cleanup of rows not keyed by owner_id
 };
 ```
 `ctx`: `repo, ms, store, authUser, userId, profile, method, pathname, searchParams, body,
@@ -87,4 +88,4 @@ make your API return the shape they read, or replace them through `fns` / `tabs[
 
 Xóa toàn bộ demo khi nạp dữ liệu thật: `DELETE FROM module_records WHERE is_demo;` và đặt `SEED_DEMO_MODULES=false`.
 
-Còn mở (cần quyết định): cooldown 72h hay 3 ngày; endpoint cũ `POST /community/recipes/:id/tip` (1 bước) còn giữ; nhắm mục tiêu theo bữa/thời tiết của M7 chưa áp vào recommender; M6 OCR độ tin thấp chưa vào hàng chờ M9-S05; merchant↔place của core chưa có (M6 dùng record `membership`).
+Còn mở (cần quyết định): cooldown 72h hay 3 ngày; endpoint cũ `POST /community/recipes/:id/tip` (1 bước) còn giữ; nhắm mục tiêu theo bữa/thời tiết của M7 chưa áp vào recommender; M6 OCR độ tin thấp chưa vào hàng chờ M9-S05; merchant↔place của core chưa có (M6 dùng record `membership`; yêu cầu nhận quán được super_admin duyệt/từ chối trong M9-S04 qua `/merchant/admin/claims`, duyệt = tạo membership owner; xóa tài khoản xóa membership của user). M13: mỗi slot giữ `holds {booking_id: owner_id}`, xóa tài khoản trả bàn lại.

@@ -91,6 +91,9 @@ export async function exportModuleData(repo, userId) {
   }
   return out;
 }
-export async function deleteModuleData(repo, userId) {
-  await moduleStore(repo).removeOwner(userId);
+export async function deleteModuleData(repo, userId, user = null) {
+  const ms = moduleStore(repo);
+  // Records keyed other than by owner_id (M6 membership by user_id/phone, M13 held slots…).
+  for (const mod of await modules()) if (typeof mod.onDeleteUser === 'function') await mod.onDeleteUser({ ms, repo }, userId, user || {});
+  await ms.removeOwner(userId);
 }

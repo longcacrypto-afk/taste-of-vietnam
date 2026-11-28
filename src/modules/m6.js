@@ -347,6 +347,9 @@ function parseHours(text) {
   return { open: a, close: b, weekly: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map(d => [d, [[a, b]]])) };
 }
 
+const CLAIM_REVIEWERS = ['super_admin', 'admin'];
+const maskPhone = p => (p ? String(p).replace(/^(\+84)(\d{2})\d{4}(\d{3})$/, '0$2****$3') : '');
+
 // ── staff ───────────────────────────────────────────────────────────────────
 const staffOut = m => ({ id: m.id, name: m.name, title: m.title || '', phone_masked: m.phone ? m.phone.replace(/^(\+84)(\d{2})\d{4}(\d{3})$/, '0$2****$3') : '',
   role: m.role, role_label: ROLE_LABEL[m.role], rights: ROLE_RIGHTS[m.role], place_ids: m.place_ids || [],
@@ -385,6 +388,54 @@ async function route(ctx) {
     const claim = await ms.insert({ module: M, kind: 'claim', ownerId: ctx.userId, data: { place_id: placeId, place_name: place.name, note,
       status: 'pending_review', verification: 'Chờ đội vận hành xác minh giấy tờ (M9). Chưa cấp quyền quản lý quán.' } });
     return { status: 201, data: claim };
+  }
+
+  // M9-S04 — admin review of merchant claims (super_admin / admin only). Approval creates
+  // the owner membership the claim asked for; rejection keeps the claim with a reason.
+  if (sub === '/admin/claims' && method === 'GET') {
+    if (!CLAIM_REVIEWERS.includes(ctx.authUser.role)) return fail(403, 'Chỉ quản trị viên được duyệt yêu cầu nhận quán');
+    const status = util.cleanText(ctx.searchParams.get('status') || 'pending_review', 20);
+    const items = await ms.list(M, 'claim', { where: c => status === 'all' || c.status === status });
+    const out = [];
+    for (const c of items) {
+      const u = await raw(ctx).getUser(c.owner_id);
+      out.push({ ...c, claimant: u ? { id: u.id, name: u.profile?.display_name || u.profile?.name || u.name || null,
+        phone_masked: maskPhone(u.phone), role: u.role } : null });
+    }
+    return { status: 200, data: { items: out, total: out.length, status } };
+  }
+  const claimM = sub.match(/^\/admin\/claims\/([^/]+)\/(approve|reject)$/);
+  if (claimM && method === 'POST') {
+    if (!CLAIM_REVIEWERS.includes(ctx.authUser.role)) return fail(403, 'Chỉ quản trị viên được duyệt yêu cầu nhận quán');
+    const claim = await ms.get(decodeURIComponent(claimM[1]));
+    if (!claim || claim.module !== M || claim.kind !== 'claim') return util.notFound('Không tìm thấy yêu cầu nhận quán');
+    if (claim.status !== 'pending_review') return fail(409, 'Yêu cầu này đã được xử lý', { status: claim.status });
+    const now = new Date().toISOString();
+    if (claimM[2] === 'reject') {
+      const reason = util.cleanText(body.reason, 500);
+      if (reason.length < 3) return util.bad('Cần ghi lý do từ chối');
+      const next = await ms.update(claim.id, cur => (cur.status !== 'pending_review' ? null : { ...cur, status: 'rejected',
+        reject_reason: reason, reviewed_by: ctx.userId, reviewed_at: now, verification: 'Đã từ chối: ' + reason }));
+      if (next.status !== 'rejected' || next.reviewed_at !== now) return fail(409, 'Yêu cầu này đã được xử lý', { status: next.status });
+      return { status: 200, data: { claim: next } };
+    }
+    const claimant = await raw(ctx).getUser(claim.owner_id);
+    if (!claimant || claimant.guest) return fail(409, 'Tài khoản gửi yêu cầu không còn tồn tại');
+    const place = await raw(ctx).getPlace(claim.place_id);
+    if (!place) return util.notFound('Không tìm thấy quán của yêu cầu');
+    const owners = await ms.list(M, 'membership', { where: m => m.role === 'owner' && (m.place_ids || []).includes(claim.place_id) });
+    if (owners.some(m => m.user_id !== claimant.id)) return fail(409, 'Quán này đã có chủ quán; hãy từ chối yêu cầu hoặc xử lý quyền chủ quán trước');
+    const next = await ms.update(claim.id, cur => (cur.status !== 'pending_review' ? null : { ...cur, status: 'approved',
+      reviewed_by: ctx.userId, reviewed_at: now, verification: 'Đã xác minh, cấp quyền chủ quán.' }));
+    if (next.status !== 'approved' || next.reviewed_at !== now) return fail(409, 'Yêu cầu này đã được xử lý', { status: next.status });
+    let membership = owners.find(m => m.user_id === claimant.id) || null;
+    if (!membership) {
+      membership = await ms.insert({ module: M, kind: 'membership', data: { phone: normalizePhone(claimant.phone || '') || null,
+        name: claimant.profile?.display_name || claimant.profile?.name || claimant.name || 'Chủ quán', title: 'Chủ quán', role: 'owner',
+        place_ids: [claim.place_id], user_id: claimant.id, linked_at: now, claim_id: claim.id, approved_by: ctx.userId } });
+    }
+    await ms.update(claim.id, { membership_id: membership.id });
+    return { status: 200, data: { claim: { ...next, membership_id: membership.id }, membership: staffOut(membership) } };
   }
 
   // M6-S02 — overview KPIs (legacy shape: place + kpis.*_7d + ctr_pct).
@@ -711,4 +762,12 @@ async function route(ctx) {
   return null;
 }
 
-export default { id: M, personalKinds: ['claim'], seed, route };
+// PDPD account deletion: claims go with owner_id (personalKinds); memberships are keyed by
+// user_id / phone, so remove the ones bound to this user and the unlinked invites for their phone.
+async function onDeleteUser({ ms }, userId, user = {}) {
+  const phone = normalizePhone(user.phone || '') || null;
+  const mine = await ms.list(M, 'membership', { where: m => m.user_id === userId || (!m.user_id && phone && m.phone === phone) });
+  for (const m of mine) await ms.remove(m.id);
+}
+
+export default { id: M, personalKinds: ['claim'], seed, route, onDeleteUser };

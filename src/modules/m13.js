@@ -60,16 +60,28 @@ function slotTimes(place, cfg, date, now = Date.now()) {
 
 const counterId = (placeId, date, time) => `M13-CNT-${placeId}-${date}-${time.replace(':', '')}`;
 async function slotCount(ms, id) { return (await ms.get(id))?.n || 0; }
-async function reserve(ms, placeId, date, time, cap) {
+// Each slot counter keeps who holds its tables (holds: { bookingId: ownerId }), so a
+// cancelled booking or a deleted account releases exactly the tables it held.
+async function reserve(ms, placeId, date, time, cap, bookingId, ownerId) {
   const id = counterId(placeId, date, time);
-  try { await ms.insert({ module: M, kind: 'slotcount', id, data: { place_id: placeId, date, time, n: 0 } }); }
+  try { await ms.insert({ module: M, kind: 'slotcount', id, data: { place_id: placeId, date, time, n: 0, holds: {} } }); }
   catch (e) { if (e.status !== 409) throw e; }
   let ok = false;
-  await ms.update(id, cur => { if ((cur.n || 0) >= cap) return null; ok = true; return { ...cur, n: (cur.n || 0) + 1 }; });
+  await ms.update(id, cur => {
+    if ((cur.n || 0) >= cap) return null;
+    ok = true;
+    return { ...cur, n: (cur.n || 0) + 1, holds: { ...(cur.holds || {}), [bookingId]: ownerId } };
+  });
   return ok;
 }
-async function release(ms, placeId, date, time) {
-  await ms.update(counterId(placeId, date, time), cur => ({ ...cur, n: Math.max(0, (cur.n || 0) - 1) }));
+async function release(ms, placeId, date, time, bookingId) {
+  await ms.update(counterId(placeId, date, time), cur => {
+    const holds = { ...(cur.holds || {}) };
+    // Counters written before holds existed have no entry: release one table as before.
+    if (bookingId && cur.holds && !(bookingId in holds) && Object.keys(holds).length >= (cur.n || 0)) return null;
+    delete holds[bookingId];
+    return { ...cur, n: Math.max(0, (cur.n || 0) - 1), holds };
+  });
 }
 
 const pubBooking = b => ({ id: b.id, booking_id: b.id, code: b.code, place_id: b.place_id, place_name: b.place_name, place_address: b.place_address,
@@ -157,11 +169,11 @@ async function bookingRoutes(ctx) {
     const mine = await ms.list(M, 'booking', { ownerId: userId });
     if (mine.some(x => x.status === 'confirmed_instant' && x.place_id === placeId && x.date === b.date && x.time === b.time))
       return { status: 409, data: { error: 'Bạn đã có bàn ở quán này vào giờ này' } };
-    if (!(await reserve(ms, placeId, b.date, b.time, cfg.tables_per_slot))) return { status: 409, data: { error: 'Khung giờ đã hết bàn, hãy chọn giờ khác' } };
     const code = 'BK-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+    if (!(await reserve(ms, placeId, b.date, b.time, cfg.tables_per_slot, code, userId))) return { status: 409, data: { error: 'Khung giờ đã hết bàn, hãy chọn giờ khác' } };
     const rec = await ms.insert({ module: M, kind: 'booking', ownerId: userId, id: code, data: {
       code, place_id: place.id, place_name: place.name, place_address: place.address, place_phone: place.phone || null, img_key: place.img_key || null,
-      ...b, status: 'confirmed_instant' } });
+      ...b, status: 'confirmed_instant', booked_by: userId } });
     return { status: 200, data: pubBooking(rec) };
   }
 
@@ -175,7 +187,7 @@ async function bookingRoutes(ctx) {
     if (vnInstant(bk.date, bk.time) <= Date.now()) return { status: 409, data: { error: 'Giờ hẹn đã qua, không sửa/huỷ được' } };
     if (method === 'DELETE') {
       const next = await ms.update(bk.id, cur => ({ ...cur, status: 'cancelled', cancelled_at: new Date().toISOString() }));
-      await release(ms, bk.place_id, bk.date, bk.time);
+      await release(ms, bk.place_id, bk.date, bk.time, bk.id);
       return { status: 200, data: { cancelled: true, ...pubBooking(next) } };
     }
     const cfg = cfgs.get(bk.place_id);
@@ -191,8 +203,8 @@ async function bookingRoutes(ctx) {
       if (bad) return bad;
     }
     if (moved) {
-      if (!(await reserve(ms, bk.place_id, b.date, b.time, cfg.tables_per_slot))) return { status: 409, data: { error: 'Khung giờ mới đã hết bàn' } };
-      await release(ms, bk.place_id, bk.date, bk.time);
+      if (!(await reserve(ms, bk.place_id, b.date, b.time, cfg.tables_per_slot, bk.id, userId))) return { status: 409, data: { error: 'Khung giờ mới đã hết bàn' } };
+      await release(ms, bk.place_id, bk.date, bk.time, bk.id);
     }
     const next = await ms.update(bk.id, cur => ({ ...cur, ...b, updated_by_user_at: new Date().toISOString() }));
     return { status: 200, data: pubBooking(next) };
@@ -302,10 +314,26 @@ async function voucherRoutes(ctx) {
   return null;
 }
 
+// PDPD account deletion: the booking rows go with owner_id; release the tables they still hold
+// first (any slot counter that lists this user as holder), so the slots reopen for others.
+async function onDeleteUser({ ms }, userId) {
+  for (const bk of await ms.list(M, 'booking', { ownerId: userId })) {
+    if (bk.status === 'confirmed_instant') await release(ms, bk.place_id, bk.date, bk.time, bk.id);
+  }
+  for (const c of await ms.list(M, 'slotcount', { where: c => Object.values(c.holds || {}).includes(userId) })) {
+    await ms.update(c.id, cur => {
+      const holds = Object.fromEntries(Object.entries(cur.holds || {}).filter(([, o]) => o !== userId));
+      const freed = Object.keys(cur.holds || {}).length - Object.keys(holds).length;
+      return freed ? { ...cur, holds, n: Math.max(0, (cur.n || 0) - freed) } : null;
+    });
+  }
+}
+
 export default {
   id: M,
   personalKinds: ['booking', 'wallet', 'payment'],
   seed,
+  onDeleteUser,
   async route(ctx) {
     return (await bookingRoutes(ctx)) || (await voucherRoutes(ctx));
   }

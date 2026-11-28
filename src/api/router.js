@@ -193,7 +193,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     suggestionCache.invalidateUser(authUser.id);
     const deleted = await deleteUser(repo, authUser.id);
     if (!deleted) return {status:409,data:{error:'Không thể xóa quản trị viên cấp cao cuối cùng'}};
-    await deleteModuleData(repo, authUser.id);
+    await deleteModuleData(repo, authUser.id, authUser);
 
     return {
       status: 200,
