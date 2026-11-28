@@ -13839,7 +13839,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       recipeCuisine: "Vietnamese", recipeYield: d.requested_servings + " khẩu phần",
       totalTime: d.prep_minutes ? "PT" + d.prep_minutes + "M" : undefined,
       nutrition: d.calories ? { "@type": "NutritionInformation", calories: d.calories + " kcal" } : undefined,
-      recipeIngredient: (d.scaled_ingredients || []).map((i) => (i.scaled_amount ?? i.amount) + " " + i.unit + " " + i.name),
+      recipeIngredient: (d.scaled_ingredients || []).map((i) => ((i.scaled_amount ?? i.amount) == null ? "" : (i.scaled_amount ?? i.amount) + " " + (i.unit || "") + " ") + i.name),
       recipeInstructions: (d.steps || []).map((s) => ({ "@type": "HowToStep", name: s.title, text: s.text })),
     };
     return `<script type="application/ld+json" data-w-jsonld>${JSON.stringify(ld).replace(/</g, "\\u003c")}<\/script>`;
@@ -13850,17 +13850,18 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     ctx.img(ctx.$("img", left), dish.img_key);
     setPills(ctx.$(".flex.gap-1\\.5", left), ["Schema.org/Recipe", REGION_VI[dish.region] || "Chưa rõ vùng"]);
     ctx.text(ctx.$("h2", left), dish.name);
+    if (dish.is_demo === true) ctx.$("h2", left)?.insertAdjacentHTML("beforebegin", "<div>" + ctx.demoPill() + "</div>"); // keeps "h2 + p" below
     const meta = ctx.$("h2 + p", left);
     ctx.text(meta, "🍴 " + dish.requested_servings + " Khẩu phần · 🔥 " + (dish.calories ?? "—") + " kcal/phần · ⏱️ " + (dish.prep_minutes ?? "—") + " phút · " + (dish.difficulty || "Chưa rõ độ khó"));
     meta?.insertAdjacentHTML("afterend",
-      `<div class="flex flex-wrap items-center gap-1.5 pt-1"><button type="button" onclick="P2.live.W.servings(-1)" aria-label="Bớt khẩu phần" class="w-7 h-7 rounded-full border border-[#E2E8F0] font-extrabold">−</button><span class="font-bold">${dish.requested_servings} khẩu phần</span><button type="button" onclick="P2.live.W.servings(1)" aria-label="Thêm khẩu phần" class="w-7 h-7 rounded-full border border-[#E2E8F0] font-extrabold">+</button><button type="button" onclick="P2.save('${ctx.J(dish.id)}')" class="ml-1 px-3 py-1 rounded-full bg-[#FEF3C7] text-[#B45309] font-extrabold">🔖 Lưu món</button><span class="text-[#64748B]">Chi phí đi chợ ước tính ${ctx.money(dish.scaled_market_cost_vnd)}</span></div>`);
+      `<div class="flex flex-wrap items-center gap-1.5 pt-1"><button type="button" onclick="P2.live.W.servings(-1)" aria-label="Bớt khẩu phần" class="w-7 h-7 rounded-full border border-[#E2E8F0] font-extrabold">−</button><span class="font-bold">${dish.requested_servings} khẩu phần</span><button type="button" onclick="P2.live.W.servings(1)" aria-label="Thêm khẩu phần" class="w-7 h-7 rounded-full border border-[#E2E8F0] font-extrabold">+</button><button type="button" onclick="P2.save('${ctx.J(dish.id)}')" class="ml-1 px-3 py-1 rounded-full bg-[#FEF3C7] text-[#B45309] font-extrabold">🔖 Lưu món</button><span class="text-[#64748B]">${dish.market_cost_base == null ? "Chưa có chi phí đi chợ" : "Chi phí đi chợ ước tính " + ctx.money(dish.scaled_market_cost_vnd)}</span></div>`);
     const ing = ctx.$(".grid-cols-4", left), tpl = ing.firstElementChild.cloneNode(true);
     ing.innerHTML = "";
     (dish.scaled_ingredients || []).forEach((a) => {
       const n = tpl.cloneNode(true);
       ctx.img(ctx.$("img", n), a.img_key);
       ctx.text(ctx.$("b", n), a.name);
-      ctx.text(ctx.$("div", n), (a.scaled_amount ?? a.amount) + " " + a.unit);
+      ctx.text(ctx.$("div", n), (a.scaled_amount ?? a.amount) == null ? "" : (a.scaled_amount ?? a.amount) + " " + (a.unit || ""));
       ing.append(n);
     });
     if (!(dish.scaled_ingredients || []).length) ing.outerHTML = '<p class="text-[#64748B]">Chưa có nguyên liệu cho món này.</p>';
@@ -15094,9 +15095,20 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   function clearAfter(root, count) {
     [...root.children].slice(count).forEach((n) => n.remove());
   }
+  // Demo catalogue rows (is_demo from the API): the existing "Dữ liệu demo" pill next to
+  // the dish name. Inline style (same look as DEMO_PILL) so no screen selector picks it up.
+  const DISH_DEMO_PILL='<span data-demo-pill style="display:inline-block;margin:2px 0 0 4px;padding:1px 8px;border-radius:9999px;background:#E0F2FE;color:#075985;font-size:10px;font-weight:800;line-height:1.5;white-space:nowrap;vertical-align:middle">Dữ liệu demo</span>';
+  function demoPillAfter(el, d) {
+    if (!el || d?.is_demo !== true || el.parentElement?.querySelector(":scope > [data-demo-pill]")) return;
+    el.insertAdjacentHTML("afterend", DISH_DEMO_PILL);
+  }
+  // Ingredient quantity: demo rows carry names only, so no "undefined" amount is shown.
+  const qty = (a) => { const v = a.scaled_amount ?? a.amount; return v == null || v === "" || Number.isNaN(Number(v)) ? "" : v + " " + (a.unit || ""); };
   function cardFill(node, d) {
     img($("img", node), d.img_key);
-    text($('b,[class*="font-extrabold"]', node), d.name || d.dish_name);
+    const name = $('b,[class*="font-extrabold"]', node);
+    text(name, d.name || d.dish_name);
+    demoPillAfter(name, d);
     click(node, `P2.dish('${J(d.id || d.dish_id)}')`);
   }
   function bindMealChips(root, showActive) {
@@ -15143,6 +15155,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           return;
         }
         img($("img", node), a.img_key);
+        demoPillAfter($('b,[class*="font-extrabold"]', node), a);
         $$('[onclick*="M2-S04"]', node).forEach((n) =>
           click(n, `P2.dish('${J(a.dish_id)}')`),
         );
@@ -15255,6 +15268,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     if (/^M2-S0[4-7]$/.test(id) || id === "M3-S02") {
       const title = $("h3", root);
       text(title, d.name);
+      demoPillAfter(title, d);
       const hero = $("img", root);
       img(hero, d.img_key);
       if (id === "M2-S04") {
@@ -15283,10 +15297,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
             (n, a) => {
               img($("img", n), a.img_key);
               text($(".font-extrabold", n), a.name);
-              text(
-                $(".text-\\[9px\\]", n),
-                (a.scaled_amount ?? a.amount) + " " + a.unit,
-              );
+              text($(".text-\\[9px\\]", n), qty(a));
             },
           );
         }
@@ -15328,12 +15339,10 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         rows(grid, tpl, d.scaled_ingredients || [], (n, a) => {
           img($("img", n), a.img_key);
           text($("b", n), a.name);
-          text(
-            $(".font-extrabold", n),
-            (a.scaled_amount ?? a.amount) + " " + a.unit,
-          );
+          text($(".font-extrabold", n), qty(a));
         });
-        text($("b", root), money(d.scaled_market_cost_vnd));
+        // No market cost recorded (demo catalogue rows): say so instead of "0đ".
+        text($("b", root), d.market_cost_base == null ? "Chưa có giá đi chợ" : money(d.scaled_market_cost_vnd));
       }
       if (id === "M2-S07") {
         const holder = root.children[2],
@@ -16107,7 +16116,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         text($(".font-extrabold",cards[0]),a.name);
         text($(".text-\\[\\#64748B\\]",cards[0]),(a.calories??"—")+" kcal");
         text($(".font-extrabold",cards[1]),(a.ingredients||[]).length+" Nhóm Nguyên liệu");
-        text($(".text-\\[\\#64748B\\]",cards[1]),(a.ingredients||[]).map(x=>x.name+" "+x.amount+x.unit).join(" · "));
+        text($(".text-\\[\\#64748B\\]",cards[1]),(a.ingredients||[]).map(x=>x.amount==null?x.name:x.name+" "+x.amount+(x.unit||"")).join(" · "));
         text($(".font-extrabold",cards[2]),(a.steps||[]).length+" Bước Nấu Có Timer");
         text($(".text-\\[\\#64748B\\]",cards[2]),(a.steps||[]).map(x=>x.title).join(" · "));
       }
