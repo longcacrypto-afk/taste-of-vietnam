@@ -18,6 +18,18 @@ services:
         # Render injects PORT automatically — do not set here
       - key: GEMINI_API_KEY
         sync: false   # Set manually in Render dashboard
+      # Măm AI chat (docs/MAM_AI.md): CometAPI, OpenAI-compatible. Without LLM_API_KEY the chat
+      # runs on the local parser ("chế độ offline").
+      - key: LLM_API_KEY
+        sync: false   # CometAPI key — set manually in the dashboard
+      - key: LLM_BASE_URL
+        value: https://api.cometapi.com/v1
+      - key: LLM_MODEL
+        value: gemini-2.5-flash-lite
+      - key: LLM_TIMEOUT_MS
+        value: "8000"
+      - key: LLM_RATE_PER_HOUR
+        value: "20"
       - key: JWT_SECRET
         generateValue: true   # Render generates a random secret once
       - key: PAYOS_CHECKSUM_KEY

@@ -79,7 +79,10 @@ export function buildCandidates(store, opts = {}, { now = Date.now(), placePredi
   else for (const dish of store.dishes || []) {
     if(!publicDish(dish)) { reject('safety'); continue; }
     // Drinks (demo catalogue, category 'drink') are searchable in M2 but are never a meal pick.
-    if (dish.category === 'drink') { reject('meal'); continue; }
+    // Only an explicit drink request (Măm chat: opts.drinks === 'only') returns drinks,
+    // and then only drinks; drinks are not tied to a meal slot.
+    const drinksOnly = opts.drinks === 'only';
+    if ((dish.category === 'drink') !== drinksOnly) { reject('meal'); continue; }
     const allergens = dish.allergen_tags;
     const allergies = profile.hard_allergies || [];
     if (dish.safety_status === 'rejected' || (approvalRequired && dish.safety_status !== 'approved')
@@ -88,7 +91,7 @@ export function buildCandidates(store, opts = {}, { now = Date.now(), placePredi
     if ((profile.disliked_dish_ids || []).includes(dish.id)) { reject('disliked'); continue; }
     const flags = Array.isArray(dish.diet_flags) ? dish.diet_flags : [];
     if (!context.diets.every(d => flags.includes(d) || (d === 'vegetarian' && flags.includes('vegan')))) { reject('diet'); continue; }
-    if (!Array.isArray(dish.meal_slots) || !dish.meal_slots.includes(context.meal_slot)) { reject('meal'); continue; }
+    if (!drinksOnly && (!Array.isArray(dish.meal_slots) || !dish.meal_slots.includes(context.meal_slot))) { reject('meal'); continue; }
     if (context.spice_max !== null && (!finite(dish.spice_level) || Number(dish.spice_level) > context.spice_max)) { reject('spice'); continue; }
     if ((store.suggestionHistory || []).some(h => h.dish_id === dish.id && h.action === 'eaten'
       && Number.isFinite(Date.parse(h.created_at)) && Date.parse(h.created_at) > now - 72 * 3600000)) { reject('cooldown'); continue; }

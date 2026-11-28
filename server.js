@@ -14,6 +14,7 @@ import { handleApiRequest } from './src/api/router.js';
 import { setupWebSocket, getWsTestPayload } from './src/services/websocketService.js';
 import { initRepository } from './src/db/repository.js';
 import { getJwtSecret } from './src/services/authService.js';
+import { llmHealth } from './src/services/llmClient.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const store = createInitialStore();
@@ -51,6 +52,8 @@ export function createAppServer() {
         postgres_connected: Boolean(store.repo),
         storage: store.repo ? 'postgres' : 'memory',
         gemini_active: Boolean(process.env.GEMINI_API_KEY),
+        // Măm AI chat provider (src/services/llmClient.js): status only, never the key.
+        llm: llmHealth(),
         environment: process.env.NODE_ENV || 'development',
         timestamp: new Date().toISOString()
       }, null, 2));
