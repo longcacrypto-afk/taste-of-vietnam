@@ -222,7 +222,7 @@
       recipeCuisine: "Vietnamese", recipeYield: d.requested_servings + " khẩu phần",
       totalTime: d.prep_minutes ? "PT" + d.prep_minutes + "M" : undefined,
       nutrition: d.calories ? { "@type": "NutritionInformation", calories: d.calories + " kcal" } : undefined,
-      recipeIngredient: (d.scaled_ingredients || []).map((i) => (i.scaled_amount ?? i.amount) + " " + i.unit + " " + i.name),
+      recipeIngredient: (d.scaled_ingredients || []).map((i) => ((i.scaled_amount ?? i.amount) == null ? "" : (i.scaled_amount ?? i.amount) + " " + (i.unit || "") + " ") + i.name),
       recipeInstructions: (d.steps || []).map((s) => ({ "@type": "HowToStep", name: s.title, text: s.text })),
     };
     return `<script type="application/ld+json" data-w-jsonld>${JSON.stringify(ld).replace(/</g, "\\u003c")}<\/script>`;
@@ -233,17 +233,18 @@
     ctx.img(ctx.$("img", left), dish.img_key);
     setPills(ctx.$(".flex.gap-1\\.5", left), ["Schema.org/Recipe", REGION_VI[dish.region] || "Chưa rõ vùng"]);
     ctx.text(ctx.$("h2", left), dish.name);
+    if (dish.is_demo === true) ctx.$("h2", left)?.insertAdjacentHTML("beforebegin", "<div>" + ctx.demoPill() + "</div>"); // keeps "h2 + p" below
     const meta = ctx.$("h2 + p", left);
     ctx.text(meta, "🍴 " + dish.requested_servings + " Khẩu phần · 🔥 " + (dish.calories ?? "—") + " kcal/phần · ⏱️ " + (dish.prep_minutes ?? "—") + " phút · " + (dish.difficulty || "Chưa rõ độ khó"));
     meta?.insertAdjacentHTML("afterend",
-      `<div class="flex flex-wrap items-center gap-1.5 pt-1"><button type="button" onclick="P2.live.W.servings(-1)" aria-label="Bớt khẩu phần" class="w-7 h-7 rounded-full border border-[#E2E8F0] font-extrabold">−</button><span class="font-bold">${dish.requested_servings} khẩu phần</span><button type="button" onclick="P2.live.W.servings(1)" aria-label="Thêm khẩu phần" class="w-7 h-7 rounded-full border border-[#E2E8F0] font-extrabold">+</button><button type="button" onclick="P2.save('${ctx.J(dish.id)}')" class="ml-1 px-3 py-1 rounded-full bg-[#FEF3C7] text-[#B45309] font-extrabold">🔖 Lưu món</button><span class="text-[#64748B]">Chi phí đi chợ ước tính ${ctx.money(dish.scaled_market_cost_vnd)}</span></div>`);
+      `<div class="flex flex-wrap items-center gap-1.5 pt-1"><button type="button" onclick="P2.live.W.servings(-1)" aria-label="Bớt khẩu phần" class="w-7 h-7 rounded-full border border-[#E2E8F0] font-extrabold">−</button><span class="font-bold">${dish.requested_servings} khẩu phần</span><button type="button" onclick="P2.live.W.servings(1)" aria-label="Thêm khẩu phần" class="w-7 h-7 rounded-full border border-[#E2E8F0] font-extrabold">+</button><button type="button" onclick="P2.save('${ctx.J(dish.id)}')" class="ml-1 px-3 py-1 rounded-full bg-[#FEF3C7] text-[#B45309] font-extrabold">🔖 Lưu món</button><span class="text-[#64748B]">${dish.market_cost_base == null ? "Chưa có chi phí đi chợ" : "Chi phí đi chợ ước tính " + ctx.money(dish.scaled_market_cost_vnd)}</span></div>`);
     const ing = ctx.$(".grid-cols-4", left), tpl = ing.firstElementChild.cloneNode(true);
     ing.innerHTML = "";
     (dish.scaled_ingredients || []).forEach((a) => {
       const n = tpl.cloneNode(true);
       ctx.img(ctx.$("img", n), a.img_key);
       ctx.text(ctx.$("b", n), a.name);
-      ctx.text(ctx.$("div", n), (a.scaled_amount ?? a.amount) + " " + a.unit);
+      ctx.text(ctx.$("div", n), (a.scaled_amount ?? a.amount) == null ? "" : (a.scaled_amount ?? a.amount) + " " + (a.unit || ""));
       ing.append(n);
     });
     if (!(dish.scaled_ingredients || []).length) ing.outerHTML = '<p class="text-[#64748B]">Chưa có nguyên liệu cho món này.</p>';

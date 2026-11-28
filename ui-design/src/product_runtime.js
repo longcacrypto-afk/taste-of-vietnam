@@ -944,9 +944,20 @@
   function clearAfter(root, count) {
     [...root.children].slice(count).forEach((n) => n.remove());
   }
+  // Demo catalogue rows (is_demo from the API): the existing "Dữ liệu demo" pill next to
+  // the dish name. Inline style (same look as DEMO_PILL) so no screen selector picks it up.
+  const DISH_DEMO_PILL='<span data-demo-pill style="display:inline-block;margin:2px 0 0 4px;padding:1px 8px;border-radius:9999px;background:#E0F2FE;color:#075985;font-size:10px;font-weight:800;line-height:1.5;white-space:nowrap;vertical-align:middle">Dữ liệu demo</span>';
+  function demoPillAfter(el, d) {
+    if (!el || d?.is_demo !== true || el.parentElement?.querySelector(":scope > [data-demo-pill]")) return;
+    el.insertAdjacentHTML("afterend", DISH_DEMO_PILL);
+  }
+  // Ingredient quantity: demo rows carry names only, so no "undefined" amount is shown.
+  const qty = (a) => { const v = a.scaled_amount ?? a.amount; return v == null || v === "" || Number.isNaN(Number(v)) ? "" : v + " " + (a.unit || ""); };
   function cardFill(node, d) {
     img($("img", node), d.img_key);
-    text($('b,[class*="font-extrabold"]', node), d.name || d.dish_name);
+    const name = $('b,[class*="font-extrabold"]', node);
+    text(name, d.name || d.dish_name);
+    demoPillAfter(name, d);
     click(node, `P2.dish('${J(d.id || d.dish_id)}')`);
   }
   function bindMealChips(root, showActive) {
@@ -993,6 +1004,7 @@
           return;
         }
         img($("img", node), a.img_key);
+        demoPillAfter($('b,[class*="font-extrabold"]', node), a);
         $$('[onclick*="M2-S04"]', node).forEach((n) =>
           click(n, `P2.dish('${J(a.dish_id)}')`),
         );
@@ -1105,6 +1117,7 @@
     if (/^M2-S0[4-7]$/.test(id) || id === "M3-S02") {
       const title = $("h3", root);
       text(title, d.name);
+      demoPillAfter(title, d);
       const hero = $("img", root);
       img(hero, d.img_key);
       if (id === "M2-S04") {
@@ -1133,10 +1146,7 @@
             (n, a) => {
               img($("img", n), a.img_key);
               text($(".font-extrabold", n), a.name);
-              text(
-                $(".text-\\[9px\\]", n),
-                (a.scaled_amount ?? a.amount) + " " + a.unit,
-              );
+              text($(".text-\\[9px\\]", n), qty(a));
             },
           );
         }
@@ -1178,12 +1188,10 @@
         rows(grid, tpl, d.scaled_ingredients || [], (n, a) => {
           img($("img", n), a.img_key);
           text($("b", n), a.name);
-          text(
-            $(".font-extrabold", n),
-            (a.scaled_amount ?? a.amount) + " " + a.unit,
-          );
+          text($(".font-extrabold", n), qty(a));
         });
-        text($("b", root), money(d.scaled_market_cost_vnd));
+        // No market cost recorded (demo catalogue rows): say so instead of "0đ".
+        text($("b", root), d.market_cost_base == null ? "Chưa có giá đi chợ" : money(d.scaled_market_cost_vnd));
       }
       if (id === "M2-S07") {
         const holder = root.children[2],
@@ -1957,7 +1965,7 @@
         text($(".font-extrabold",cards[0]),a.name);
         text($(".text-\\[\\#64748B\\]",cards[0]),(a.calories??"—")+" kcal");
         text($(".font-extrabold",cards[1]),(a.ingredients||[]).length+" Nhóm Nguyên liệu");
-        text($(".text-\\[\\#64748B\\]",cards[1]),(a.ingredients||[]).map(x=>x.name+" "+x.amount+x.unit).join(" · "));
+        text($(".text-\\[\\#64748B\\]",cards[1]),(a.ingredients||[]).map(x=>x.amount==null?x.name:x.name+" "+x.amount+(x.unit||"")).join(" · "));
         text($(".font-extrabold",cards[2]),(a.steps||[]).length+" Bước Nấu Có Timer");
         text($(".text-\\[\\#64748B\\]",cards[2]),(a.steps||[]).map(x=>x.title).join(" · "));
       }
