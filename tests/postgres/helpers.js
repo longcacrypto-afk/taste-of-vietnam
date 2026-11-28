@@ -5,6 +5,10 @@ import { runMigrations } from '../../src/db/migrate.js';
 import { seedCatalog } from '../../src/db/seedCatalog.js';
 import { createPool } from '../../src/db/connection.js';
 
+// The shared suites assert the original 12-dish catalogue: the removable demo catalogue
+// (docs/DEMO_CATALOG.md) is off unless a test turns it on (tests/postgres/demo-catalog.test.js).
+process.env.SEED_DEMO_CATALOG ??= 'false';
+
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || '';
 export const skip = TEST_DATABASE_URL ? false : 'TEST_DATABASE_URL not set (PostgreSQL suite skipped)';
 
