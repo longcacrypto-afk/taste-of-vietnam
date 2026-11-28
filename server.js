@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInitialStore } from './src/data/seed.js';
+import { applyDemoCatalog, demoCatalogEnabled } from './src/data/demoCatalog.js';
 import { handleApiRequest } from './src/api/router.js';
 import { setupWebSocket, getWsTestPayload } from './src/services/websocketService.js';
 import { initRepository } from './src/db/repository.js';
@@ -16,6 +17,8 @@ import { getJwtSecret } from './src/services/authService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const store = createInitialStore();
+// Memory mode: the removable demo catalogue (docs/DEMO_CATALOG.md); SEED_DEMO_CATALOG=false skips it.
+if (demoCatalogEnabled()) applyDemoCatalog(store);
 
 export function createAppServer() {
   const server = http.createServer(async (req, res) => {

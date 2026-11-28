@@ -26,7 +26,8 @@ export function suggestionItem(candidate, weather = null) {
     calories: d.calories, prep_minutes: d.prep_minutes, difficulty: d.difficulty, tags: d.tags,
     allergen_tags: d.allergen_tags, img_key: d.img_key, is_sponsored: false, badge_label: 'Gợi ý tự nhiên',
     reason: `${place ? `Quán cách ${Math.round(place.distance_m)}m` : 'Có công thức tự nấu'} · Hợp điều kiện đã chọn${weatherReason(d, weather)}`,
-    nearest_place: place, open_places_count: candidate.open_places.length, score: candidate.score };
+    nearest_place: place, open_places_count: candidate.open_places.length, score: candidate.score,
+    ...(d.is_demo === true ? { is_demo: true } : {}) };
 }
 export function getTodaySuggestions(store, opts = {}) {
   const start = performance.now();

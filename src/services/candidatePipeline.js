@@ -78,6 +78,8 @@ export function buildCandidates(store, opts = {}, { now = Date.now(), placePredi
   if (!context.valid) reject('invalid_context');
   else for (const dish of store.dishes || []) {
     if(!publicDish(dish)) { reject('safety'); continue; }
+    // Drinks (demo catalogue, category 'drink') are searchable in M2 but are never a meal pick.
+    if (dish.category === 'drink') { reject('meal'); continue; }
     const allergens = dish.allergen_tags;
     const allergies = profile.hard_allergies || [];
     if (dish.safety_status === 'rejected' || (approvalRequired && dish.safety_status !== 'approved')

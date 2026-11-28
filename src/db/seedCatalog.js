@@ -5,6 +5,8 @@
 // src/data/seed.js so memory mode and Postgres mode start from the same data.
 // Idempotent: ON CONFLICT DO NOTHING, so re-running never overwrites rows an
 // admin has edited. No user accounts are seeded.
+// Plus the removable DEMO catalogue (106 dishes + 40 drinks, is_demo = TRUE, and their
+// demo menu links) unless SEED_DEMO_CATALOG=false — see docs/DEMO_CATALOG.md.
 //   npm run db:seed               insert missing demo rows only
 //   npm run db:seed -- --update   also refresh the demo rows that already exist
 //                                 (same ids) with every catalogue field — for a
@@ -19,6 +21,7 @@ import { createInitialStore } from '../data/seed.js';
 import { removeVietnameseTones } from '../services/textUtils.js';
 import { createPool } from './connection.js';
 import { hourToTime } from './postgresRepository.js';
+import { demoCatalogDishes, demoCatalogEnabled, DEMO_MENU_LINKS } from '../data/demoCatalog.js';
 
 // Seed rows share one old timestamp so new rows (newest first) list above them
 const SEED_TS = '2026-01-01T00:00:00Z';
@@ -28,7 +31,7 @@ const onConflict = (update, key, cols) => update
   ? `ON CONFLICT (${key}) DO UPDATE SET ${cols.map(c => `${c} = EXCLUDED.${c}`).join(', ')}`
   : `ON CONFLICT (${key}) DO NOTHING`;
 
-export async function seedCatalog(pool, { log = console.log, update = false } = {}) {
+export async function seedCatalog(pool, { log = console.log, update = false, demo = demoCatalogEnabled() } = {}) {
   const store = createInitialStore();
   const client = await pool.connect();
   const counts = { dishes: 0, places: 0, menu_items: 0, campaigns: 0, ocr: 0, reports: 0, recipes: 0 };
@@ -110,6 +113,7 @@ export async function seedCatalog(pool, { log = console.log, update = false } = 
           rec.tips_received_vnd || 0, SEED_TS]);
       counts.recipes += r.rowCount;
     }
+    if (demo) Object.assign(counts, await insertDemoCatalog(client, { update }));
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
@@ -118,6 +122,39 @@ export async function seedCatalog(pool, { log = console.log, update = false } = 
     client.release();
   }
   log(`🌱 Seed ${update ? 'inserted/refreshed' : 'inserted (existing rows kept)'}: ${JSON.stringify(counts)}`);
+  return counts;
+}
+
+/**
+ * Demo catalogue (src/data/demoCatalog.js): 106 dishes + 40 drinks, is_demo = TRUE, and
+ * their demo menu links (place_dishes.is_demo = TRUE) to places that exist. Idempotent:
+ * ON CONFLICT DO NOTHING; with update, refreshes only rows that are still demo rows
+ * (a row an admin took over by clearing is_demo is never touched).
+ */
+export async function insertDemoCatalog(client, { update = false } = {}) {
+  const cols = ['name', 'unaccented_name', 'region', 'meal_slots', 'diet_flags', 'allergen_flags', 'spice_level', 'calories',
+    'estimated_price_vnd', 'ingredients', 'recipe_steps', 'description', 'tags', 'weather_fit', 'base_servings', 'is_soup', 'category'];
+  const counts = { demo_dishes: 0, demo_menu_items: 0 };
+  for (const d of demoCatalogDishes()) {
+    const r = await client.query(
+      `INSERT INTO dishes (id, name, unaccented_name, region, meal_slots, diet_flags, allergen_flags, spice_level, calories,
+         estimated_price_vnd, ingredients, recipe_steps, description, tags, weather_fit, base_servings, is_soup, category, is_demo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,TRUE)
+       ON CONFLICT (id) DO ${update ? `UPDATE SET ${cols.map(c => `${c} = EXCLUDED.${c}`).join(', ')}, updated_at = NOW() WHERE dishes.is_demo` : 'NOTHING'}`,
+      [d.id, d.name, removeVietnameseTones(d.name), d.region, d.meal_slots, d.diet_flags, d.allergen_tags, d.spice_level, d.calories,
+        d.ref_price, JSON.stringify(d.ingredients), JSON.stringify(d.steps), d.description, d.tags, d.weather_fit, d.base_servings,
+        typeof d.is_soup === 'boolean' ? d.is_soup : null, d.category]);
+    counts.demo_dishes += r.rowCount;
+  }
+  for (const l of DEMO_MENU_LINKS) {
+    const r = await client.query(
+      `INSERT INTO place_dishes (place_id, dish_id, price_vnd, is_available, is_demo)
+       SELECT $1::varchar(32), $2::varchar(32), $3::int, TRUE, TRUE
+       WHERE EXISTS (SELECT 1 FROM places WHERE id = $1::varchar(32)) AND EXISTS (SELECT 1 FROM dishes WHERE id = $2::varchar(32) AND is_demo)
+       ON CONFLICT (place_id, dish_id) DO ${update ? 'UPDATE SET price_vnd = EXCLUDED.price_vnd WHERE place_dishes.is_demo' : 'NOTHING'}`,
+      [l.place_id, l.dish_id, l.price]);
+    counts.demo_menu_items += r.rowCount;
+  }
   return counts;
 }
 

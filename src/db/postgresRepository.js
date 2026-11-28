@@ -48,6 +48,10 @@ export function dishFromRow(r) {
     cms: r.cms,
     weather_fit: r.weather_fit,
     is_soup: r.is_soup,
+    // Demo catalogue (migration 014): only reported when set, so the original catalogue's
+    // responses are unchanged. category null = not entered (treated as a dish).
+    category: r.category,
+    is_demo: r.is_demo === true ? true : null,
     tags: r.tags,
     img_key: r.img_key,
     description: r.description,
@@ -77,8 +81,9 @@ function dishColumns(d) {
 const PLACE_SELECT = `
   SELECT p.*, ST_Y(p.geom::geometry) AS lat, ST_X(p.geom::geometry) AS lng,
          EXTRACT(HOUR FROM p.open_time)::int AS open_hour, EXTRACT(HOUR FROM p.close_time)::int AS close_hour,
-         COALESCE((SELECT json_agg(json_build_object('dish_id', pd.dish_id, 'name', COALESCE(pd.menu_name, d.name),
-                                                     'price', pd.price_vnd, 'available', pd.is_available) ORDER BY pd.dish_id)
+         COALESCE((SELECT json_agg(jsonb_strip_nulls(jsonb_build_object('dish_id', pd.dish_id, 'name', COALESCE(pd.menu_name, d.name),
+                                                     'price', pd.price_vnd, 'available', pd.is_available,
+                                                     'is_demo', CASE WHEN pd.is_demo THEN TRUE END)) ORDER BY pd.dish_id)
                    FROM place_dishes pd LEFT JOIN dishes d ON d.id = pd.dish_id WHERE pd.place_id = p.id), '[]') AS menu
   FROM places p`;
 
@@ -503,8 +508,8 @@ export class PostgresRepository {
        p.phone||'',JSON.stringify(p.links||{}),p.img_key??null,JSON.stringify(p.cms)]);
     await this.q('DELETE FROM place_dishes WHERE place_id=$1',[p.id]);
     for(const m of p.menu||[]) await this.q(
-      'INSERT INTO place_dishes(place_id,dish_id,menu_name,price_vnd,is_available) VALUES($1,$2,$3,$4,$5)',
-      [p.id,m.dish_id,m.name||null,m.price,m.available]);
+      'INSERT INTO place_dishes(place_id,dish_id,menu_name,price_vnd,is_available,is_demo) VALUES($1,$2,$3,$4,$5,$6)',
+      [p.id,m.dish_id,m.name||null,m.price,m.available,m.is_demo===true]);
     return this.getPlace(p.id);
   }
   async saveContentVersion(entity,id,version,snapshot) {
