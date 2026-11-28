@@ -127,7 +127,11 @@ test('product UI never calls frozen APIs (payments, orders, merchant...) while n
       .flatMap((f) => [...fs.readFileSync('ui-design/src/' + f, 'utf8').matchAll(/["'`](\/(?:admin|me|dishes|places|auth|suggestions|orders|areas|chat)[a-z/-]*)/g)])]
     .map((m) => '/api/v1' + m[1]))];
   assert.ok(used.length > 15);
-  for (const p of [...used, '/api/v1/health-check', '/api/v1/orders/redirect'])
+  // Core screens that read a live module's API (core flags) call it only behind liveApi(...).
+  const runtimeSrc = fs.readFileSync('ui-design/src/product_runtime.js', 'utf8');
+  const guarded = ['/api/v1/me/meal-schedule', '/api/v1/analytics/overview', '/api/v1/analytics/ai-performance'];
+  for (const p of guarded) assert.ok(runtimeSrc.includes(`liveApi("${p.slice(7)}")`), `${p} behind liveApi`);
+  for (const p of [...used.filter((p) => !guarded.includes(p)), '/api/v1/health-check', '/api/v1/orders/redirect'])
     assert.equal(k.frozenApi(p), null, p);
   // The guard sits in the fetch wrapper; frozen desktop loaders/actions are replaced.
   const wrapper = between('  window.fetch = async function (input, init = {}) {', '  // Existing alerts are feedback');

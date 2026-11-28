@@ -123,7 +123,7 @@ test('M9-S08/S09 UI helpers: role counts skip guests, audit query uses Vietnam d
   assert.match(line, /\[2026-11-26 11:00:00\]/);
   assert.doesNotMatch(line, /<b>x<\/b>/);
   assert.match(fs.readFileSync('ui-design/build.js', 'utf8'), /admin_rbac_audit\.js/);
-  assert.match(fs.readFileSync('ui-design/src/admin_forms.js', 'utf8'), /M9-S0\[1-689\]/);
+  assert.match(fs.readFileSync('ui-design/src/admin_forms.js', 'utf8'), /M9-S0\[1-9\]\$/); // S07 mounts too since M7 is live (adsModeration)
 });
 
 test('M9-S01 activity: 7 Vietnam calendar days, bars scaled to the real counts', async () => {
