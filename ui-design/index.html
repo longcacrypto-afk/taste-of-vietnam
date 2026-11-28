@@ -9772,7 +9772,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     mount(scope,id,d) {
       if (!scope) return;
       navigation(scope);
-      if (!/^M9-S0[1-689]$/.test(id) || !d || scope.dataset.m9Mounted === id) return;
+      if (!/^M9-S0[1-9]$/.test(id) || !d || scope.dataset.m9Mounted === id) return;
       const nav = scope.querySelector("aside nav");
       if (!nav) return;
       const root = nav.closest("aside").parentElement;
@@ -14168,9 +14168,9 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
   // to switch it on. Flags only enable code paths that already exist below.
   const FEATURES = (window.TOV_FEATURES = {
     placeFilters: false, // M4-S01 chips "Dưới 50k / Máy lạnh / Giao hàng"
-    mealReminders: false, // M1-S10 "Lịch nhắc bữa ăn" → M8-S04 (M8 frozen)
-    adsModeration: false, // M9-S07 "Kiểm duyệt Ads M7" (M7 frozen)
-    adminMetrics: false, // M9 latency/accuracy/safety figures (no metrics source)
+    mealReminders: true, // M1-S10 "Lịch nhắc bữa ăn" ← GET /me/meal-schedule (M8-S04, live)
+    adsModeration: true, // M9-S07 "Kiểm duyệt Ads M7" ← GET /admin/ads + POST /admin/ads/:id/moderate (M7 live)
+    adminMetrics: true, // M9 p95/NLU/safety figures ← /analytics/overview + /analytics/ai-performance (M10 live, super_admin)
     phoneLogin: false, // M1-S01 phone/OTP card + desktop login phone fields (SMS not set up)
     zaloLogin: false, // M1-S01 "Zalo" button (no Zalo login)
     appleLogin: false, // M1-S01 "Apple" button (no Apple login)
@@ -14445,6 +14445,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     return { list, saved };
   }
   const AUDIT_ROLES = ["ops_admin", "super_admin"];
+  const ADS_ROLES = ["ops_admin", "super_admin"]; // adminPolicy permission "ads"
   function activityBars(totals, now = new Date()) {
     const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
     const max = Math.max(1, ...totals.map((t) => t.count));
@@ -14913,11 +14914,33 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
                   "&to=" + encodeURIComponent(day + "T23:59:59.999+07:00"))).total,
               })),
             );
+          // Live sources for the shared admin chrome and M9-S07; a failed or forbidden read
+          // leaves that part in its honest "no access / no data" state, never a sample figure.
+          const soft = (p) => api(p).catch((e) => ({ __error: e.status || 0 }));
+          const [overview, ai, ads] = await Promise.all([
+            FEATURES.adminMetrics && identity.role === "super_admin" && liveApi("/analytics/overview") ? soft("/analytics/overview?days=7") : null,
+            FEATURES.adminMetrics && identity.role === "super_admin" && liveApi("/analytics/ai-performance") ? soft("/analytics/ai-performance") : null,
+            FEATURES.adsModeration && ADS_ROLES.includes(identity.role) && liveApi("/ads/campaigns") ? soft("/admin/ads") : null, // M7 must be live
+          ]);
+          const metrics = overview && ai && !overview.__error && !ai.__error ? {
+            p95_ms: overview.suggestion_latency?.p95_ms ?? null,
+            latency_samples: overview.suggestion_latency?.samples ?? 0,
+            sla_ms: overview.suggestion_latency?.sla_ms ?? null,
+            nlu_accuracy_pct: ai.nlu?.accuracy_pct ?? null,
+            nlu_cases: ai.nlu?.cases ?? 0,
+            nlu_history: Array.isArray(ai.history) ? ai.history : [],
+            allergy_violation_pct: ai.safety?.allergy_violation_pct ?? null,
+            audit_items: ai.safety?.items ?? 0,
+            ran_at: ai.ran_at || null,
+            is_demo: !!(overview.is_demo || ai.is_demo),
+          } : null;
           return {
             ...d,
             catalog: d.catalog || [],
             actor_role: identity.role,
             activity,
+            metrics,
+            ads: ads && !ads.__error && Array.isArray(ads.items) ? ads : null,
           };
         },
       ];
@@ -14951,6 +14974,28 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       state.cache[key] = { status: "error", error: e };
     }
     if (config(appState.activeScreenId)?.[0] === key) paint();
+  }
+  // M1-S10 reminder row: words only from GET /me/meal-schedule (M8 settings).
+  function reminderCopy(d) {
+    const slots = [d.lunch_enabled !== false ? d.lunch : null, d.dinner_enabled !== false ? d.dinner : null].filter(Boolean);
+    if (!d.meal_suggestions || !(d.max_per_day > 0) || !slots.length)
+      return { title: "Lịch nhắc bữa ăn (đang tắt)", sub: "Chưa bật nhắc bữa · tối đa " + (d.hard_cap_per_day ?? 2) + " thông báo/ngày" };
+    return { title: "Lịch nhắc bữa ăn (" + slots.join(" & ") + ")", sub: "Tối đa " + d.max_per_day + " thông báo/ngày · trong ứng dụng" };
+  }
+  // A core screen reads a live module's API only while that module is live (m5-frozen guard).
+  const liveApi = (p) => !frozenApi("/api/v1" + p.split("?")[0]);
+  async function loadMealSchedule(force = false) {
+    if (!FEATURES.mealReminders || !liveApi("/me/meal-schedule")) return;
+    if (!force && state.cache.mealSchedule?.status === "success") return;
+    state.cache.mealSchedule = { status: "loading" };
+    try {
+      const data = await api("/me/meal-schedule");
+      if (!data || typeof data.max_per_day !== "number") throw new Error("Dữ liệu chưa hợp lệ.");
+      state.cache.mealSchedule = { status: "success", data };
+    } catch (e) {
+      state.cache.mealSchedule = { status: "error", error: e };
+    }
+    if (appState.activeScreenId === "M1-S10") paint();
   }
   async function loadAreas(force = false) {
     if (!force && state.cache.areas?.status === "success") return;
@@ -15545,12 +15590,27 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         download.outerHTML =
           '<button onclick="P2.exportData()" class="font-bold text-[#1D4ED8]">Tải về</button>';
       click(root.lastElementChild, "P2.deleteAccount()");
-      // Meal reminders live in the frozen M8 module: keep the row, mark it "sắp có".
+      // Meal reminders (M8): the original row shows the saved schedule from M8-S04's API;
+      // "Sửa →" opens M8-S04. With the flag off the row stays, marked "sắp có".
       if (!FEATURES.mealReminders)
         $$('[onclick*="M8-"]', root).forEach((n) => {
           text(n, "Sắp có");
           soon(n, "Lịch nhắc bữa ăn chưa mở trong bản này.");
         });
+      else {
+        const edit = $('[onclick*="M8-S04"]', root);
+        const row = edit?.parentElement, title = row && $("b", row), sub = row && $(".text-\\[10px\\]", row);
+        const sch = state.cache.mealSchedule;
+        if (title && sub) {
+          if (sch?.status === "success") {
+            const m = reminderCopy(sch.data);
+            text(title, m.title); text(sub, m.sub);
+          } else {
+            text(title, "Lịch nhắc bữa ăn");
+            text(sub, sch?.status === "error" ? "Chưa tải được lịch nhắc." : "Đang tải lịch nhắc…");
+          }
+        }
+      }
     }
   }
   // <m5-confirm>
@@ -15788,6 +15848,68 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       else soon(b, "Chưa có lượt đặt món, gọi điện hay chỉ đường để xác nhận.");
     }
   }
+  // <core-flags> Admin metrics (M10) and ad moderation (M7) for the M9 shell.
+  const DEMO_PILL='<span data-demo-pill class="inline-block px-2 py-0.5 rounded-full bg-[#E0F2FE] text-[#075985] text-[10px] font-extrabold">Dữ liệu demo</span>';
+  const fmtPct=(v)=>v===null||v===undefined?"—":String(v).replace(".",",")+"%";
+  const fmtSec=(ms)=>ms===null||ms===undefined?"chưa có dữ liệu":(ms/1000).toFixed(2).replace(".",",")+"s";
+  function nluLine(line,M,noMetrics) {
+    const head=line.firstElementChild, title=head?.firstElementChild, value=head?.lastElementChild;
+    const svg=$("svg",line);
+    if(!M) {
+      // No figures for this role: same frame, no sample curve.
+      text(title,"Độ chính xác NLU tiếng Việt"); text(value,noMetrics); line.style.opacity="0.6";
+      if(svg) $$("path,circle",svg).forEach(n=>n.remove());
+      return;
+    }
+    text(title,"Độ chính xác NLU tiếng Việt ("+M.nlu_cases+" câu chuẩn)");
+    text(value,fmtPct(M.nlu_accuracy_pct)+" Accuracy");
+    line.title=M.ran_at?"Lần chạy benchmark gần nhất: "+new Date(M.ran_at).toLocaleString("vi-VN",{timeZone:"Asia/Ho_Chi_Minh",hour12:false}):"";
+    // Same chart frame; the curve is the stored benchmark runs (oldest → newest).
+    if(!svg) return;
+    const pts=(M.nlu_history||[]).filter(h=>Number.isFinite(h.accuracy_pct));
+    const xy=pts.map((h,i)=>[pts.length>1?Math.round(i*320/(pts.length-1)):320,Math.round(80-h.accuracy_pct*0.7)]);
+    const [area,curve]=$$("path",svg);
+    $$("circle",svg).forEach(c=>c.remove());
+    if(!xy.length) { area?.remove(); curve?.remove(); return; }
+    const d="M"+xy.map(p=>p.join(",")).join(" L");
+    curve?.setAttribute("d",d);
+    if(area) area.setAttribute("d",d+" L"+xy[xy.length-1][0]+",85 L"+xy[0][0]+",85 Z");
+    const stroke=curve?.getAttribute("stroke")||"#F59E0B";
+    xy.forEach(([x,y],i)=>svg.insertAdjacentHTML("beforeend",'<circle cx="'+x+'" cy="'+y+'" r="4" fill="#FFFFFF" stroke="'+stroke+'" stroke-width="2.5"><title>'+H(fmtPct(pts[i].accuracy_pct))+'</title></circle>'));
+  }
+  const AD_STATUS={pending_review:["⏳ Chờ duyệt","yellow"],active:["● Đang chạy","green"],paused:["⏸ Tạm dừng","purple"],rejected:["✕ Đã từ chối","rose"],draft:["✎ Bản nháp","blue"]};
+  function bindAdsModeration(content,d) {
+    const tpl=content.firstElementChild?.cloneNode(true);
+    if(!d.ads) {
+      content.innerHTML=ADS_ROLES.includes(d.actor_role)?stateHtml("M9-S07","error",true):'<p class="p-4 text-center text-[#64748B]">Vai trò này không kiểm duyệt quảng cáo (cần Ops Admin hoặc Super Admin).</p>';
+      return;
+    }
+    if(!tpl||!d.ads.items.length) { content.innerHTML=stateHtml("M9-S07","empty",true); return; }
+    rows(content,tpl,d.ads.items,(n,a)=>{
+      img($("img",n),a.img_key);
+      const head=$(".flex.items-center.gap-2",n), b=$("b",head), pill=b?.nextElementSibling;
+      text(b,"Chiến dịch: "+a.title+(a.price_vnd?" ("+money(a.price_vnd)+")":""));
+      if(pill) { pill.outerHTML=K.tagPill(a.ready?"✔ Đạt tiêu chí kiểm duyệt":"✕ Chưa đạt tiêu chí",a.ready?"green":"rose")+" "+K.tagPill((AD_STATUS[a.status]||[a.status])[0],(AD_STATUS[a.status]||[,"blue"])[1]); }
+      const line=$(".text-\\[11px\\]",n);
+      text(line,[...a.checks.map(c=>(c.ok?"✔ ":"✕ ")+c.label),"✔ Trần hiển thị ≤ "+(d.ads.serving_rules?.max_sponsored_ratio||"1/3")+" slot (áp khi phân phối)"].join(" · "));
+      line.insertAdjacentHTML("afterend",'<div class="text-[10px] text-[#94A3B8] mt-0.5">'+H([a.dish_name,a.place_name,a.id].filter(Boolean).join(" · "))+'</div>');
+      const btn=$("button",n), safe=J(a.id);
+      // Small controls inside the original card: a reason box and the other decisions.
+      const wrap=document.createElement("div"); wrap.className="flex flex-wrap items-center gap-2";
+      btn.replaceWith(wrap);
+      wrap.insertAdjacentHTML("beforeend",'<input data-ad-reason="'+H(a.id)+'" maxlength="200" placeholder="Lý do (bắt buộc khi từ chối/tạm dừng)" aria-label="Lý do kiểm duyệt '+H(a.title)+'" class="px-3 py-2 rounded-full border border-[#E2E8F0] text-[11px] w-56" />');
+      // The original approve button stays on every card; it acts only when it can.
+      btn.setAttribute("onclick","P2.moderateAd('"+safe+"','active')");
+      btn.disabled=a.status==="active"||!a.ready;
+      if(a.status==="active") btn.title="Chiến dịch đang chạy.";
+      else if(!a.ready) btn.title="Chưa đạt tiêu chí kiểm duyệt: "+a.checks.filter(c=>!c.ok).map(c=>c.label).join("; ");
+      if(btn.disabled) btn.style.opacity="0.5";
+      wrap.append(btn);
+      if(a.status==="pending_review"||a.status==="paused") wrap.insertAdjacentHTML("beforeend",'<button onclick="P2.moderateAd(\''+safe+'\',\'rejected\')" class="px-4 py-2.5 rounded-full bg-white border border-[#FECDD3] text-[#BE123C] font-extrabold">✕ Từ chối</button>');
+      if(a.status==="active") wrap.insertAdjacentHTML("beforeend",'<button onclick="P2.moderateAd(\''+safe+'\',\'paused\')" class="px-4 py-2.5 rounded-full bg-white border border-[#E2E8F0] text-[#0F172A] font-extrabold">⏸ Tạm dừng chạy</button>');
+    });
+    if(d.ads.is_demo) content.insertAdjacentHTML("afterbegin",'<div>'+DEMO_PILL+'</div>');
+  }
   function bindAdmin(root, id, d) {
     const workspace=root.lastElementChild, content=workspace.lastElementChild;
     const queue=(d.ocr_queue||[]).filter(a=>a.status==="pending_review");
@@ -15822,11 +15944,16 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
       for(const span of $$("span",b)) if(span.children.length===0) span.textContent=span.textContent.replace(/\(542\)/g,"("+(d.total_dishes??0)+")");
     });
     const guard=$("aside > div:last-child > div:last-child",root);
+    const M=d.metrics, noMetrics=d.actor_role==="super_admin"?"chưa tải được số đo":"chỉ Super Admin xem được";
     if(guard && !FEATURES.adminMetrics) guard.innerHTML='<b class="text-[#4ADE80] block">Lá Safety Guard</b>Thống kê vi phạm dị ứng'+SOON;
+    else if(guard) guard.innerHTML='<b class="text-[#4ADE80] block">Lá Safety Guard</b>'+(M
+      ? H(fmtPct(M.allergy_violation_pct))+" vi phạm dị ứng cứng trên "+H(Number(M.audit_items||0).toLocaleString("vi-VN"))+" món gợi ý kiểm thử gần nhất."
+      : "Thống kê vi phạm dị ứng: "+H(noMetrics)+".");
     const title=$("h3",workspace);
     if(title) title.textContent=title.textContent.replace(/542 Món/g,(d.total_dishes??0)+" Món").replace(/5 Báo cáo/g,reports.length+" Báo cáo");
     $$("span",workspace.firstElementChild).filter(n=>/LiteLLM/.test(n.textContent)).forEach(n=>{
-      if(FEATURES.adminMetrics) return;
+      // Measured: suggestion_shown latency (M10 events), not an LLM gateway figure.
+      if(FEATURES.adminMetrics) { n.textContent="● p95 gợi ý: "+(M?fmtSec(M.p95_ms):noMetrics); n.title="p95 độ trễ gợi ý 7 ngày (sự kiện suggestion_shown)"; return; }
       n.textContent="● Độ trễ AI p95"+SOON; soon(n,"Chưa đo độ trễ AI thật.");
     });
     if(id==="M9-S01") {
@@ -15844,12 +15971,17 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         text($("span",head),"Thao tác quản trị 7 ngày qua (Audit log)");
         const pill=head.lastElementChild;
         if(pill && pill!==head.firstElementChild && !FEATURES.adminMetrics){text(pill,"Realtime p95"+SOON);soon(pill,"Chưa đo độ trễ thật.");}
+        else if(pill && pill!==head.firstElementChild) {
+          text(pill,M?"p95 gợi ý 7 ngày · "+fmtSec(M.p95_ms):"p95 · "+noMetrics);
+          pill.title=M?(M.latency_samples+" lượt gợi ý đo được"+(M.sla_ms?" · SLA "+fmtSec(M.sla_ms):"")):"";
+          if(M?.is_demo) pill.insertAdjacentHTML("beforebegin",DEMO_PILL);
+        }
         const [oldBars,line]=[...chart.children].slice(1);
         if(line && !FEATURES.adminMetrics){
           const value=$(".flex.justify-between > :last-child",line)||$("span:last-child",line);
           text(value,"Chưa có số liệu"+SOON);
           soon(line,"Chưa có bộ đo độ chính xác LLM.");
-        }
+        } else if(line) nluLine(line,M,noMetrics);
         if(!d.activity) {
           // Same slot, honest state: this role cannot read the audit log.
           oldBars?.insertAdjacentHTML("afterend",'<p class="p-4 text-center text-[#64748B]">Vai trò này không xem được audit log.</p>');
@@ -15870,10 +16002,13 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
         const code=n.getAttribute("onclick")||"";
         if(code.includes("M9-S07")) {
           if(!FEATURES.adsModeration){text($(".text-\\[10px\\]",n),"Chưa mở (M7 đang đóng băng)");soon(n,"Kiểm duyệt quảng cáo chưa mở.");}
+          else if(d.ads) text($(".text-\\[10px\\]",n),d.ads.pending_review+" chiến dịch chờ duyệt · "+d.ads.total+" chiến dịch");
+          else if(!ADS_ROLES.includes(d.actor_role)) text($(".text-\\[10px\\]",n),"Chỉ Ops Admin / Super Admin kiểm duyệt quảng cáo");
         }
         else text($(".text-\\[10px\\]",n),code.includes("M9-S05")?queue.length:reports.length);
       });
     }
+    if(id==="M9-S07" && FEATURES.adsModeration) bindAdsModeration(content,d);
     if(id==="M9-S02") {
       const tbody=$("tbody",content), tpl=tbody.firstElementChild.cloneNode(true);
       // "Vector DB" column stays; status shown only from a real has_embedding flag.
@@ -16311,6 +16446,14 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
           },
         );
     },
+    moderateAd(id, decision) {
+      const box=document.querySelector('[data-ad-reason="'+CSS.escape(id)+'"]');
+      const typed=(box?.value||"").trim();
+      if(decision!=="active" && !typed) { status("Hãy nhập lý do trước khi "+(decision==="rejected"?"từ chối":"tạm dừng")+" chiến dịch."); box?.focus(); return; }
+      const reason=typed||"Đạt các tiêu chí kiểm duyệt M9-S07";
+      action(()=>api("/admin/ads/"+encodeURIComponent(id)+"/moderate","POST",{decision,reason}),
+        ()=>{delete state.cache.admin;goScreen("M9-S07");status(decision==="active"?"Đã phê duyệt chiến dịch.":decision==="rejected"?"Đã từ chối chiến dịch.":"Đã tạm dừng chiến dịch.");});
+    },
     approvePlace(id, version) {
       if(!confirm("Duyệt dựa trên bằng chứng đã lưu? Thao tác này không mở lại quán đang tạm dừng.")) return;
       action(()=>api("/admin/places/"+encodeURIComponent(id)+"/approve","POST",{version,reason:"Duyệt hồ sơ theo bằng chứng đã lưu"}),
@@ -16431,6 +16574,7 @@ export async function load${escHtml(activeScr.id.replace('-',''))}() {
     }
     originalGo(id);
     if (id === "M1-S08") loadAreas();
+    if (id === "M1-S10") loadMealSchedule(true);
     load(id);
     polish($("#stage-container"));
   };

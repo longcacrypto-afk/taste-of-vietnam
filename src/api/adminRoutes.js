@@ -6,6 +6,9 @@ import { REPORT_REASONS } from '../services/reportPolicy.js';
 import { handleAdminDataRoute } from './adminDataRoutes.js';
 import { ROLES, adminAllowed, PolicyError } from '../services/adminPolicy.js';
 import { cleanText } from './router.js';
+import { moderationChecks, MODERATION_DECISIONS } from '../services/adModeration.js';
+import { ensureDemoData } from '../modules/index.js';
+import { moduleStore } from '../modules/moduleStore.js';
 
 const ok = data => ({status:200,data});
 const number = (v,min,max,fallback) => Number.isFinite(Number(v)) ? Math.min(max,Math.max(min,Number(v))) : fallback;
@@ -24,6 +27,12 @@ const page = (rows,q) => {
 const publicReport = ({reporter_key,...r}) => r;
 
 export async function handleAdminRoute(repo,user,method,path,q,body,headers,store) {
+  // M9-S07 read: campaigns with their pre-checks + M7 targeting (module_records), read-only.
+  if(method==='GET' && path==='/api/v1/admin/ads') {
+    const actor=await repo.getUser(user.id);
+    if (!actor || !adminAllowed(method,path,actor.role)) throw new PolicyError(403,'Không có quyền thực hiện thao tác này');
+    return ok(await adsForModeration(repo,q));
+  }
   return repo.atomic(async tx => {
     const actor=structuredClone(await tx.getUser(user.id));
     if (!actor || !adminAllowed(method,path,actor.role)) throw new PolicyError(403,'Không có quyền thực hiện thao tác này');
@@ -155,12 +164,45 @@ async function dispatch(repo,actor,method,path,q,body,store) {
   m=path.match(/^\/api\/v1\/admin\/ads\/([^/]+)\/moderate$/);
   if(m) {
     const reason=requireReason(body);
-    if(!['active','rejected','paused'].includes(body.decision)) throw new PolicyError(400,'Quyết định không hợp lệ');
+    if(!MODERATION_DECISIONS.includes(body.decision)) throw new PolicyError(400,'Quyết định không hợp lệ');
     const before=structuredClone(await repo.getCampaign(m[1]));
     if(!before) throw new PolicyError(404,'Campaign not found');
+    if(body.decision==='active') {
+      // Only a campaign that passes every stored pre-check may run in a "Tài trợ" slot.
+      const [dish,place]=await Promise.all([repo.getDish(before.dish_id),repo.getPlace(before.place_id)]);
+      const pre=moderationChecks(before,dish||null,place||null);
+      if(!pre.ready) return {status:409,data:{error:'Chiến dịch chưa đạt tiêu chí kiểm duyệt: '+pre.checks.filter(c=>!c.ok).map(c=>c.label).join('; '),checks:pre.checks}};
+    }
     const after=await repo.updateCampaign(m[1],{status:body.decision});
     // Do not claim allergy/sponsor checks that this endpoint has not performed.
     return changed({campaign:after},'MODERATE_AD',after.id,before,after,reason);
   }
   throw new PolicyError(403,'API quản trị chưa được cấp quyền');
+}
+
+const STATUS_ORDER={pending_review:0,paused:1,active:2,rejected:3};
+async function adsForModeration(repo,q) {
+  await ensureDemoData(repo);
+  const ms=moduleStore(repo);
+  const [campaigns,dishes,places,metas]=await Promise.all([repo.listCampaigns(),repo.listDishes(),repo.listPlaces(),ms.list('M7','campaign')]);
+  const dish=new Map(dishes.map(d=>[d.id,d])), place=new Map(places.map(p=>[p.id,p])), meta=new Map(metas.map(m=>[m.campaign_id,m]));
+  let items=campaigns.map(c=>{
+    const d=dish.get(c.dish_id)||null, p=place.get(c.place_id)||null, m=meta.get(c.id)||null;
+    const pre=moderationChecks(c,d,p);
+    return {id:c.id,title:c.title||c.package_name||d?.name||c.id,status:c.status,badge_label:c.badge_label??null,
+      dish_id:c.dish_id,dish_name:d?.name||null,img_key:d?.img_key||null,allergen_tags:Array.isArray(d?.allergen_tags)?d.allergen_tags:null,
+      spice_level:d?.spice_level??null,place_id:c.place_id,place_name:p?.name||null,price_vnd:pre.price_vnd,radius_m:c.radius_m??null,
+      meal_slots:m?.meal_slots||[],weather:m?.weather||[],plan:m?.plan||null,submitted_at:m?.submitted_at||null,
+      checks:pre.checks,ready:pre.ready,is_demo:!!m?.is_demo};
+  });
+  const status=cleanText(q.get('status')||'',32);
+  if(status) {
+    if(!(status in STATUS_ORDER)) throw new PolicyError(400,'Trạng thái lọc không hợp lệ');
+    items=items.filter(c=>c.status===status);
+  }
+  items.sort((a,b)=>(STATUS_ORDER[a.status]??9)-(STATUS_ORDER[b.status]??9)||String(a.id).localeCompare(String(b.id)));
+  const counts={};
+  for(const c of campaigns) counts[c.status]=(counts[c.status]||0)+1;
+  return {items,total:items.length,counts,pending_review:counts.pending_review||0,
+    serving_rules:moderationChecks({},null,null).serving_rules,is_demo:items.some(c=>c.is_demo)};
 }

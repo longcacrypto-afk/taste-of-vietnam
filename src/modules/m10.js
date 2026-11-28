@@ -542,8 +542,11 @@ export default {
       const run = await latestRun(ctx, route === 'ai-benchmark' || searchParams.get('rerun') === '1');
       const events = await loadEvents(ms);
       const n = run.nlu;
+      // Accuracy of every stored run (oldest → newest, last 12): the M9-S01 trend line.
+      const history = (await ms.list(M, 'ai_run')).sort((a, b) => ms_(a.ran_at) - ms_(b.ran_at)).slice(-12)
+        .map(r => ({ ran_at: r.ran_at, accuracy_pct: r.nlu?.accuracy_pct ?? null, cases: r.nlu?.cases ?? 0 }));
       return { status: 200, data: { ...run, accuracy_pct: n.accuracy_pct, target_pct: n.target_pct, passed_sla: n.passed_sla,
-        benchmark_size: n.cases, sampled_cases: n.cases, details: n.details,
+        benchmark_size: n.cases, sampled_cases: n.cases, details: n.details, history,
         is_demo: n.details.some(d => d.is_demo), chrome: await chrome(ctx, events, run) } };
     }
 
