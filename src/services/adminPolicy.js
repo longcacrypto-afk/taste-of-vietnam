@@ -31,6 +31,7 @@ export const ADMIN_ROUTES = [
   ['POST', /^\/api\/v1\/admin\/places\/[^/]+\/(approve|unpause)$/, 'places'],
   ['GET', /^\/api\/v1\/admin\/reports$/, 'reports'],
   ['PATCH', /^\/api\/v1\/admin\/reports\/[^/]+$/, 'reports'],
+  ['GET', /^\/api\/v1\/admin\/ads$/, 'ads'],
   ['POST', /^\/api\/v1\/admin\/ads\/[^/]+\/moderate$/, 'ads'],
   ['GET', /^\/api\/v1\/admin\/audit-logs$/, 'audit'],
   ['GET', /^\/api\/v1\/admin\/rbac\/roles$/, 'rbac'],
