@@ -1263,6 +1263,20 @@
           : `P2.dish('${J(o.dish_id)}','M2-S06')`);
       });
     }
+    if (id === "M3-S04") {
+      // <mam-ai> Small source pill: "Măm AI" when the LLM answered, "chế độ offline" otherwise.
+      const src = appState.liveChatSource, head = $(".bg-\\[\\#EFF6FF\\] > .font-extrabold", root);
+      if (src && head && appState.liveChatQuery)
+        head.insertAdjacentHTML("beforeend", ` <span data-mam-source="${H(src.source)}" title="${src.source === "llm" ? "Câu trả lời do Măm AI viết từ dữ liệu quán thật" : "Măm trả lời bằng bộ phân tích trên máy chủ (không dùng AI)"}" class="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold align-middle ${src.source === "llm" ? "bg-[#DCFCE7] text-[#15803D]" : "bg-[#F1F5F9] text-[#64748B]"}">${H(src.label)}</span>`);
+      // "Hỏi Măm bất cứ điều gì…" bar: tap focuses the chat input; send asks Măm.
+      const bar = $$(".rounded-full.shadow-inner", root).pop();
+      if (bar) {
+        click(bar, `document.getElementById('mam-chat-inp')?.focus()`);
+        const send = $("button", bar);
+        if (send) click(send, `event.stopPropagation();(document.getElementById('mam-chat-inp')?.value||'').trim()?LIVE_APP.sendMamChat():goScreen('M3-S05')`);
+      }
+      // </mam-ai>
+    }
     if (id === "M3-S04" || id === "M3-S05") {
       const list = $$(".space-y-2", root).find(
         (n) => n.querySelectorAll(':scope > [onclick*="M2-S04"]').length >= 2,
@@ -1276,7 +1290,17 @@
           rows(list, tpl, state.chat, (n, a) => {
             cardFill(n, a);
             text($(".font-extrabold", n), a.dish_name || a.name);
-            text($(".text-\\[10px\\]", n), a.explanation || "");
+            // <mam-ai> Pills and the info line come from the option (tags, Tài trợ, prep, place,
+            // total); the design sample ("Healthy", "20 phút · 2 người · 45.000đ") never stays.
+            const pills = $(".flex.gap-1", n), info = $("div.text-\\[10px\\]", n);
+            if (pills) pills.innerHTML = [...(a.is_sponsored ? [K.tagPill("Tài trợ", "orange")] : []),
+              ...(a.tags || []).slice(0, a.is_sponsored ? 1 : 2).map((t, i) => K.tagPill(H(t), i ? "blue" : "yellow"))].join("");
+            if (info) info.innerHTML = (Number.isFinite(a.prep_minutes) && a.prep_minutes > 0 && !a.place
+              ? `<span class="inline-flex items-center gap-0.5">${K.icon("clock", "w-3 h-3")} ${a.prep_minutes} phút</span>` : "")
+              + `<span class="truncate">${a.place ? H(a.place.place_name) + (meters(a.place.distance_m) ? " · " + meters(a.place.distance_m) : "") : "Tự nấu"}`
+              + (a.estimated_group_cost_vnd > 0 ? " · Tổng ~" + money(a.estimated_group_cost_vnd) : "") + "</span>";
+            if (a.place?.place_id) click(n, `P2.dish('${J(a.dish_id)}','M4-S03');P2.place('${J(a.place.place_id)}')`);
+            // </mam-ai>
           });
       }
     }
@@ -1317,11 +1341,19 @@
       else
         (d.items || []).forEach((a) => {
           const n = tpl.cloneNode(true);
-          text($(".font-extrabold", n), a.dish_name);
+          text($(".font-extrabold", n), a.dish_name + (a.price_vnd ? " (" + money(a.price_vnd) + ")" : ""));
           text(
             $(".text-\\[10px\\]", n),
-            new Date(a.created_at).toLocaleDateString("vi-VN"),
+            new Date(a.created_at).toLocaleDateString("vi-VN") +
+              (a.place_name ? " · " + a.place_name : "") +
+              (a.cooldown_until ? " · Không gợi ý lại đến " + new Date(a.cooldown_until).toLocaleDateString("vi-VN") : ""),
           );
+          // <mam-ai> picture and pill come from the entry, not the design sample.
+          const pic = $("img", n);
+          if (pic) { if (a.img_key) img(pic, a.img_key); else { pic.removeAttribute("data-img"); pic.removeAttribute("src"); } }
+          const pill = n.lastElementChild;
+          if (pill && pill.tagName === "SPAN")
+            pill.outerHTML = K.tagPill(a.action_label || a.action || "", a.action === "eaten" ? "green" : a.action === "liked" ? "yellow" : "blue");
           root.append(n);
         });
     }
@@ -2542,6 +2574,7 @@
     appState.liveChatReply = "Đang tìm món phù hợp…";
     state.chat = [];
     state.chatIntent = null;
+    appState.liveChatSource = null;
     paint();
     try {
       const d = await api("/chat", "POST", { query: q });
@@ -2550,6 +2583,7 @@
       state.chat = d.options || [];
       state.chatIntent = d.intent || null;
       appState.liveChatOptions = state.chat;
+      appState.liveChatSource = d.ai_label ? { source: d.ai_source, label: d.ai_label } : null;
     } catch (e) {
       appState.liveChatReply =
         "Chưa gửi được câu hỏi. Kiểm tra mạng rồi thử lại.";
