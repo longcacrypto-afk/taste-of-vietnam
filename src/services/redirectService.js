@@ -4,6 +4,8 @@ const PARTNER_HOSTS = new Map([
   ['grabfood', ['food.grab.com', 'r.grab.com']],
   ['shopeefood', ['shopeefood.vn', 'www.shopeefood.vn']]
 ]);
+/** Ordering partners the server will redirect to (M4-S01 "Giao hàng" filter uses the same list). */
+export const ORDER_PARTNERS = [...PARTNER_HOSTS.keys()];
 export const redirectAction = partner => partner === 'maps' ? 'direction' : partner === 'phone' ? 'call' : 'order';
 export function buildRedirect(place, partner) {
   if (!PARTNER_HOSTS.has(partner) && partner !== 'maps' && partner !== 'phone')

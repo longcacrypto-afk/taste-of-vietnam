@@ -17,15 +17,15 @@
   // shows a "chưa mở / sắp có" state; flip its flag (or return data from its hook)
   // to switch it on. Flags only enable code paths that already exist below.
   const FEATURES = (window.TOV_FEATURES = {
-    placeFilters: false, // M4-S01 chips "Dưới 50k / Máy lạnh / Giao hàng"
+    placeFilters: true, // M4-S01 chips "Dưới 50k / Máy lạnh / Giao hàng" → GET /places?max_price&has_ac&delivery
     mealReminders: false, // M1-S10 "Lịch nhắc bữa ăn" → M8-S04 (M8 frozen)
     adsModeration: false, // M9-S07 "Kiểm duyệt Ads M7" (M7 frozen)
     adminMetrics: false, // M9 latency/accuracy/safety figures (no metrics source)
     phoneLogin: false, // M1-S01 phone/OTP card + desktop login phone fields (SMS not set up)
     zaloLogin: false, // M1-S01 "Zalo" button (no Zalo login)
     appleLogin: false, // M1-S01 "Apple" button (no Apple login)
-    searchFilters: false, // M2-S02 chip row "Dưới 55k / Món nước / Ẩn Hải sản"
-    collections: false, // M2-S08 per-card collection chip "N món"
+    searchFilters: true, // M2-S02 chips "Dưới 55k / Món nước / Ẩn Hải sản" → GET /dishes?budget_max&soup&exclude_seafood
+    collections: true, // M2-S08 per-card collection chip "N món" (GET /me/collections dish_count)
     liveMap: true, // M4-S02 / M5-S03: real Leaflet map in the original frame (m7)
     // M5-S02: partners the server redirect allowlist accepts (src/services/redirectService.js).
     orderPartners: ["grabfood", "shopeefood"],
@@ -221,6 +221,46 @@
     const m = (menu || []).find((x) => x.dish_id === dishId);
     return m ? money(m.price) + (m.name ? " · " + m.name : "") : "Chưa có giá";
   }
+  // <core-filters> Filter chips of M2-S02 and M4-S01, keyed by the original design label.
+  // Each chip is a query parameter the server filters on (src/services/dishContract.js,
+  // src/services/placeQuery.js); the UI never filters or guesses on its own.
+  const SEARCH_CHIPS = { "Dưới 55k": "budget_max=55000", "Món nước": "soup=true", "🚫 Ẩn Hải sản": "exclude_seafood=true" };
+  const PLACE_CHIPS = { "Dưới 50k": "max_price=50000", "Máy lạnh": "has_ac=true", "Giao hàng": "delivery=true" };
+  const chipLabel = (t) => String(t || "").replace(SOON, "").replace(/\s*✓\s*$/, "").trim();
+  function chipQuery(map, active) {
+    return Object.keys(map)
+      .filter((k) => (active || []).includes(k))
+      .map((k) => "&" + map[k])
+      .join("");
+  }
+  function bindChip(chip, map, active, fn) {
+    const label = chipLabel(chip.textContent);
+    if (!map[label]) return false;
+    const on = (active || []).includes(label);
+    chip.textContent = label + (on ? " ✓" : "");
+    chip.setAttribute("role", "button");
+    chip.setAttribute("aria-pressed", String(on));
+    chip.style.cursor = "pointer";
+    click(chip, `P2.${fn}('${J(label)}')`);
+    return true;
+  }
+  // M2-S08: "<collection> · N món" for the first of the user's collections holding the dish
+  // (N = server dish_count); title lists every collection it is in. null → plain "Đã lưu".
+  function collectionChip(collections, dishId) {
+    const mine = (collections || []).filter((c) => (c.dish_ids || []).includes(dishId));
+    if (!mine.length) return null;
+    const n = Number.isInteger(mine[0].dish_count) ? mine[0].dish_count : (mine[0].dish_ids || []).length;
+    return {
+      text: mine[0].name + " · " + n + " món" + (mine.length > 1 ? " +" + (mine.length - 1) : ""),
+      title: "Trong bộ sưu tập: " + mine.map((c) => c.name).join(", "),
+    };
+  }
+  // "N quán bị ẩn" line under the M4-S01 list, from the server's filtered_out count.
+  function placeFilterNote(d) {
+    const n = Number(d?.filtered_out) || 0;
+    return n > 0 ? "Bộ lọc đang ẩn " + n + " quán (chưa ghi nhận đủ thông tin hoặc không khớp). Bỏ chọn để xem tất cả." : "";
+  }
+  // </core-filters>
   function hoursNote(p) {
     return {
       open: "Quán đang mở theo giờ đã xác minh",
@@ -229,8 +269,12 @@
     }[openStatus(p)] || "Giờ mở chưa xác minh";
   }
   function weatherPill(w) {
-    // live_weather comes from the server weather hook (null until a provider is set).
-    return w?.label ? { text: (w.emoji || "🌡️") + " " + w.label, live: true } : { text: "🌤️ Thời tiết" + SOON, live: false };
+    // live_weather comes from the server weather hook (null when there is no real reading).
+    // A reading for the default area (no location chosen yet) names that area.
+    return w?.label ? { text: (w.emoji || "🌡️") + " " + w.label + weatherArea(w), live: true } : { text: "🌤️ Thời tiết" + SOON, live: false };
+  }
+  function weatherArea(w) {
+    return w?.location?.source === "default" && w.location.name ? " · " + w.location.name : "";
   }
   function whyText(d) {
     const s = d?.suggestion,
@@ -359,7 +403,7 @@
     // Desktop Live App header + "Cá nhân hóa theo thời tiết …" line: live_weather hook only.
     const w = appState.liveToday?.live_weather;
     const badge = document.getElementById("live-weather-badge");
-    const want = w?.label ? (w.emoji || "🌡️") + " " + w.label : WEATHER_SOON;
+    const want = w?.label ? (w.emoji || "🌡️") + " " + w.label + weatherArea(w) : WEATHER_SOON;
     if (badge && badge.textContent !== want) {
       badge.textContent = want;
       badge.title = w?.label ? "Nguồn: " + (w.source || "nhà cung cấp thời tiết") : "Chưa lấy được thời tiết thật.";
@@ -533,6 +577,8 @@
     query: "",
     region: "",
     meal: "", // meal chip filter on M2-S01 (GET /dishes?meal_slot=)
+    searchChips: [], // M2-S02 active SEARCH_CHIPS labels (server-side filters)
+    placeChips: [], // M4-S01 active PLACE_CHIPS labels (server-side filters)
     chat: [],
     chatIntent: null, // intent of the last /chat answer (M3-S05 subtitle)
     phone: "",
@@ -705,17 +751,21 @@
         },
       ];
     if (id === "M3-S03") return ["spin-pool", () => api("/suggestions/spin")];
-    if (["M2-S01", "M2-S02"].includes(id))
+    if (["M2-S01", "M2-S02"].includes(id)) {
+      // <core-filters> Search chips apply on M2-S02 only (server-side GET /dishes params).
+      const chips = id === "M2-S02" && FEATURES.searchFilters ? chipQuery(SEARCH_CHIPS, state.searchChips) : "";
       return [
-        "dishes:" + state.query + ":" + state.region + ":" + state.meal,
+        "dishes:" + state.query + ":" + state.region + ":" + state.meal + chips,
         () =>
           api(
             "/dishes?q=" +
               encodeURIComponent(state.query) +
               (state.region ? "&region=" + encodeURIComponent(state.region) : "") +
-              (state.meal ? "&meal_slot=" + encodeURIComponent(state.meal) : ""),
+              (state.meal ? "&meal_slot=" + encodeURIComponent(state.meal) : "") +
+              chips,
           ),
       ];
+    }
     if (/^M2-S0[4-7]$/.test(id) || id === "M3-S06")
       return [
         "dish:" + selected() + ":" + appState.servings,
@@ -739,11 +789,18 @@
             items: await Promise.all(
               ids.map((id) => api("/dishes/" + encodeURIComponent(id))),
             ),
+            collections: d.collections || [], // M2-S08 per-card collection chip
           };
         },
       ];
     if (id === "M3-S01") return ["today", () => api("/suggestions/today")];
     if (id === "M3-S07") return ["history", () => api("/suggestions/history")];
+    // <core-filters> M4-S01 chips → server-side GET /places params, under their own cache
+    // key; every other M4/M5 screen keeps the unfiltered list.
+    if (id === "M4-S01" && FEATURES.placeFilters && state.placeChips.length) {
+      const chips = chipQuery(PLACE_CHIPS, state.placeChips);
+      return ["places:" + selected() + ":" + chips, () => api("/places?dish_id=" + encodeURIComponent(selected()) + chips)];
+    }
     if (/^M[45]-/.test(id))
       return [
         "places:" + selected(),
@@ -942,11 +999,13 @@
       if (id === "M2-S02") {
         const bar = root.children[1];
         bar.innerHTML = `<form onsubmit="event.preventDefault();P2.search(this.query.value)" class="flex gap-2 w-full"><label for="p2-search" class="sr-only">Tìm món</label><input id="p2-search" name="query" value="${H(state.query)}" class="bg-transparent min-w-0 flex-1" placeholder="Tìm món, nguyên liệu…"><button class="font-extrabold">Tìm</button></form>`;
-        // Original filter chips stay in place, marked "sắp có" (no ✓: nothing is applied).
+        // Original filter chips stay in place. On: each toggles its GET /dishes parameter
+        // (✓ only while applied). Off: marked "sắp có" (no ✓: nothing is applied).
         const chipRow = root.children[2];
-        if (!FEATURES.searchFilters && chipRow)
+        if (chipRow)
           $$(":scope > span", chipRow).forEach((chip) => {
-            chip.textContent = chip.textContent.replace(/\s*✓\s*$/, "") + SOON;
+            if (FEATURES.searchFilters && bindChip(chip, SEARCH_CHIPS, state.searchChips, "searchChip")) return;
+            chip.textContent = chipLabel(chip.textContent) + SOON;
             soon(chip, "Bộ lọc tìm kiếm chưa hoạt động.");
           });
         const tpl = $('[onclick*="M2-S04"]', root);
@@ -972,11 +1031,18 @@
           rows(grid, tpl, items, (n, a) => {
             cardFill(n, a);
             text($(".font-extrabold", n), a.name);
-            // The design's collection chip ("6 món") stays; collections view is not wired.
+            // The design's collection chip ("6 món"): the user's real collection that holds
+            // this dish and its dish_count from GET /me/collections (flag off: "sắp có").
             $$("span", n).forEach((x) => {
-              if (!/món/.test(x.textContent) || FEATURES.collections) return;
-              text(x, "Bộ sưu tập" + SOON);
-              soon(x, "Nhóm món theo bộ sưu tập chưa mở.");
+              if (!/món/.test(x.textContent)) return;
+              if (!FEATURES.collections) {
+                text(x, "Bộ sưu tập" + SOON);
+                return soon(x, "Nhóm món theo bộ sưu tập chưa mở.");
+              }
+              const chip = collectionChip(d.collections, a.id) || { text: "Đã lưu", title: "Món đã lưu" };
+              text(x, chip.text);
+              x.title = chip.title;
+              Object.assign(x.style, { display: "inline-block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
             });
           });
       }
@@ -1431,7 +1497,9 @@
   }
   function bindPlaces(root, id, items) {
     const place = items.find((p) => p.id === state.place) || items[0];
-    if (!place) {
+    // <core-filters> An empty filtered M4-S01 list keeps the screen (and its chips) so the
+    // filter can be turned off again; the list itself shows the empty card.
+    if (!place && !(id === "M4-S01" && state.placeChips.length)) {
       clearAfter(root, 1);
       root.insertAdjacentHTML("beforeend", stateHtml(id, "empty", true));
       return;
@@ -1449,16 +1517,20 @@
         text($('[class*="D97736"]', n), menuPrice(p.menu, selected()));
         click(n, `P2.place('${J(p.id)}')`);
       });
+      if (!items.length) holder.innerHTML = stateHtml(id, "empty", true);
+      const note = FEATURES.placeFilters && state.placeChips.length ? placeFilterNote(state.cache[config(id)[0]]?.data) : "";
+      if (note) holder.insertAdjacentHTML("afterend", `<p data-place-filter-note role="status" class="text-[10px] text-[#64748B]">${H(note)}</p>`);
       const openChip = $(".overflow-x-auto > span", root);
       if (openChip) openChip.textContent = openChipText(items);
       // Longer real labels must not wrap: the original row scrolls sideways.
       $$(".overflow-x-auto > span", root).forEach((chip) => (chip.style.whiteSpace = "nowrap"));
-      // The other original filter chips are not wired yet: keep them, marked "sắp có".
-      if (!FEATURES.placeFilters)
-        $$(".overflow-x-auto > span", root).slice(1).forEach((chip) => {
-          if (!chip.textContent.includes(SOON)) chip.textContent += SOON;
-          soon(chip, "Bộ lọc này chưa hoạt động.");
-        });
+      // The other original chips toggle a GET /places filter (✓ while applied); with the
+      // flag off they stay in place, marked "sắp có".
+      $$(".overflow-x-auto > span", root).slice(1).forEach((chip) => {
+        if (FEATURES.placeFilters && bindChip(chip, PLACE_CHIPS, state.placeChips, "placeChip")) return;
+        if (!chip.textContent.includes(SOON)) chip.textContent += SOON;
+        soon(chip, "Bộ lọc này chưa hoạt động.");
+      });
     }
     if (id === "M4-S02") {
       const pins = $$("button.absolute", root);
@@ -1945,6 +2017,19 @@
     place(id) {
       state.place = id;
       goScreen("M4-S03");
+    },
+    // <core-filters> M2-S02 / M4-S01 chip toggles: a new loader key → fresh server query.
+    searchChip(label) {
+      if (!SEARCH_CHIPS[label]) return;
+      const a = state.searchChips;
+      state.searchChips = a.includes(label) ? a.filter((k) => k !== label) : [...a, label];
+      goScreen("M2-S02");
+    },
+    placeChip(label) {
+      if (!PLACE_CHIPS[label]) return;
+      const a = state.placeChips;
+      state.placeChips = a.includes(label) ? a.filter((k) => k !== label) : [...a, label];
+      goScreen("M4-S01");
     },
     search(q) {
       state.query = q;

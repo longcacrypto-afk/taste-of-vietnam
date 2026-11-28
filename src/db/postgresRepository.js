@@ -8,7 +8,7 @@ import { mergeProfile, mergeCollections } from '../services/profileService.js';
 
 import { PolicyError, ROLES, bootstrapAllowed } from '../services/adminPolicy.js';
 import crypto from 'node:crypto';
-import { placeWithStatus, validCoordinates } from '../services/placeQuery.js';
+import { placeWithStatus, validCoordinates, placeMatchesFilters } from '../services/placeQuery.js';
 import { isPlaceEligible } from '../services/placeHours.js';
 
 import { removeVietnameseTones } from '../services/textUtils.js';
@@ -47,6 +47,7 @@ export function dishFromRow(r) {
     safety_status: r.safety_status,
     cms: r.cms,
     weather_fit: r.weather_fit,
+    is_soup: r.is_soup,
     tags: r.tags,
     img_key: r.img_key,
     description: r.description,
@@ -62,7 +63,7 @@ function dishColumns(d) {
   const map = {
     safety_status: 'safety_status', name: 'name', region: 'region', meal_slots: 'meal_slots', ref_price: 'estimated_price_vnd', calories: 'calories',
     prep_minutes: 'prep_time_minutes', difficulty: 'difficulty', spice_level: 'spice_level',
-    allergen_tags: 'allergen_flags', diet_flags: 'diet_flags', weather_fit: 'weather_fit', tags: 'tags',
+    allergen_tags: 'allergen_flags', diet_flags: 'diet_flags', weather_fit: 'weather_fit', tags: 'tags', is_soup: 'is_soup',
     img_key: 'img_key', description: 'description', base_servings: 'base_servings', market_cost_base: 'market_cost_base'
   };
   const jsonCols = { cms: 'cms', macros: 'macros', ingredients: 'ingredients', steps: 'recipe_steps' };
@@ -470,7 +471,7 @@ export class PostgresRepository {
   }
 
   /** ST_DWithin on the geography column (GiST index), ST_Distance in metres, nearest first. */
-  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true, now = new Date(),
+  async findPlacesNear({ lat, lng, radiusM = 3000, dishId = null, openOnly = true, filters = {}, now = new Date(),
     requireVerifiedHours = process.env.REQUIRE_VERIFIED_HOURS === 'true' }) {
     const located = validCoordinates(lat, lng);
     const sql = `
@@ -483,7 +484,8 @@ export class PostgresRepository {
     const r = await this.q(sql, [located ? lng : null, located ? lat : null, Number(radiusM), located, dishId || null]);
     // Filter BEFORE limit: a near closed place must not crowd out an open one.
     return r.rows.map(placeFromRow).map(p => placeWithStatus(p, now))
-      .filter(p => !openOnly || isPlaceEligible(p, now, { requireVerifiedHours })).slice(0, 100);
+      .filter(p => !openOnly || isPlaceEligible(p, now, { requireVerifiedHours }))
+      .filter(p => placeMatchesFilters(p, filters, dishId)).slice(0, 100);
   }
 
   async savePlace(p) {
@@ -497,7 +499,7 @@ export class PostgresRepository {
        is_paused=EXCLUDED.is_paused,report_count=EXCLUDED.report_count,has_ac=EXCLUDED.has_ac,
        has_kids_seat=EXCLUDED.has_kids_seat,phone=EXCLUDED.phone,links=EXCLUDED.links,img_key=EXCLUDED.img_key,cms=EXCLUDED.cms`,
       [p.id,p.name,p.address,p.lat,p.lng,p.opening_hours==null?null:JSON.stringify(p.opening_hours),p.verified_at??null,p.is_verified,
-       p.is_open_override===false,p.closed_report_count||0,p.rating||0,p.review_count||0,p.has_ac||false,p.has_kids_seat||false,
+       p.is_open_override===false,p.closed_report_count||0,p.rating||0,p.review_count||0,p.has_ac ?? null,p.has_kids_seat||false,
        p.phone||'',JSON.stringify(p.links||{}),p.img_key??null,JSON.stringify(p.cms)]);
     await this.q('DELETE FROM place_dishes WHERE place_id=$1',[p.id]);
     for(const m of p.menu||[]) await this.q(

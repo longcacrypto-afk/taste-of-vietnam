@@ -40,6 +40,7 @@ export function createInitialStore() {
         difficulty: 'Dễ nấu',
         spice_level: 1,
         allergen_tags: [], // Safe!
+        is_soup: true, // món nước (M2-S02 filter)
         weather_fit: ['rain_cool', 'any'],
         tags: ['Nhanh 15p', 'Healthy'],
         img_key: '298',
@@ -69,6 +70,7 @@ export function createInitialStore() {
         difficulty: 'Trung bình',
         spice_level: 0,
         allergen_tags: ['egg'],
+        is_soup: false, // món nước (M2-S02 filter)
         weather_fit: ['any', 'hot_sunny'],
         tags: ['Phổ biến', 'Chắc bụng'],
         img_key: '304',
@@ -98,6 +100,7 @@ export function createInitialStore() {
         difficulty: 'Trung bình',
         spice_level: 1,
         allergen_tags: [], // Safe!
+        is_soup: true, // món nước (M2-S02 filter)
         weather_fit: ['rain_cool', 'any'],
         tags: ['Giàu Đạm', 'Đậm đà'],
         img_key: '310',
@@ -127,6 +130,7 @@ export function createInitialStore() {
         difficulty: 'Dễ nấu',
         spice_level: 1,
         allergen_tags: ['gluten'],
+        is_soup: false, // món nước (M2-S02 filter)
         weather_fit: ['any'],
         tags: ['Ăn nhanh 10p', 'Tiết kiệm'],
         img_key: '470',
@@ -155,6 +159,7 @@ export function createInitialStore() {
         difficulty: 'Dễ nấu',
         spice_level: 1,
         allergen_tags: [], // Cá đồng nước ngọt (không phải Tôm/Giáp xác)
+        is_soup: true, // món nước (M2-S02 filter)
         weather_fit: ['rain_cool', 'hot_sunny', 'any'],
         tags: ['Cơm gia đình', 'Ít béo'],
         img_key: '592',
@@ -184,6 +189,7 @@ export function createInitialStore() {
         difficulty: 'Trung bình',
         spice_level: 1,
         allergen_tags: ['shrimp'], // Chứa Tôm/Cua -> Phải bị chặn bởi Hard Filter!
+        is_soup: true, // món nước (M2-S02 filter)
         weather_fit: ['rain_cool', 'any'],
         tags: ['Truyền thống', 'Hải sản'],
         img_key: '310',
@@ -208,6 +214,7 @@ export function createInitialStore() {
         difficulty: 'Dễ nấu',
         spice_level: 0,
         allergen_tags: ['shrimp', 'peanut'], // Chứa cả Tôm & Đậu phộng -> Phải bị chặn!
+        is_soup: false, // món nước (M2-S02 filter)
         weather_fit: ['hot_sunny'],
         tags: ['Thanh mát', 'Low Calorie'],
         img_key: '034',
@@ -257,6 +264,7 @@ export function createInitialStore() {
         spice_level: 1,
         allergen_tags: ['shrimp', 'egg'],
         diet_flags: [],
+        is_soup: false, // món nước (M2-S02 filter)
         weather_fit: ['rain_cool', 'any'],
         tags: ['Đặc sản', 'Giòn ngon'],
         img_key: '310',
@@ -287,6 +295,7 @@ export function createInitialStore() {
         spice_level: 0,
         allergen_tags: ['fish'],
         diet_flags: [],
+        is_soup: true, // món nước (M2-S02 filter)
         weather_fit: ['hot_sunny', 'any'],
         tags: ['Thanh mát', 'Cơm nhà'],
         img_key: '034',
@@ -347,6 +356,7 @@ export function createInitialStore() {
         spice_level: 0,
         allergen_tags: ['gluten'],
         diet_flags: ['vegan', 'vegetarian'],
+        is_soup: false, // món nước (M2-S02 filter)
         weather_fit: ['any'],
         tags: ['Thực dưỡng', 'Ăn chay'],
         img_key: '304',

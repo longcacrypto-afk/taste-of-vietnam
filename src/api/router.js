@@ -32,7 +32,7 @@ import { requestOtp, verifyOtp, createGuest, authenticate, deleteUser, scopeStor
 import { getRepository } from '../db/repository.js';
 import { handleFrozenRoute } from './frozenRoutes.js';
 import { handleDishRoutes } from './dishRoutes.js';
-import { currentWeather } from '../services/weatherProvider.js';
+import { weatherForProfile } from '../services/weatherProvider.js';
 import { areasFromPlaces } from '../services/areas.js';
 import { handleModuleRoute, exportModuleData, deleteModuleData } from '../modules/index.js';
 
@@ -269,10 +269,10 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
   // ====================================================================
   if (pathname === '/api/v1/suggestions/today' && method === 'GET') {
     bump(store, 'suggestion_shown');
-    // live_weather: real reading for the user's saved location (null when the provider
-    // has none). It is also the only weather the ranking sees; no seeded weather.
-    // Only for a location the user chose/shared: the default seed point is not "their" weather.
-    const live_weather = locationChosen(profile) ? await currentWeather({ lat: profile.lat, lng: profile.lng }) : null;
+    // live_weather: real Open-Meteo reading (null when there is none) at the location the
+    // user chose/shared, else at the default area Biên Hòa (live_weather.location says which).
+    // It is also the only weather the ranking sees; no seeded weather.
+    const live_weather = await weatherForProfile(profile, { chosen: locationChosen(profile) });
     const view = await buildView(repo, store, authUser, { weather: live_weather });
     const opts = Object.fromEntries(['radius_m', 'mode', 'meal_slot', 'diet_mode', 'budget_min', 'budget_max', 'spice_max'].filter(k => searchParams.has(k)).map(k => [k, searchParams.get(k)]));
     // Hash every gate input, catalogue and history so approval/menu/profile changes
@@ -295,7 +295,7 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
 
   // Three existing decision animations share the same safe pool; never fake loot/vouchers.
   if (['/api/v1/suggestions/spin', '/api/v1/suggestions/game', '/api/v1/suggestions/fortune', '/api/v1/suggestions/blind-box'].includes(pathname) && method === 'GET') {
-    const weather = locationChosen(profile) ? await currentWeather({ lat: profile.lat, lng: profile.lng }) : null;
+    const weather = await weatherForProfile(profile, { chosen: locationChosen(profile) });
     const view = await buildView(repo, store, authUser, { weather });
     const opts = Object.fromEntries(['radius_m', 'mode', 'meal_slot', 'diet_mode', 'budget_min', 'budget_max', 'spice_max'].filter(k => searchParams.has(k)).map(k => [k, searchParams.get(k)]));
     const result = buildCandidates(view, opts);
@@ -366,7 +366,11 @@ export async function handleApiRequest(store, method, pathname, searchParams, bo
     const explicit = searchParams.has('lat') || searchParams.has('lng');
     const center = (explicit || locationChosen(profile)) && validCoordinates(query.lat, query.lng)
       ? { lat: query.lat, lng: query.lng, radius_m: query.radiusM } : null;
-    return { status: 200, data: { total: items.length, items, center } };
+    // filters: the M4-S01 chips applied server-side (has_ac / delivery / max_price);
+    // filtered_out: how many places the same search returns without them.
+    const active = Object.keys(query.filters);
+    const filtered_out = active.length ? (await repo.findPlacesNear({ ...query, filters: {} })).length - items.length : 0;
+    return { status: 200, data: { total: items.length, items, center, filters: query.filters, filtered_out } };
   }
 
   const placeMatch = pathname.match(/^\/api\/v1\/places\/([^/]+)$/);
